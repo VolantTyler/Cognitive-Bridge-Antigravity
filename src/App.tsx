@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Brain, Layers, Dna, ArrowRight, Zap, Target, ShieldCheck, Github, User as UserIcon, Settings, Cpu } from 'lucide-react';
+import { Brain, Dna, ArrowRight, Zap, Target, ShieldCheck, Github, User as UserIcon, Settings, Cpu } from 'lucide-react';
 import { ModuleId, OceanScores, Message, ComparisonMessage } from './types';
 import { INITIAL_OCEAN, INITIAL_MIRROR_MESSAGE } from './constants';
 import Mirror from './components/Mirror';
@@ -196,9 +196,11 @@ export default function App() {
       {/* Navigation Header */}
       <nav className="h-16 bg-bg-secondary border-b border-border-primary px-6 flex items-center justify-between z-50 sticky top-0 transition-colors duration-300">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center shadow-lg shadow-orange-500/10">
-            <Layers className="w-5 h-5 text-white" />
-          </div>
+          <img
+            src="/favicon.svg"
+            alt="Cognitive Bridge"
+            className="w-8 h-8 rounded shadow-lg shadow-orange-500/10"
+          />
           <span className="font-bold tracking-tight text-sm sm:text-lg">COGNITIVE BRIDGE <span className="hidden sm:inline-block text-[10px] font-mono text-orange-500 ml-1 border border-orange-500/30 px-1 rounded uppercase">v1.5</span></span>
         </div>
 
