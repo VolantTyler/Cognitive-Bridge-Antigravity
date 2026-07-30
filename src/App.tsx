@@ -493,13 +493,23 @@ export default function App() {
       <footer className="h-auto md:h-10 border-t border-border-primary px-6 py-4 md:py-0 flex flex-col md:flex-row items-center justify-between gap-3 md:gap-0 text-[9px] uppercase tracking-[0.3em] font-bold text-text-muted-darker bg-bg-primary transition-colors duration-300">
         <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 md:gap-4 text-center">
           <a
-            href="https://www.linkedin.com/in/tyler-j-stahl"
+            href="https://tylerstahl.dev"
             target="_blank"
             rel="noopener noreferrer"
             className="hover:text-text-primary transition-colors"
           >
             Tyler J. Stahl
-          </a>          <span className="text-border-primary">/</span>
+          </a>
+          <span className="text-border-primary">/</span>
+          <a
+            href="https://www.linkedin.com/in/tyler-j-stahl"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-text-primary transition-colors"
+          >
+            LinkedIn
+          </a>
+          <span className="text-border-primary">/</span>
           <button
             onClick={() => setIsReleaseNotesOpen(true)}
             className="hover:text-text-primary transition-colors cursor-pointer border-0 bg-transparent uppercase tracking-[0.3em] font-bold text-[9px] text-text-muted-darker"
