@@ -74,9 +74,9 @@
   
   --text-primary: #1f1b14;
   --text-secondary: #383226;
-  --text-muted: #665d4c;
-  --text-muted-dark: #8f8470;
-  --text-muted-darker: #a09580;
+  --text-muted: #4a4336;
+  --text-muted-dark: #3d382e;
+  --text-muted-darker: #5c5345;
 
   /* Custom component values for light mode readability */
   --bg-chat-user: #8c7a65; /* warm brown/taupe for user bubbles in light mode */

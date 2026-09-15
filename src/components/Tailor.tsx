@@ -77,7 +77,7 @@ export default function Tailor({ scores, onNext }: TailorProps) {
                   <FileCode className="w-4 h-4 text-orange-400" />
                   <span className="text-xs font-bold text-orange-400">ALIGNMENT.md Generator</span>
                </div>
-               <p className="text-[11px] text-text-muted leading-relaxed italic">
+               <p className="text-[11px] text-text-secondary leading-relaxed italic">
                  Click the export button above to copy a portable markdown snippet. You can paste this into ChatGPT, Claude, or any other AI to align that session with your Cognitive Bridge profile.
                </p>
             </div>
@@ -114,7 +114,7 @@ export default function Tailor({ scores, onNext }: TailorProps) {
         <div className="bg-bg-surface border border-border-primary rounded-xl p-6 flex flex-col gap-6 transition-colors duration-300">
           <div className="flex flex-col gap-2">
             <h3 className="text-xl font-bold tracking-tight">The "Tailor" Synthesis</h3>
-            <p className="text-sm text-text-muted">Your profile has been mapped to specific steering directives in the agent's logic. This ensures the model compensates for your biases and enhances your strengths.</p>
+            <p className="text-sm text-text-secondary">Your profile has been mapped to specific steering directives in the agent's logic. This ensures the model compensates for your biases and enhances your strengths.</p>
           </div>
 
           <div className="space-y-4">
@@ -124,7 +124,7 @@ export default function Tailor({ scores, onNext }: TailorProps) {
               </div>
               <div>
                 <h4 className="text-sm font-semibold">Recursive Memory</h4>
-                <p className="text-xs text-text-muted-dark mt-1">Directives injected via system prompt to guide procedural skills.</p>
+                <p className="text-xs text-text-secondary mt-1">Directives injected via system prompt to guide procedural skills.</p>
               </div>
             </div>
             <div className="flex items-start gap-4">
@@ -133,7 +133,7 @@ export default function Tailor({ scores, onNext }: TailorProps) {
               </div>
               <div>
                 <h4 className="text-sm font-semibold">Bias Mitigation</h4>
-                <p className="text-xs text-text-muted-dark mt-1">Programmatically reduces agreeableness bias based on your score.</p>
+                <p className="text-xs text-text-secondary mt-1">Programmatically reduces agreeableness bias based on your score.</p>
               </div>
             </div>
           </div>
