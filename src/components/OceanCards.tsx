@@ -6,6 +6,7 @@
 import React from 'react';
 import { motion } from 'motion/react';
 import { OceanScores } from '../types';
+import { STEERING_LIBRARY } from '../constants';
 
 interface OceanCardsProps {
   scores: OceanScores | null;
@@ -63,6 +64,13 @@ export default function OceanCards({ scores }: OceanCardsProps) {
         const config = TRAIT_CONFIG[trait];
         const value = scores ? scores[trait] : null;
         const hasScore = value !== null && value !== undefined;
+        const activeDirective = hasScore
+          ? STEERING_LIBRARY.find(
+              (d) =>
+                d.trait === trait &&
+                ((d.threshold === 'high' && value! > 70) || (d.threshold === 'low' && value! < 30))
+            )
+          : undefined;
         
         return (
           <motion.div 
@@ -86,6 +94,11 @@ export default function OceanCards({ scores }: OceanCardsProps) {
               <span className="text-[10px] uppercase font-bold tracking-[0.1em] text-text-muted group-hover:text-text-secondary transition-colors truncate">
                 {config.label}
               </span>
+              {activeDirective && (
+                <span className="text-[9px] px-1.5 py-0.5 rounded uppercase font-bold bg-purple-500/20 text-purple-300 ml-auto shrink-0">
+                  {activeDirective.strategy}
+                </span>
+              )}
             </div>
             
             <div className="flex items-end gap-1 relative z-10">

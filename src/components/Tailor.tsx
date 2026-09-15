@@ -5,8 +5,8 @@
 
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { OceanScores, SteeringDirective } from '../types';
-import { STEERING_LIBRARY, generatePortableMetadata } from '../constants';
+import { OceanScores } from '../types';
+import { getActiveDirectives, generatePortableMetadata } from '../constants';
 import { Brain, ArrowRight, Dna, Activity, Users, ShieldAlert, Heart, Copy, Check, FileCode } from 'lucide-react';
 import OceanCards from './OceanCards';
 
@@ -26,10 +26,8 @@ const TRAIT_CONFIG = {
 export default function Tailor({ scores, onNext }: TailorProps) {
   const [copied, setCopied] = useState(false);
   
-  const activeDirectives = STEERING_LIBRARY.filter(d => {
-    const value = scores[d.trait];
-    return (d.threshold === 'high' && value > 70) || (d.threshold === 'low' && value < 30);
-  });
+  const activeDirectives = getActiveDirectives(scores);
+  const showBleedChip = scores.agreeableness > 70 && scores.conscientiousness > 70;
 
   const handleCopy = () => {
     const text = generatePortableMetadata(scores);
@@ -41,6 +39,12 @@ export default function Tailor({ scores, onNext }: TailorProps) {
   return (
     <div className="h-full flex flex-col gap-6 overflow-hidden">
       <OceanCards scores={scores} />
+
+      {showBleedChip && (
+        <div className="px-4 py-2 bg-amber-500/10 border border-amber-500/30 rounded-lg text-[11px] text-amber-300 font-medium">
+          Possible A↔C bleed — prefer Compassion vs Industriousness reading from interview
+        </div>
+      )}
 
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-0">
         <div className="flex flex-col gap-4 overflow-hidden">
@@ -83,11 +87,14 @@ export default function Tailor({ scores, onNext }: TailorProps) {
                   transition={{ delay: i * 0.1 }}
                   className="p-4 bg-bg-surface border border-border-primary rounded-lg group hover:border-orange-500/50 transition-colors duration-300"
                 >
-                  <div className="flex items-center gap-2 mb-2">
+                  <div className="flex items-center gap-2 mb-2 flex-wrap">
                     <span className={`text-[10px] px-2 py-0.5 rounded uppercase font-bold ${
                       d.threshold === 'high' ? 'bg-orange-500/20 text-orange-400' : 'bg-blue-500/20 text-blue-400'
                     }`}>
                       {d.threshold === 'high' ? 'High' : 'Low'} {TRAIT_CONFIG[d.trait].label}
+                    </span>
+                    <span className="text-[10px] px-2 py-0.5 rounded uppercase font-bold bg-purple-500/20 text-purple-300">
+                      {d.strategy}
                     </span>
                   </div>
                   <p className="text-sm text-text-secondary leading-relaxed italic">"{d.text}"</p>

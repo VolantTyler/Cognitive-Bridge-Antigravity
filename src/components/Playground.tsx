@@ -272,16 +272,22 @@ export default function Playground({ scores, messages, setMessages, setScores, o
         <div className="flex-1 flex flex-col bg-bg-secondary border border-border-primary rounded-xl overflow-hidden shadow-2xl relative min-w-0 transition-colors duration-300">
           <div className="grid grid-cols-2 bg-bg-surface border-b border-border-primary transition-colors duration-300">
             <div className="p-4 flex items-center justify-between border-r border-border-primary">
-              <div className="flex items-center gap-3">
-                <Shield className="w-4 h-4 text-green-400" />
-                <span className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-green-400">Aligned Bridge</span>
+              <div className="flex flex-col gap-0.5">
+                <div className="flex items-center gap-3">
+                  <Shield className="w-4 h-4 text-green-400" />
+                  <span className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-green-400">Aligned Bridge</span>
+                </div>
+                <span className="text-[9px] text-text-muted italic pl-7">Complementarity + congruence (research matrix)</span>
               </div>
               <Zap className="w-3 h-3 text-text-primary animate-pulse hidden sm:block" />
             </div>
             <div className="p-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <AlertTriangle className="w-4 h-4 text-red-500" />
-                <span className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-red-500">Reinforced Bias</span>
+              <div className="flex flex-col gap-0.5">
+                <div className="flex items-center gap-3">
+                  <AlertTriangle className="w-4 h-4 text-red-500" />
+                  <span className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-red-500">Unaligned Bridge</span>
+                </div>
+                <span className="text-[9px] text-text-muted italic pl-7">Similarity-attraction / amplify extremes</span>
               </div>
               <Split className="w-3 h-3 text-red-800 hidden sm:block" />
             </div>
@@ -477,13 +483,13 @@ export default function Playground({ scores, messages, setMessages, setScores, o
                 <div className="flex items-start gap-2">
                   <Shield className="w-3 h-3 text-green-500 mt-0.5 shrink-0" />
                   <p className="text-[11px] text-text-muted leading-relaxed italic">
-                    Aligned: Dampens psychological extremes to prevent "Yes-Manning" and confirmation loops.
+                    Aligned: Complementarity + congruence (research matrix). Applies congruent, complementary, or compensatory directives per trait.
                   </p>
                 </div>
                 <div className="flex items-start gap-2">
                   <AlertTriangle className="w-3 h-3 text-red-500 mt-0.5 shrink-0" />
                   <p className="text-[11px] text-text-secondary leading-relaxed italic">
-                    Inverse: Amplifies user tendencies to show the "Raw Personality" output without bridge correction.
+                    Unaligned: Similarity-attraction / amplify extremes. Inverts directive selection to reinforce trait spikes.
                   </p>
                 </div>
              </div>
