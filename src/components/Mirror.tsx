@@ -263,7 +263,7 @@ export default function Mirror({ messages, setMessages, onComplete, onSaveSessio
                   <Sparkles className="w-3 h-3 text-accent-orange" />
                   Skip diagnostic using a pre-calibrated test profile:
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
                   <button
                     onClick={() => setCompletedScores({ openness: 50, conscientiousness: 50, extroversion: 90, agreeableness: 50, neuroticism: 85 })}
                     disabled={isLoading}
@@ -279,7 +279,7 @@ export default function Mirror({ messages, setMessages, onComplete, onSaveSessio
                     className="p-3 rounded-xl border border-border-card bg-bg-secondary/60 hover:bg-bg-tertiary hover:border-accent-yellow text-left transition-all disabled:opacity-50 group flex flex-col justify-between cursor-pointer"
                   >
                     <div className="text-[10px] font-bold text-accent-yellow uppercase tracking-wide group-hover:text-accent-yellow-hover transition-colors">Low Extroversion, High Neuroticism</div>
-                    <div className="text-[9px] text-text-muted mt-1 italic leading-tight">Enlists high-energy motivation, active encouragement & structure.</div>
+                    <div className="text-[9px] text-text-muted mt-1 italic leading-tight">Concise, low-friction tone plus compensatory calm under anxiety.</div>
                   </button>
 
                   <button
@@ -288,7 +288,16 @@ export default function Mirror({ messages, setMessages, onComplete, onSaveSessio
                     className="p-3 rounded-xl border border-border-card bg-bg-secondary/60 hover:bg-bg-tertiary hover:border-accent-purple text-left transition-all disabled:opacity-50 group flex flex-col justify-between cursor-pointer"
                   >
                     <div className="text-[10px] font-bold text-accent-purple uppercase tracking-wide group-hover:text-accent-purple-hover transition-colors">Low Conscientiousness, High Agreeableness</div>
-                    <div className="text-[9px] text-text-muted mt-1 italic leading-tight">Counteracts consensus seeking. Mandates precision & clear definitions.</div>
+                    <div className="text-[9px] text-text-muted mt-1 italic leading-tight">Congruent warmth plus compensatory executive-function scaffolding.</div>
+                  </button>
+
+                  <button
+                    onClick={() => setCompletedScores({ openness: 50, conscientiousness: 45, extroversion: 50, agreeableness: 85, neuroticism: 50 })}
+                    disabled={isLoading}
+                    className="p-3 rounded-xl border border-border-card bg-bg-secondary/60 hover:bg-bg-tertiary hover:border-accent-green text-left transition-all disabled:opacity-50 group flex flex-col justify-between cursor-pointer"
+                  >
+                    <div className="text-[10px] font-bold text-accent-green uppercase tracking-wide group-hover:text-accent-green-hover transition-colors">High Agreeableness (bleed resolved)</div>
+                    <div className="text-[9px] text-text-muted mt-1 italic leading-tight">Compassion over industriousness after A↔C disambiguation (A=85, C=45).</div>
                   </button>
                 </div>
               </div>
