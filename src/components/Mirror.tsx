@@ -259,10 +259,13 @@ export default function Mirror({ messages, setMessages, onComplete, onSaveSessio
               </div>
 
               <div className="border-t border-border-primary pt-3">
-                <div className="text-[10px] uppercase font-bold tracking-widest text-text-muted-dark mb-2 flex items-center gap-1.5 justify-center">
+                <div className="text-[10px] uppercase font-bold tracking-widest text-text-secondary mb-1 flex items-center gap-1.5 justify-center">
                   <Sparkles className="w-3 h-3 text-accent-orange" />
                   Skip diagnostic using a pre-calibrated test profile:
                 </div>
+                <p className="text-[11px] text-text-secondary text-center mb-2 italic">
+                  Presets skip the diagnostic for a quick demo — no login required.
+                </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
                   <button
                     onClick={() => setCompletedScores({ openness: 50, conscientiousness: 50, extroversion: 90, agreeableness: 50, neuroticism: 85 })}
@@ -270,7 +273,7 @@ export default function Mirror({ messages, setMessages, onComplete, onSaveSessio
                     className="p-3 rounded-xl border border-border-card bg-bg-secondary/60 hover:bg-bg-tertiary hover:border-accent-orange text-left transition-all disabled:opacity-50 group flex flex-col justify-between cursor-pointer"
                   >
                     <div className="text-[10px] font-bold text-accent-orange uppercase tracking-wide group-hover:text-accent-orange-hover transition-colors">High Extroversion and Neuroticism</div>
-                    <div className="text-[9px] text-text-muted mt-1 italic leading-tight">Dampens hyper-reactive anxiety. Provides steady, structural ground.</div>
+                    <div className="text-[9px] text-text-secondary mt-1 italic leading-tight">Dampens hyper-reactive anxiety. Provides steady, structural ground.</div>
                   </button>
 
                   <button
@@ -279,7 +282,7 @@ export default function Mirror({ messages, setMessages, onComplete, onSaveSessio
                     className="p-3 rounded-xl border border-border-card bg-bg-secondary/60 hover:bg-bg-tertiary hover:border-accent-yellow text-left transition-all disabled:opacity-50 group flex flex-col justify-between cursor-pointer"
                   >
                     <div className="text-[10px] font-bold text-accent-yellow uppercase tracking-wide group-hover:text-accent-yellow-hover transition-colors">Low Extroversion, High Neuroticism</div>
-                    <div className="text-[9px] text-text-muted mt-1 italic leading-tight">Concise, low-friction tone plus compensatory calm under anxiety.</div>
+                    <div className="text-[9px] text-text-secondary mt-1 italic leading-tight">Concise, low-friction tone plus compensatory calm under anxiety.</div>
                   </button>
 
                   <button
@@ -288,7 +291,7 @@ export default function Mirror({ messages, setMessages, onComplete, onSaveSessio
                     className="p-3 rounded-xl border border-border-card bg-bg-secondary/60 hover:bg-bg-tertiary hover:border-accent-purple text-left transition-all disabled:opacity-50 group flex flex-col justify-between cursor-pointer"
                   >
                     <div className="text-[10px] font-bold text-accent-purple uppercase tracking-wide group-hover:text-accent-purple-hover transition-colors">Low Conscientiousness, High Agreeableness</div>
-                    <div className="text-[9px] text-text-muted mt-1 italic leading-tight">Congruent warmth plus compensatory executive-function scaffolding.</div>
+                    <div className="text-[9px] text-text-secondary mt-1 italic leading-tight">Congruent warmth plus compensatory executive-function scaffolding.</div>
                   </button>
 
                   <button
@@ -297,7 +300,7 @@ export default function Mirror({ messages, setMessages, onComplete, onSaveSessio
                     className="p-3 rounded-xl border border-border-card bg-bg-secondary/60 hover:bg-bg-tertiary hover:border-accent-green text-left transition-all disabled:opacity-50 group flex flex-col justify-between cursor-pointer"
                   >
                     <div className="text-[10px] font-bold text-accent-green uppercase tracking-wide group-hover:text-accent-green-hover transition-colors">High Agreeableness (bleed resolved)</div>
-                    <div className="text-[9px] text-text-muted mt-1 italic leading-tight">Compassion over industriousness after A↔C disambiguation (A=85, C=45).</div>
+                    <div className="text-[9px] text-text-secondary mt-1 italic leading-tight">Compassion over industriousness after A↔C disambiguation (A=85, C=45).</div>
                   </button>
                 </div>
               </div>
