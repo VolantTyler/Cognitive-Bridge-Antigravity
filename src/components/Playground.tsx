@@ -10,9 +10,9 @@ import { OceanScores, Message, ComparisonMessage } from '../types';
 import { generateAlignmentPrompt, generateInverseAlignmentPrompt } from '../constants';
 import { chatWithGeminiStream } from '../services/gemini';
 import OceanCards from './OceanCards';
+import { isStreamErrorText } from './playgroundUtils';
 
 const GENERATION_TIMEOUT_MS = 25000;
-const STREAM_ERROR_SNIPPET = 'Error connecting to the stream.';
 
 interface PlaygroundProps {
   scores: OceanScores;
@@ -53,6 +53,7 @@ export default function Playground({ scores, messages, setMessages, setScores, o
   const initializedRef = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const generationAttemptsRef = useRef<Map<number, number>>(new Map());
 
   useEffect(() => {
     if (!initializedRef.current && messages.length > 0) {
@@ -115,6 +116,10 @@ export default function Playground({ scores, messages, setMessages, setScores, o
     userPrompt: string,
     options?: { scoresOverride?: OceanScores }
   ) => {
+    const attemptId = (generationAttemptsRef.current.get(messageIndex) ?? 0) + 1;
+    generationAttemptsRef.current.set(messageIndex, attemptId);
+    const isStaleAttempt = () => generationAttemptsRef.current.get(messageIndex) !== attemptId;
+
     const activeScores = options?.scoresOverride ?? scores;
     const alignedPrompt = generateAlignmentPrompt(activeScores);
     const unalignedPrompt = generateInverseAlignmentPrompt(activeScores);
@@ -165,11 +170,7 @@ export default function Playground({ scores, messages, setMessages, setScores, o
 
       await Promise.all([alignedPromise, unalignedPromise]);
 
-      const hasStreamError =
-        alignedText.includes(STREAM_ERROR_SNIPPET) ||
-        unalignedText.includes(STREAM_ERROR_SNIPPET);
-
-      if (hasStreamError) {
+      if (isStreamErrorText(alignedText) || isStreamErrorText(unalignedText)) {
         throw new Error('Stream connection failed');
       }
 
@@ -181,6 +182,8 @@ export default function Playground({ scores, messages, setMessages, setScores, o
         generationPromise,
         GENERATION_TIMEOUT_MS
       );
+
+      if (isStaleAttempt()) return;
 
       setMessages(prev => {
         const updated = [...prev];
@@ -198,10 +201,13 @@ export default function Playground({ scores, messages, setMessages, setScores, o
       });
       selectFirstHighlight(finalAligned, finalUnaligned);
     } catch (err) {
+      if (isStaleAttempt()) return;
       console.error('Bridge generation failed:', err);
       updateMessage(messageIndex, { loading: false, error: true });
     } finally {
-      setIsLoading(false);
+      if (!isStaleAttempt()) {
+        setIsLoading(false);
+      }
     }
   }, [messages, scores, updateMessage, selectFirstHighlight, onSaveSession, setMessages]);
 
