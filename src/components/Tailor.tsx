@@ -23,6 +23,10 @@ const TRAIT_CONFIG = {
   neuroticism: { label: 'Neuroticism', color: 'text-accent-red' },
 };
 
+/** Muted strategy pill — same footprint as High/Low trait tags, no bracket prefix in UI */
+const STRATEGY_PILL_CLASS =
+  'text-[10px] px-2 py-0.5 rounded font-medium bg-bg-tertiary border border-border-secondary text-text-muted';
+
 export default function Tailor({ scores, onNext }: TailorProps) {
   const [copied, setCopied] = useState(false);
   
@@ -93,9 +97,7 @@ export default function Tailor({ scores, onNext }: TailorProps) {
                     }`}>
                       {d.threshold === 'high' ? 'High' : 'Low'} {TRAIT_CONFIG[d.trait].label}
                     </span>
-                    <span className="text-[10px] px-2 py-0.5 rounded uppercase font-bold bg-purple-500/20 text-purple-300">
-                      {d.strategy}
-                    </span>
+                    <span className={STRATEGY_PILL_CLASS}>{d.strategy}</span>
                   </div>
                   <p className="text-sm text-text-secondary leading-relaxed italic">"{d.text}"</p>
                 </motion.div>

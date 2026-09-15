@@ -95,7 +95,7 @@ export default function OceanCards({ scores }: OceanCardsProps) {
                 {config.label}
               </span>
               {activeDirective && (
-                <span className="text-[9px] px-1.5 py-0.5 rounded uppercase font-bold bg-purple-500/20 text-purple-300 ml-auto shrink-0">
+                <span className="text-[10px] px-2 py-0.5 rounded font-medium bg-bg-tertiary border border-border-secondary text-text-muted ml-auto shrink-0">
                   {activeDirective.strategy}
                 </span>
               )}
