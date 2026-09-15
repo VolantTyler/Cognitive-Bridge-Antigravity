@@ -14,9 +14,48 @@ on:
   workflow_dispatch: # Allows manual trigger from GitHub UI
 
 jobs:
+  validate-matrix:
+    name: Validate steering matrix (PR gate)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Python Dependencies
+        run: |
+          python -m venv venv
+          source venv/bin/activate
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Validate steering matrix (offline)
+        run: |
+          source venv/bin/activate
+          python scripts/agent_eval.py --validate-matrix
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Run Vitest
+        run: npm ci && npm run test
+
   run-evaluation:
     name: Run Agent Testing & Alignment Verification
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
     runs-on: ubuntu-latest
+    timeout-minutes: 120
 
     steps:
       - name: Checkout Repository
