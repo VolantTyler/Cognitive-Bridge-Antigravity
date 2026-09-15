@@ -3,13 +3,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Send, Sparkles, User, Shield, Info, Loader2, AlertTriangle, Zap, Split, Brain, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Send, Sparkles, User, Shield, Info, Loader2, AlertTriangle, Zap, Split, Brain, Trash2, ChevronDown, ChevronUp, RotateCcw } from 'lucide-react';
 import { OceanScores, Message, ComparisonMessage } from '../types';
 import { generateAlignmentPrompt, generateInverseAlignmentPrompt } from '../constants';
 import { chatWithGeminiStream } from '../services/gemini';
 import OceanCards from './OceanCards';
+
+const GENERATION_TIMEOUT_MS = 25000;
+const STREAM_ERROR_SNIPPET = 'Error connecting to the stream.';
 
 interface PlaygroundProps {
   scores: OceanScores;
@@ -19,13 +22,37 @@ interface PlaygroundProps {
   onSaveSession?: (updatedMessages: ComparisonMessage[], updatedScores?: OceanScores) => void;
 }
 
+function extractFirstHighlight(text: string): { text: string; explanation: string } | null {
+  const match = text.match(/<mark-bridge explanation="([^"]*)">(.*?)<\/mark-bridge>/);
+  if (match) {
+    return { explanation: match[1], text: match[2] };
+  }
+  return null;
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('Generation timed out')), ms);
+    promise
+      .then((value) => {
+        clearTimeout(timer);
+        resolve(value);
+      })
+      .catch((err) => {
+        clearTimeout(timer);
+        reject(err);
+      });
+  });
+}
+
 export default function Playground({ scores, messages, setMessages, setScores, onSaveSession }: PlaygroundProps) {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [activeAnalysis, setActiveAnalysis] = useState<{ text: string, explanation: string, type: string } | null>(null);
+  const [activeAnalysis, setActiveAnalysis] = useState<{ text: string; explanation: string; type: string } | null>(null);
   const [expandedIndices, setExpandedIndices] = useState<Record<number, boolean>>({});
   const initializedRef = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (!initializedRef.current && messages.length > 0) {
@@ -53,7 +80,7 @@ export default function Playground({ scores, messages, setMessages, setScores, o
       return next;
     });
   };
-  
+
   const alignedSystemPrompt = generateAlignmentPrompt(scores);
   const unalignedSystemPrompt = generateInverseAlignmentPrompt(scores);
 
@@ -63,65 +90,145 @@ export default function Playground({ scores, messages, setMessages, setScores, o
     }
   }, [messages]);
 
-  const handleSend = async () => {
-    if (!input.trim() || isLoading) return;
-
-    const userPrompt = input;
-    const newMessage: ComparisonMessage = {
-      user: userPrompt,
-      aligned: '',
-      unaligned: '',
-      loading: true
-    };
-    
-    const newIndex = messages.length;
-    setExpandedIndices({ [newIndex]: true });
-    setMessages(prev => [...prev, newMessage]);
-    const currentMessageIndex = messages.length;
-    setInput('');
-    setIsLoading(true);
-
-    let alignedText = '';
-    let unalignedText = '';
-
-    const conversationHistory: Message[] = messages.flatMap(m => [
-      { role: 'user', content: m.user },
-      { role: 'model', content: m.aligned }
-    ]);
-    const currentInput: Message = { role: 'user', content: input };
-
-    const alignedPromise = (async () => {
-      const stream = chatWithGeminiStream([...conversationHistory, currentInput], alignedSystemPrompt, "gemini-2.5-pro", "playground-aligned");
-      for await (const chunk of stream) {
-        alignedText += chunk;
-        updateMessage(currentMessageIndex, { aligned: alignedText });
-      }
-    })();
-
-    const unalignedPromise = (async () => {
-      const stream = chatWithGeminiStream([...conversationHistory, currentInput], unalignedSystemPrompt, "gemini-2.5-pro", "playground-unaligned");
-      for await (const chunk of stream) {
-        unalignedText += chunk;
-        updateMessage(currentMessageIndex, { unaligned: unalignedText });
-      }
-    })();
-
-    await Promise.all([alignedPromise, unalignedPromise]);
-    updateMessage(currentMessageIndex, { loading: false });
-    setIsLoading(false);
-
-    if (onSaveSession) {
-      const finalMessages = [...messages, { user: userPrompt, aligned: alignedText, unaligned: unalignedText, loading: false }];
-      onSaveSession(finalMessages);
-    }
-  };
-
-  const updateMessage = (index: number, patch: Partial<ComparisonMessage>) => {
+  const updateMessage = useCallback((index: number, patch: Partial<ComparisonMessage>) => {
     setMessages(prev => {
       const updated = [...prev];
       updated[index] = { ...updated[index], ...patch };
       return updated;
     });
+  }, [setMessages]);
+
+  const selectFirstHighlight = useCallback((alignedText: string, unalignedText: string) => {
+    const alignedHighlight = extractFirstHighlight(alignedText);
+    if (alignedHighlight) {
+      setActiveAnalysis({ ...alignedHighlight, type: 'aligned' });
+      return;
+    }
+    const unalignedHighlight = extractFirstHighlight(unalignedText);
+    if (unalignedHighlight) {
+      setActiveAnalysis({ ...unalignedHighlight, type: 'unaligned' });
+    }
+  }, []);
+
+  const runGeneration = useCallback(async (
+    messageIndex: number,
+    userPrompt: string,
+    options?: { scoresOverride?: OceanScores }
+  ) => {
+    const activeScores = options?.scoresOverride ?? scores;
+    const alignedPrompt = generateAlignmentPrompt(activeScores);
+    const unalignedPrompt = generateInverseAlignmentPrompt(activeScores);
+
+    updateMessage(messageIndex, {
+      loading: true,
+      error: false,
+      aligned: '',
+      unaligned: '',
+    });
+    setIsLoading(true);
+
+    const conversationHistory: Message[] = messages
+      .filter((_, idx) => idx !== messageIndex)
+      .flatMap(m => [
+        { role: 'user' as const, content: m.user },
+        { role: 'model' as const, content: m.aligned },
+      ]);
+    const currentInput: Message = { role: 'user', content: userPrompt };
+
+    let alignedText = '';
+    let unalignedText = '';
+
+    const generationPromise = (async () => {
+      const alignedPromise = (async () => {
+        const stream = chatWithGeminiStream(
+          [...conversationHistory, currentInput],
+          alignedPrompt,
+          'gemini-2.5-pro',
+          'playground-aligned'
+        );
+        for await (const chunk of stream) {
+          alignedText += chunk;
+        }
+      })();
+
+      const unalignedPromise = (async () => {
+        const stream = chatWithGeminiStream(
+          [...conversationHistory, currentInput],
+          unalignedPrompt,
+          'gemini-2.5-pro',
+          'playground-unaligned'
+        );
+        for await (const chunk of stream) {
+          unalignedText += chunk;
+        }
+      })();
+
+      await Promise.all([alignedPromise, unalignedPromise]);
+
+      const hasStreamError =
+        alignedText.includes(STREAM_ERROR_SNIPPET) ||
+        unalignedText.includes(STREAM_ERROR_SNIPPET);
+
+      if (hasStreamError) {
+        throw new Error('Stream connection failed');
+      }
+
+      return { alignedText, unalignedText };
+    })();
+
+    try {
+      const { alignedText: finalAligned, unalignedText: finalUnaligned } = await withTimeout(
+        generationPromise,
+        GENERATION_TIMEOUT_MS
+      );
+
+      setMessages(prev => {
+        const updated = [...prev];
+        updated[messageIndex] = {
+          ...updated[messageIndex],
+          aligned: finalAligned,
+          unaligned: finalUnaligned,
+          loading: false,
+          error: false,
+        };
+        if (onSaveSession) {
+          onSaveSession(updated, options?.scoresOverride);
+        }
+        return updated;
+      });
+      selectFirstHighlight(finalAligned, finalUnaligned);
+    } catch (err) {
+      console.error('Bridge generation failed:', err);
+      updateMessage(messageIndex, { loading: false, error: true });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [messages, scores, updateMessage, selectFirstHighlight, onSaveSession, setMessages]);
+
+  const handleSend = async () => {
+    if (!input.trim() || isLoading) return;
+
+    const userPrompt = input.trim();
+    const newMessage: ComparisonMessage = {
+      user: userPrompt,
+      aligned: '',
+      unaligned: '',
+      loading: true,
+    };
+
+    const newIndex = messages.length;
+    setExpandedIndices({ [newIndex]: true });
+    setMessages(prev => [...prev, newMessage]);
+    setInput('');
+
+    await runGeneration(newIndex, userPrompt);
+  };
+
+  const handleRetry = async (messageIndex: number) => {
+    if (isLoading) return;
+    const message = messages[messageIndex];
+    if (!message) return;
+    await runGeneration(messageIndex, message.user);
   };
 
   const handlePresetSubmit = async (presetScores: OceanScores, presetPrompt: string) => {
@@ -132,74 +239,28 @@ export default function Playground({ scores, messages, setMessages, setScores, o
     }
 
     setInput('');
-    
+
     const newMessage: ComparisonMessage = {
       user: presetPrompt,
       aligned: '',
       unaligned: '',
-      loading: true
+      loading: true,
     };
 
     const newIndex = messages.length;
     setExpandedIndices({ [newIndex]: true });
     setMessages(prev => [...prev, newMessage]);
-    const currentMessageIndex = messages.length;
-    setIsLoading(true);
 
-    let alignedText = '';
-    let unalignedText = '';
+    await runGeneration(newIndex, presetPrompt, { scoresOverride: presetScores });
+  };
 
-    const alignedPresetSystemPrompt = generateAlignmentPrompt(presetScores);
-    const unalignedPresetSystemPrompt = generateInverseAlignmentPrompt(presetScores);
-
-    const conversationHistory: Message[] = messages.flatMap(m => [
-      { role: 'user', content: m.user },
-      { role: 'model', content: m.aligned }
-    ]);
-    const currentInput: Message = { role: 'user', content: presetPrompt };
-
-    const alignedPromise = (async () => {
-      const stream = chatWithGeminiStream([...conversationHistory, currentInput], alignedPresetSystemPrompt, "gemini-2.5-pro", "playground-preset-aligned");
-      for await (const chunk of stream) {
-        alignedText += chunk;
-        setMessages(prev => {
-          const updated = [...prev];
-          updated[currentMessageIndex] = { ...updated[currentMessageIndex], aligned: alignedText };
-          return updated;
-        });
-      }
-    })();
-
-    const unalignedPromise = (async () => {
-      const stream = chatWithGeminiStream([...conversationHistory, currentInput], unalignedPresetSystemPrompt, "gemini-2.5-pro", "playground-preset-unaligned");
-      for await (const chunk of stream) {
-        unalignedText += chunk;
-        setMessages(prev => {
-          const updated = [...prev];
-          updated[currentMessageIndex] = { ...updated[currentMessageIndex], unaligned: unalignedText };
-          return updated;
-        });
-      }
-    })();
-
-    await Promise.all([alignedPromise, unalignedPromise]);
-    setMessages(prev => {
-      const updated = [...prev];
-      updated[currentMessageIndex] = { ...updated[currentMessageIndex], loading: false };
-      return updated;
-    });
-    setIsLoading(false);
-
-    if (onSaveSession) {
-      const finalMessages = [...messages, { user: presetPrompt, aligned: alignedText, unaligned: unalignedText, loading: false }];
-      onSaveSession(finalMessages, presetScores);
-    }
+  const focusQuestionInput = () => {
+    inputRef.current?.focus();
   };
 
   const renderContent = (text: string, type: 'aligned' | 'unaligned') => {
-    // Regex for <mark-bridge explanation="...">text</mark-bridge>
     const parts = text.split(/(<mark-bridge explanation="[^"]*">.*?<\/mark-bridge>)/g);
-    
+
     return parts.map((part, i) => {
       const match = part.match(/<mark-bridge explanation="([^"]*)">(.*?)<\/mark-bridge>/);
       if (match) {
@@ -214,6 +275,7 @@ export default function Playground({ scores, messages, setMessages, setScores, o
             className={`cursor-help transition-all duration-300 font-medium mark-bridge-highlight ${
               type === 'aligned' ? 'mark-aligned' : 'mark-unaligned'
             } ${isActive ? 'active' : ''}`}
+            title="Click to analyze in Logic Analysis"
           >
             {content}
           </button>
@@ -223,42 +285,51 @@ export default function Playground({ scores, messages, setMessages, setScores, o
     });
   };
 
+  const renderColumnSkeleton = () => (
+    <div className="space-y-2">
+      <div className="h-3 w-3/4 bg-border-primary animate-pulse rounded" />
+      <div className="h-3 w-1/2 bg-border-primary animate-pulse rounded" />
+      <div className="h-3 w-2/3 bg-border-primary animate-pulse rounded" />
+    </div>
+  );
+
   return (
     <div className="h-full flex flex-col gap-6 overflow-hidden">
       <OceanCards scores={scores} />
 
       <div className="flex-1 flex gap-6 relative min-h-0">
-        {/* Mobile Analysis Modal */}
         <AnimatePresence>
           {activeAnalysis && (
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               className="lg:hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-6"
               onClick={() => setActiveAnalysis(null)}
             >
-              <motion.div 
+              <motion.div
                 initial={{ scale: 0.9, y: 20 }}
                 animate={{ scale: 1, y: 0 }}
                 className={`p-6 rounded-2xl border max-w-sm w-full shadow-2xl transition-colors duration-300 ${
-                  activeAnalysis.type === 'aligned' ? 'bg-bg-modal-aligned border-green-500/50 text-text-primary' : 'bg-bg-modal-unaligned border-red-500/50 text-text-primary'
+                  activeAnalysis.type === 'aligned'
+                    ? 'bg-bg-modal-aligned border-green-500/50 text-text-primary'
+                    : 'bg-bg-modal-unaligned border-red-500/50 text-text-primary'
                 }`}
                 onClick={e => e.stopPropagation()}
               >
                 <div className="flex items-center gap-2 mb-4">
                   <div className={`p-1.5 rounded-lg ${activeAnalysis.type === 'aligned' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
-                     {activeAnalysis.type === 'aligned' ? <Shield className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
+                    {activeAnalysis.type === 'aligned' ? <Shield className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
                   </div>
                   <h4 className="font-bold text-sm uppercase tracking-widest">{activeAnalysis.type.toUpperCase()} ANALYSIS</h4>
                 </div>
-                <p className="text-text-muted text-[10px] uppercase font-bold tracking-wider mb-2">Original Context:</p>
-                <blockquote className="border-l-2 border-border-primary/40 pl-3 italic text-xs mb-4 text-text-secondary">"{activeAnalysis.text}"</blockquote>
-                <p className="text-text-muted text-[10px] uppercase font-bold tracking-wider mb-2">Bridge Logic:</p>
+                <p className="text-text-secondary text-[10px] uppercase font-bold tracking-wider mb-2">Original Context:</p>
+                <blockquote className="border-l-2 border-border-primary/40 pl-3 italic text-xs mb-4 text-text-secondary">&ldquo;{activeAnalysis.text}&rdquo;</blockquote>
+                <p className="text-text-secondary text-[10px] uppercase font-bold tracking-wider mb-2">Bridge Logic:</p>
                 <p className="text-sm leading-relaxed text-text-primary">
                   {activeAnalysis.explanation}
                 </p>
-                <button 
+                <button
                   onClick={() => setActiveAnalysis(null)}
                   className="mt-6 w-full py-3 bg-bg-surface hover:bg-bg-tertiary border border-border-primary text-text-primary rounded-xl text-xs font-bold uppercase transition-colors cursor-pointer"
                 >
@@ -275,7 +346,7 @@ export default function Playground({ scores, messages, setMessages, setScores, o
               <div className="flex flex-col gap-0.5">
                 <div className="flex items-center gap-3">
                   <Shield className="w-4 h-4 text-green-400" />
-                  <span className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-green-400">Aligned Bridge</span>
+                  <span className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-green-400">Aligned</span>
                 </div>
                 <span className="text-[9px] text-text-muted italic pl-7">Complementarity + congruence (research matrix)</span>
               </div>
@@ -285,7 +356,7 @@ export default function Playground({ scores, messages, setMessages, setScores, o
               <div className="flex flex-col gap-0.5">
                 <div className="flex items-center gap-3">
                   <AlertTriangle className="w-4 h-4 text-red-500" />
-                  <span className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-red-500">Unaligned Bridge</span>
+                  <span className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-red-500">Unaligned</span>
                 </div>
                 <span className="text-[9px] text-text-muted italic pl-7">Similarity-attraction / amplify extremes</span>
               </div>
@@ -293,10 +364,10 @@ export default function Playground({ scores, messages, setMessages, setScores, o
             </div>
           </div>
 
-          {/* Anchored Input Container */}
           <div className="p-4 bg-bg-surface border-b border-border-primary transition-colors duration-300">
             <div className="relative">
               <textarea
+                ref={inputRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => {
@@ -305,10 +376,10 @@ export default function Playground({ scores, messages, setMessages, setScores, o
                     handleSend();
                   }
                 }}
-                placeholder="Ask a question to see the alignment gap..."
+                placeholder="Ask a question to compare Aligned vs Unaligned responses..."
                 className="w-full bg-bg-secondary border border-border-secondary text-text-primary placeholder-text-muted-dark rounded-xl py-4 px-6 pr-14 text-sm focus:outline-none focus:border-blue-500 transition-all resize-none h-[64px]"
               />
-              <button 
+              <button
                 onClick={handleSend}
                 disabled={isLoading || !input.trim()}
                 className="absolute right-3 bottom-3 p-2 bg-orange-600 hover:bg-orange-700 disabled:opacity-50 transition-all rounded-lg shadow-lg shadow-orange-600/20 cursor-pointer"
@@ -318,22 +389,32 @@ export default function Playground({ scores, messages, setMessages, setScores, o
             </div>
           </div>
 
-          <div 
+          <div
             ref={scrollRef}
             className="flex-1 overflow-y-auto p-0 flex flex-col divide-y divide-border-primary custom-scrollbar transition-colors duration-300"
           >
             {isLoading && (
               <div className="p-3 flex justify-center gap-2 bg-bg-secondary border-b border-border-primary transition-colors duration-300 shrink-0">
-                 <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-500" />
-                 <span className="text-[10px] uppercase font-bold tracking-widest text-text-muted-dark">Generating Cognitive Delta...</span>
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-500" />
+                <span className="text-[10px] uppercase font-bold tracking-widest text-text-secondary">Generating Aligned and Unaligned responses...</span>
               </div>
             )}
 
             {messages.length === 0 && !isLoading && (
-              <div className="p-20 flex flex-col items-center justify-center text-center opacity-30">
+              <div className="p-12 sm:p-16 flex flex-col items-center justify-center text-center">
                 <Sparkles className="w-12 h-12 mb-4 text-orange-500" />
-                <h4 className="text-lg font-medium">Initialize Comparative Analysis</h4>
-                <p className="text-sm max-w-sm mt-2 font-mono">Parallel streaming enabled. Witness the divergence between Aligned and Unaligned logic.</p>
+                <h4 className="text-lg font-semibold text-text-primary">Compare Aligned vs Unaligned</h4>
+                <p className="text-sm max-w-md mt-2 text-text-secondary leading-relaxed">
+                  Ask any question below. Both columns will answer side-by-side so you can see how personality-aware steering changes the response.
+                </p>
+                <button
+                  type="button"
+                  onClick={focusQuestionInput}
+                  className="mt-6 inline-flex items-center gap-2 px-6 py-3 bg-orange-600 hover:bg-orange-700 text-white font-bold text-sm uppercase tracking-wider rounded-xl shadow-lg shadow-orange-600/20 transition-all cursor-pointer"
+                >
+                  <Send className="w-4 h-4" />
+                  Ask your first question
+                </button>
               </div>
             )}
 
@@ -369,15 +450,40 @@ export default function Playground({ scores, messages, setMessages, setScores, o
                           </button>
                         </div>
                       </div>
-                      
-                      <div className="grid grid-cols-2 divide-x divide-border-primary min-h-[100px] transition-colors duration-300">
-                        <div className="p-4 sm:p-6 text-sm text-text-primary leading-relaxed whitespace-pre-wrap bg-green-500/5">
-                           {m.aligned ? renderContent(m.aligned, 'aligned') : (m.loading && <div className="space-y-2"><div className="h-3 w-3/4 bg-border-primary animate-pulse rounded" /><div className="h-3 w-1/2 bg-border-primary animate-pulse rounded" /></div>)}
+
+                      {m.error ? (
+                        <div className="p-8 flex flex-col items-center justify-center text-center gap-4 bg-bg-secondary">
+                          <AlertTriangle className="w-10 h-10 text-red-500" />
+                          <div>
+                            <p className="text-sm font-semibold text-text-primary">Generation failed or timed out</p>
+                            <p className="text-xs text-text-secondary mt-1 max-w-sm">
+                              Both responses must finish before results appear. This took longer than {GENERATION_TIMEOUT_MS / 1000} seconds or the connection was interrupted.
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleRetry(origIdx)}
+                            disabled={isLoading}
+                            className="inline-flex items-center gap-2 px-5 py-2.5 bg-orange-600 hover:bg-orange-700 disabled:opacity-50 text-white font-bold text-xs uppercase tracking-wider rounded-lg transition-all cursor-pointer"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" />
+                            Retry
+                          </button>
                         </div>
-                        <div className="p-4 sm:p-6 text-sm text-text-muted leading-relaxed whitespace-pre-wrap border-l border-red-500/10 bg-red-500/5">
-                           {m.unaligned ? renderContent(m.unaligned, 'unaligned') : (m.loading && <div className="space-y-2"><div className="h-3 w-3/4 bg-border-primary animate-pulse rounded" /><div className="h-3 w-1/2 bg-border-primary animate-pulse rounded" /></div>)}
+                      ) : (
+                        <div className="grid grid-cols-2 divide-x divide-border-primary min-h-[100px] transition-colors duration-300">
+                          <div className="p-4 sm:p-6 text-sm text-text-primary leading-relaxed whitespace-pre-wrap bg-green-500/5">
+                            {m.loading || !m.aligned
+                              ? renderColumnSkeleton()
+                              : renderContent(m.aligned, 'aligned')}
+                          </div>
+                          <div className="p-4 sm:p-6 text-sm text-text-primary leading-relaxed whitespace-pre-wrap border-l border-red-500/10 bg-red-500/5">
+                            {m.loading || !m.unaligned
+                              ? renderColumnSkeleton()
+                              : renderContent(m.unaligned, 'unaligned')}
+                          </div>
                         </div>
-                      </div>
+                      )}
                     </>
                   ) : (
                     <div className="bg-bg-tertiary/60 hover:bg-bg-tertiary p-3 flex justify-between items-center transition-colors duration-200">
@@ -391,6 +497,9 @@ export default function Playground({ scores, messages, setMessages, setScores, o
                         <span className="text-xs text-text-secondary truncate font-medium max-w-[80%]">
                           {m.user}
                         </span>
+                        {m.error && (
+                          <span className="text-[10px] uppercase font-bold text-red-500 shrink-0">Failed</span>
+                        )}
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
                         <button
@@ -418,81 +527,83 @@ export default function Playground({ scores, messages, setMessages, setScores, o
 
         <div className="hidden lg:flex w-[320px] shrink-0 flex-col gap-6">
           <div className="flex-1 p-6 bg-bg-tertiary border border-border-primary rounded-xl flex flex-col gap-4 overflow-hidden shadow-xl transition-colors duration-300">
-             <div className="flex items-center gap-3">
-                <Brain className="w-5 h-5 text-orange-500" />
-                <h4 className="text-sm font-bold uppercase tracking-[0.2em] text-text-primary">Logic Analysis</h4>
-             </div>
-             
-             <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
-                <AnimatePresence mode="wait">
-                  {activeAnalysis ? (
-                    <motion.div 
-                      key="analysis"
-                      initial={{ opacity: 0, x: 20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: -20 }}
-                      className="space-y-6"
+            <div className="flex items-center gap-3">
+              <Brain className="w-5 h-5 text-orange-500" />
+              <h4 className="text-sm font-bold uppercase tracking-[0.2em] text-text-primary">Logic Analysis</h4>
+            </div>
+
+            <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
+              <AnimatePresence mode="wait">
+                {activeAnalysis ? (
+                  <motion.div
+                    key="analysis"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    className="space-y-6"
+                  >
+                    <div>
+                      <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-widest ${
+                        activeAnalysis.type === 'aligned' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
+                      }`}>
+                        {activeAnalysis.type} Mode Active
+                      </span>
+                    </div>
+
+                    <div className="space-y-2">
+                      <p className="text-[10px] uppercase font-bold text-text-secondary tracking-wider">Proof Point:</p>
+                      <blockquote className="p-4 bg-bg-primary/40 border-l-2 border-orange-500 rounded-r-lg italic text-sm text-text-secondary">
+                        &ldquo;{activeAnalysis.text}&rdquo;
+                      </blockquote>
+                    </div>
+
+                    <div className="space-y-3">
+                      <p className="text-[10px] uppercase font-bold text-text-secondary tracking-wider">Alignment Explanation:</p>
+                      <p className="text-sm leading-relaxed text-text-secondary">
+                        {activeAnalysis.explanation}
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={() => setActiveAnalysis(null)}
+                      className="text-[10px] uppercase font-bold text-text-muted hover:text-text-primary transition-colors cursor-pointer"
                     >
-                      <div>
-                        <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-widest ${
-                          activeAnalysis.type === 'aligned' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
-                        }`}>
-                          {activeAnalysis.type} Mode Active
-                        </span>
-                      </div>
-
-                      <div className="space-y-2">
-                        <p className="text-[10px] uppercase font-bold text-text-muted-dark tracking-wider">Proof Point:</p>
-                        <blockquote className="p-4 bg-bg-primary/40 border-l-2 border-orange-500 rounded-r-lg italic text-sm text-text-secondary">
-                          "{activeAnalysis.text}"
-                        </blockquote>
-                      </div>
-
-                      <div className="space-y-3">
-                        <p className="text-[10px] uppercase font-bold text-text-muted-dark tracking-wider">Alignment Explanation:</p>
-                        <p className="text-sm leading-relaxed text-text-muted">
-                          {activeAnalysis.explanation}
-                        </p>
-                      </div>
-
-                      <button 
-                        onClick={() => setActiveAnalysis(null)}
-                        className="text-[10px] uppercase font-bold text-text-muted-darker hover:text-text-primary transition-colors cursor-pointer"
-                      >
-                        Clear Selection
-                      </button>
-                    </motion.div>
-                  ) : (
-                    <motion.div 
-                      key="empty"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      className="h-full flex flex-col items-center justify-center text-center p-4"
-                    >
-                      <Info className="w-10 h-10 text-text-muted-dark mb-4" />
-                      <p className="text-xs text-text-muted-dark italic">Select a highlighted section in the bridge chat to view its psychometric derivation and alignment logic.</p>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-             </div>
+                      Clear Selection
+                    </button>
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="empty"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="h-full flex flex-col items-center justify-center text-center p-4"
+                  >
+                    <Info className="w-10 h-10 text-text-secondary mb-4" />
+                    <p className="text-xs text-text-secondary leading-relaxed">
+                      Select a <span className="font-semibold text-text-primary">highlighted</span> span in the Aligned or Unaligned column to view its psychometric derivation and alignment logic.
+                    </p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
 
           <div className="p-5 bg-blue-900/10 border border-blue-500/20 rounded-xl">
-             <h4 className="text-xs font-bold uppercase tracking-wider text-blue-400 mb-3">Steering Mode</h4>
-             <div className="space-y-4">
-                <div className="flex items-start gap-2">
-                  <Shield className="w-3 h-3 text-green-500 mt-0.5 shrink-0" />
-                  <p className="text-[11px] text-text-muted leading-relaxed italic">
-                    Aligned: Complementarity + congruence (research matrix). Applies congruent, complementary, or compensatory directives per trait.
-                  </p>
-                </div>
-                <div className="flex items-start gap-2">
-                  <AlertTriangle className="w-3 h-3 text-red-500 mt-0.5 shrink-0" />
-                  <p className="text-[11px] text-text-secondary leading-relaxed italic">
-                    Unaligned: Similarity-attraction / amplify extremes. Inverts directive selection to reinforce trait spikes.
-                  </p>
-                </div>
-             </div>
+            <h4 className="text-xs font-bold uppercase tracking-wider text-blue-400 mb-3">Steering Mode</h4>
+            <div className="space-y-4">
+              <div className="flex items-start gap-2">
+                <Shield className="w-3 h-3 text-green-500 mt-0.5 shrink-0" />
+                <p className="text-[11px] text-text-secondary leading-relaxed italic">
+                  Aligned: Complementarity + congruence (research matrix). Applies congruent, complementary, or compensatory directives per trait.
+                </p>
+              </div>
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="w-3 h-3 text-red-500 mt-0.5 shrink-0" />
+                <p className="text-[11px] text-text-secondary leading-relaxed italic">
+                  Unaligned: Similarity-attraction / amplify extremes. Inverts directive selection to reinforce trait spikes.
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       </div>

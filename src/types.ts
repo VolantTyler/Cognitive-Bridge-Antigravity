@@ -23,6 +23,7 @@ export interface ComparisonMessage {
   aligned: string;
   unaligned: string;
   loading: boolean;
+  error?: boolean;
 }
 
 export type AlignmentStrategy = 'congruent' | 'complementary' | 'compensatory';
