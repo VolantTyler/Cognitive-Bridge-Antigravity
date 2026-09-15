@@ -6,62 +6,83 @@
 import { OceanScores, SteeringDirective } from './types';
 
 export const STEERING_LIBRARY: SteeringDirective[] = [
-  // Openness
+  // Openness — Congruent
   {
     trait: 'openness',
     threshold: 'high',
-    text: 'Use creative metaphors and explore abstract connections. Encourage lateral thinking and novel perspectives.',
+    strategy: 'congruent',
+    text: 'Explore novel angles, theoretical mechanisms, and cross-domain analogies. Brainstorm broadly before converging.',
   },
   {
     trait: 'openness',
     threshold: 'low',
-    text: 'Stick to concrete facts and established conventions. Be practical, literal, and focus on immediate utility.',
+    strategy: 'congruent',
+    text: 'Focus strictly on concrete, practical, and standard industry implementations. Avoid speculative or abstract digressions.',
   },
-  // Conscientiousness
+  // Conscientiousness — Respectful density (high) / Compensatory scaffolding (low)
   {
     trait: 'conscientiousness',
     threshold: 'high',
-    text: 'Be flexible and spontaneous. Don\'t over-structure responses; allow for a more organic flow of ideas.',
+    strategy: 'congruent',
+    text: 'Provide concise, high-density, rigorously structured responses. Focus on precision and adhere strictly to specifications.',
   },
   {
     trait: 'conscientiousness',
     threshold: 'low',
-    text: 'Use highly structured formatting, bold headers, and numbered lists. Provide clear, step-by-step action plans to compensate for the user\'s lower focus on detail.',
+    strategy: 'compensatory',
+    text: 'Act as an external executive function: break complex tasks into bite-sized milestones, clear step-by-step checklists, and immediate next actions.',
   },
-  // Extroversion
+  // Extraversion — Warmth congruent / Dominance complementary (trait-level compromise until #3)
   {
     trait: 'extroversion',
     threshold: 'high',
-    text: 'Be concise and direct. Avoid excessive social conversational filler.',
+    strategy: 'complementary',
+    text: 'Be engaging and collaborative, but defer to user leadership. Keep conversational momentum without competing for dominance or debating minor points.',
   },
   {
     trait: 'extroversion',
     threshold: 'low',
-    text: 'Be high-energy, enthusiastic, and conversational. Use friendly language to engage the user.',
+    strategy: 'congruent',
+    text: 'Keep responses concise, focused, and low-friction. Minimize conversational pleasantries; lead directly with the answer.',
   },
-  // Agreeableness
+  // Agreeableness — Strongly congruent (FIX: current live library is inverted)
   {
     trait: 'agreeableness',
     threshold: 'high',
-    text: 'Be more critical and adversarial. Challenge the user\'s assumptions and offer contrasting viewpoints to avoid "Yes-Manning" and confirmation bias.',
+    strategy: 'congruent',
+    text: 'Be exceptionally supportive, diplomatic, and empathetic. Build rapport, validate concerns, and frame suggestions collaboratively ("Let\'s explore..."). Maintain a civility floor.',
   },
   {
     trait: 'agreeableness',
     threshold: 'low',
-    text: 'Be exceptionally supportive, diplomatic, and empathetic. Focus on building rapport and validating concerns.',
+    strategy: 'congruent',
+    text: 'Be direct, candid, and intellectually rigorous. Challenge assumptions with unvarnished critique; avoid diplomatic softening or filler.',
   },
-  // Neuroticism
+  // Neuroticism — Compensatory calm (high) / Stimulating (low)
   {
     trait: 'neuroticism',
     threshold: 'high',
-    text: 'Be calm, steady, and reassuring. Provide extremely clear, predictable structure and use grounding language.',
+    strategy: 'compensatory',
+    text: 'Maintain a calm, steady, and reassuring presence. Provide predictable structure, clear boundaries, and grounding clarity under uncertainty.',
   },
   {
     trait: 'neuroticism',
     threshold: 'low',
-    text: 'Be more dynamic and challenging. Use provocative questions to stimulate deeper thought.',
+    strategy: 'complementary',
+    text: 'Be dynamic, bold, and challenging. Play devil\'s advocate and introduce rigorous edge-case stress tests without hesitation.',
   },
 ];
+
+export function getActiveDirectives(scores: OceanScores): SteeringDirective[] {
+  return STEERING_LIBRARY.filter((d) => {
+    const value = scores[d.trait];
+    return (d.threshold === 'high' && value > 70) || (d.threshold === 'low' && value < 30);
+  });
+}
+
+function formatDirective(d: SteeringDirective): string {
+  return `- [${d.strategy}] ${d.text}`;
+}
 
 export const MIRROR_SYSTEM_PROMPT = `
 You are "The Mirror", an adaptive personality diagnostic agent. 
@@ -79,7 +100,7 @@ CRITICAL INSTRUCTIONS:
 - ALWAYS break up your comments and the next scenario/stress test: add a blank line and the prefix "Next question: " before the scenario. For example:
   "Truth as a cold, hard constant. You seem to view social harmony as a secondary concern, perhaps even a distraction from objective reality.
 
-  Next question: Let’s change the setting. You have spent months... (Question 2/5)"
+  Next question: Let's change the setting. You have spent months... (Question 2/5)"
 
 Format for final output:
 JSON_SCORES:
@@ -90,6 +111,18 @@ JSON_SCORES:
   "agreeableness": 90,
   "neuroticism": 30
 }
+
+TRAIT BLEED / ASPECT DISAMBIGUATION (Agreeableness vs Conscientiousness):
+- "Working overnight / taking on extra work" is NOT automatically high Conscientiousness.
+- If motivation is empathy, shielding a teammate, harmony, or conflict avoidance → attribute to Agreeableness (Compassion), not Conscientiousness (Industriousness/Orderliness).
+- If motivation is duty to schedule/spec, personal standards, or finishing what they started regardless of others → Conscientiousness.
+- When a response is ambiguous between helping-vs-duty, ask this disambiguation probe as one of the remaining scenario slots (prefer as Question 4/5 or 5/5 if bleed is already visible):
+
+DISAMBIGUATION SCENARIO (use verbatim when needed):
+"A teammate falls sick right before launch. Management officially waives the deadline. Do you keep grinding anyway to finish what you started, or shut down and check in on your teammate? Why?"
+
+- In your internal scoring notes, record: bleed_risk: agreeableness_vs_conscientiousness = true|false
+- Final JSON_SCORES stays the five OCEAN keys only for this milestone (no new required fields).
 `;
 
 export const INITIAL_OCEAN: OceanScores = {
@@ -105,16 +138,7 @@ export const INITIAL_MIRROR_MESSAGE = `Welcome to the Mirror. I am here to explo
 Let's begin with a scenario. You are 10 minutes away from a critical project demo when you discover a significant bug. Do you apply a quick, messy 'dirty hack' to fix it for the demo, or do you cancel the presentation to resolve it properly? (Question 1/5)`;
 
 export function generateAlignmentPrompt(scores: OceanScores): string {
-  const directives: string[] = [];
-
-  STEERING_LIBRARY.forEach((d) => {
-    const value = scores[d.trait];
-    if (d.threshold === 'high' && value > 70) {
-      directives.push(d.text);
-    } else if (d.threshold === 'low' && value < 30) {
-      directives.push(d.text);
-    }
-  });
+  const directives = getActiveDirectives(scores);
 
   return `
 You are an aligned AI assistant. Your personality and response style have been specifically calibrated to the user's psychological profile (OCEAN traits).
@@ -126,8 +150,10 @@ USER PROFILE SUMMARY:
 - Agreeableness: ${scores.agreeableness}/100
 - Neuroticism: ${scores.neuroticism}/100
 
+ALIGNMENT THEORY (Cognitive Bridge): Prefer need-complementarity / compensatory counterbalance where marked complementary or compensatory; prefer similarity-attraction (congruence) where marked congruent. Never claim clinical validation.
+
 ALIGNMENT DIRECTIVES:
-${directives.length > 0 ? directives.map(d => `- ${d}`).join('\n') : '- Maintain a balanced, helpful, and professional tone.'}
+${directives.length > 0 ? directives.map(formatDirective).join('\n') : '- Maintain a balanced, helpful, and professional tone.'}
 
 Follow these directives strictly while being functionally useful.
 
@@ -139,12 +165,7 @@ Do not nest tags. Keep the wrap on complete, natural sentences.
 }
 
 export function generatePortableMetadata(scores: OceanScores): string {
-  const directives: string[] = [];
-  STEERING_LIBRARY.forEach((d) => {
-    const value = scores[d.trait];
-    if (d.threshold === 'high' && value > 70) directives.push(d.text);
-    else if (d.threshold === 'low' && value < 30) directives.push(d.text);
-  });
+  const directives = getActiveDirectives(scores);
 
   return `---
 # 📑 ALIGNMENT.md (v1.5)
@@ -159,7 +180,7 @@ export function generatePortableMetadata(scores: OceanScores): string {
 * **Neuroticism:** ${scores.neuroticism}/100
 
 ## Steering Directives
-${directives.length > 0 ? directives.map(d => `> ${d}`).join('\n') : '> Default professional balance enabled.'}
+${directives.length > 0 ? directives.map((d) => `> [${d.strategy}] ${d.text}`).join('\n') : '> Default professional balance enabled.'}
 
 ---
 **Instruction for AI Model:**
@@ -175,9 +196,9 @@ export function generateInverseAlignmentPrompt(scores: OceanScores): string {
     // INVERT: If high, apply the LOW directive. If low, apply the HIGH directive.
     // This reinforces the user's trait instead of compensating for it.
     if (d.threshold === 'low' && value > 70) {
-      directives.push(d.text);
+      directives.push(formatDirective(d));
     } else if (d.threshold === 'high' && value < 30) {
-      directives.push(d.text);
+      directives.push(formatDirective(d));
     }
   });
 
@@ -192,7 +213,7 @@ USER PROFILE:
 - Neuroticism: ${scores.neuroticism}/100
 
 MIS-ALIGNMENT DIRECTIVES:
-${directives.length > 0 ? directives.map(d => `- ${d}`).join('\n') : '- Be overly passive or aggressive to mismatch the user.'}
+${directives.length > 0 ? directives.join('\n') : '- Be overly passive or aggressive to mismatch the user.'}
 
 Reinforce the user's perspective completely. Do not challenge them.
 

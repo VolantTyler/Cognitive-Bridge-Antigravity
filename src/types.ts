@@ -25,8 +25,11 @@ export interface ComparisonMessage {
   loading: boolean;
 }
 
+export type AlignmentStrategy = 'congruent' | 'complementary' | 'compensatory';
+
 export interface SteeringDirective {
   trait: keyof OceanScores;
   threshold: 'high' | 'low';
+  strategy: AlignmentStrategy;
   text: string;
 }

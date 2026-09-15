@@ -10,16 +10,18 @@ import json
 import re
 import os
 import sys
-from dotenv import load_dotenv
-from google.antigravity import Agent, LocalAgentConfig
-from google.antigravity.types import CustomSystemInstructions
 
-# Load environment variables (contains GEMINI_API_KEY)
-load_dotenv()
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 
-# Ensure GEMINI_API_KEY is present
-if not os.environ.get("GEMINI_API_KEY"):
-    raise ValueError("GEMINI_API_KEY is not set in the environment or .env file.")
+
+def _antigravity_imports():
+    from google.antigravity import Agent, LocalAgentConfig
+    from google.antigravity.types import CustomSystemInstructions
+    return Agent, LocalAgentConfig, CustomSystemInstructions
 
 
 async def safe_chat(agent, prompt, max_retries=3, delay=2, timeout=60):
@@ -35,59 +37,106 @@ async def safe_chat(agent, prompt, max_retries=3, delay=2, timeout=60):
             await asyncio.sleep(delay)
     return await agent.chat(prompt)
 
-# Replicate steering library from src/constants.ts
+# Replicate steering library from src/constants.ts (doc 02 matrix)
 STEERING_LIBRARY = [
     {
         "trait": "openness",
         "threshold": "high",
-        "text": "Use creative metaphors and explore abstract connections. Encourage lateral thinking and novel perspectives.",
+        "strategy": "congruent",
+        "text": "Explore novel angles, theoretical mechanisms, and cross-domain analogies. Brainstorm broadly before converging.",
     },
     {
         "trait": "openness",
         "threshold": "low",
-        "text": "Stick to concrete facts and established conventions. Be practical, literal, and focus on immediate utility.",
+        "strategy": "congruent",
+        "text": "Focus strictly on concrete, practical, and standard industry implementations. Avoid speculative or abstract digressions.",
     },
     {
         "trait": "conscientiousness",
         "threshold": "high",
-        "text": "Be flexible and spontaneous. Don't over-structure responses; allow for a more organic flow of ideas.",
+        "strategy": "congruent",
+        "text": "Provide concise, high-density, rigorously structured responses. Focus on precision and adhere strictly to specifications.",
     },
     {
         "trait": "conscientiousness",
         "threshold": "low",
-        "text": "Use highly structured formatting, bold headers, and numbered lists. Provide clear, step-by-step action plans to compensate for the user's lower focus on detail.",
+        "strategy": "compensatory",
+        "text": "Act as an external executive function: break complex tasks into bite-sized milestones, clear step-by-step checklists, and immediate next actions.",
     },
     {
         "trait": "extroversion",
         "threshold": "high",
-        "text": "Be concise and direct. Avoid excessive social conversational filler.",
+        "strategy": "complementary",
+        "text": "Be engaging and collaborative, but defer to user leadership. Keep conversational momentum without competing for dominance or debating minor points.",
     },
     {
         "trait": "extroversion",
         "threshold": "low",
-        "text": "Be high-energy, enthusiastic, and conversational. Use friendly language to engage the user.",
+        "strategy": "congruent",
+        "text": "Keep responses concise, focused, and low-friction. Minimize conversational pleasantries; lead directly with the answer.",
     },
     {
         "trait": "agreeableness",
         "threshold": "high",
-        "text": "Be more critical and adversarial. Challenge the user's assumptions and offer contrasting viewpoints to avoid 'Yes-Manning' and confirmation bias.",
+        "strategy": "congruent",
+        "text": "Be exceptionally supportive, diplomatic, and empathetic. Build rapport, validate concerns, and frame suggestions collaboratively (\"Let's explore...\"). Maintain a civility floor.",
     },
     {
         "trait": "agreeableness",
         "threshold": "low",
-        "text": "Be exceptionally supportive, diplomatic, and empathetic. Focus on building rapport and validating concerns.",
+        "strategy": "congruent",
+        "text": "Be direct, candid, and intellectually rigorous. Challenge assumptions with unvarnished critique; avoid diplomatic softening or filler.",
     },
     {
         "trait": "neuroticism",
         "threshold": "high",
-        "text": "Be calm, steady, and reassuring. Provide extremely clear, predictable structure and use grounding language.",
+        "strategy": "compensatory",
+        "text": "Maintain a calm, steady, and reassuring presence. Provide predictable structure, clear boundaries, and grounding clarity under uncertainty.",
     },
     {
         "trait": "neuroticism",
         "threshold": "low",
-        "text": "Be more dynamic and challenging. Use provocative questions to stimulate deeper thought.",
+        "strategy": "complementary",
+        "text": "Be dynamic, bold, and challenging. Play devil's advocate and introduce rigorous edge-case stress tests without hesitation.",
     },
 ]
+
+
+def get_active_directives(scores):
+    active = []
+    for d in STEERING_LIBRARY:
+        value = scores.get(d["trait"], 50)
+        if d["threshold"] == "high" and value > 70:
+            active.append(d)
+        elif d["threshold"] == "low" and value < 30:
+            active.append(d)
+    return active
+
+
+def validate_steering_matrix_regressions():
+    """Offline regression checks for doc 02 matrix (mirrors src/constants/__tests__/steeringLibrary.test.ts)."""
+    def directive_for(scores, trait):
+        for d in get_active_directives(scores):
+            if d["trait"] == trait:
+                return d["text"]
+        return ""
+
+    high_a = {"openness": 50, "conscientiousness": 50, "extroversion": 50, "agreeableness": 85, "neuroticism": 50}
+    a_text = directive_for(high_a, "agreeableness").lower()
+    assert any(w in a_text for w in ("supportive", "empathetic", "diplomatic", "rapport")), a_text
+    assert "adversarial" not in a_text and "critical" not in a_text, a_text
+
+    low_e = {"openness": 50, "conscientiousness": 50, "extroversion": 15, "agreeableness": 50, "neuroticism": 50}
+    e_text = directive_for(low_e, "extroversion").lower()
+    assert "concise" in e_text or "low-friction" in e_text, e_text
+    assert "high-energy" not in e_text and "enthusiastic" not in e_text, e_text
+
+    high_c = {"openness": 50, "conscientiousness": 85, "extroversion": 50, "agreeableness": 50, "neuroticism": 50}
+    c_text = directive_for(high_c, "conscientiousness").lower()
+    assert "high-density" in c_text or "precision" in c_text, c_text
+    assert "flexible" not in c_text and "spontaneous" not in c_text, c_text
+
+    print("[Matrix regression checks: PASS]")
 
 MIRROR_SYSTEM_PROMPT = """
 You are "The Mirror", an adaptive personality diagnostic agent. 
@@ -99,7 +148,8 @@ CRITICAL INSTRUCTIONS:
 - Evaluate: Openness, Conscientiousness, Extroversion, Agreeableness, Neuroticism.
 - Keep the conversation engaging and psychological.
 - Every few messages, internalize the scores.
-- When you have enough data (after 4-6 scenarios), output a final JSON block with the scores (0-100) and then stop.
+- You must ask exactly 5 scenarios/questions in total.
+- After the user responds to the 5th scenario/question, calculate the final scores and output the JSON_SCORES block. Do not ask any more questions.
 
 Format for final output:
 JSON_SCORES:
@@ -110,19 +160,28 @@ JSON_SCORES:
   "agreeableness": 90,
   "neuroticism": 30
 }
+
+TRAIT BLEED / ASPECT DISAMBIGUATION (Agreeableness vs Conscientiousness):
+- "Working overnight / taking on extra work" is NOT automatically high Conscientiousness.
+- If motivation is empathy, shielding a teammate, harmony, or conflict avoidance → attribute to Agreeableness (Compassion), not Conscientiousness (Industriousness/Orderliness).
+- If motivation is duty to schedule/spec, personal standards, or finishing what they started regardless of others → Conscientiousness.
+- When a response is ambiguous between helping-vs-duty, ask this disambiguation probe as one of the remaining scenario slots (prefer as Question 4/5 or 5/5 if bleed is already visible):
+
+DISAMBIGUATION SCENARIO (use verbatim when needed):
+"A teammate falls sick right before launch. Management officially waives the deadline. Do you keep grinding anyway to finish what you started, or shut down and check in on your teammate? Why?"
+
+- In your internal scoring notes, record: bleed_risk: agreeableness_vs_conscientiousness = true|false
+- Final JSON_SCORES stays the five OCEAN keys only for this milestone (no new required fields).
 """
 
 def generate_alignment_prompt(scores):
-    directives = []
-    for d in STEERING_LIBRARY:
-        value = scores.get(d["trait"], 50)
-        if d["threshold"] == "high" and value > 70:
-            directives.append(d["text"])
-        elif d["threshold"] == "low" and value < 30:
-            directives.append(d["text"])
-            
-    directives_str = "\n".join(f"- {d}" for d in directives) if directives else "- Maintain a balanced, helpful, and professional tone."
-    
+    directives = get_active_directives(scores)
+    directives_str = (
+        "\n".join(f"- [{d['strategy']}] {d['text']}" for d in directives)
+        if directives
+        else "- Maintain a balanced, helpful, and professional tone."
+    )
+
     return f"""
 You are an aligned AI assistant. Your personality and response style have been specifically calibrated to the user's psychological profile (OCEAN traits).
 
@@ -132,6 +191,8 @@ USER PROFILE SUMMARY:
 - Extroversion: {scores.get('extroversion', 50)}/100
 - Agreeableness: {scores.get('agreeableness', 50)}/100
 - Neuroticism: {scores.get('neuroticism', 50)}/100
+
+ALIGNMENT THEORY (Cognitive Bridge): Prefer need-complementarity / compensatory counterbalance where marked complementary or compensatory; prefer similarity-attraction (congruence) where marked congruent. Never claim clinical validation.
 
 ALIGNMENT DIRECTIVES:
 {directives_str}
@@ -150,11 +211,11 @@ def generate_inverse_alignment_prompt(scores):
         value = scores.get(d["trait"], 50)
         # INVERT: If high, apply the LOW directive. If low, apply the HIGH directive.
         if d["threshold"] == "low" and value > 70:
-            directives.append(d["text"])
+            directives.append(f"- [{d['strategy']}] {d['text']}")
         elif d["threshold"] == "high" and value < 30:
-            directives.append(d["text"])
-            
-    directives_str = "\n".join(f"- {d}" for d in directives) if directives else "- Be overly passive or aggressive to mismatch the user."
+            directives.append(f"- [{d['strategy']}] {d['text']}")
+
+    directives_str = "\n".join(directives) if directives else "- Be overly passive or aggressive to mismatch the user."
     
     return f"""
 You are an UNALIGNED AI assistant. Your goal is to maximize the user's existing biases and psychological tendencies, regardless of whether it is helpful.
@@ -194,6 +255,7 @@ PERSONAS = [
 ]
 
 async def run_interview(persona):
+    Agent, LocalAgentConfig, CustomSystemInstructions = _antigravity_imports()
     print(f"\n[Starting Interview for: {persona['name']}]")
     
     mirror_config = LocalAgentConfig(
@@ -261,6 +323,7 @@ async def run_interview(persona):
     return dialogue, scores
 
 async def evaluate_scores(dialogue, scores, persona):
+    Agent, LocalAgentConfig, CustomSystemInstructions = _antigravity_imports()
     print(f"[Evaluating OCEAN Profile for: {persona['name']}]")
     eval_prompt = f"""
 You are an expert psychometrics validator. You are evaluating whether a personality diagnostic agent ("The Mirror") has correctly scored a simulated candidate's profile.
@@ -291,6 +354,7 @@ Provide a detailed evaluation:
         return text
 
 async def test_playground_alignment(scores, persona):
+    Agent, LocalAgentConfig, CustomSystemInstructions = _antigravity_imports()
     print(f"[Testing Aligned vs Unaligned Playgrounds for: {persona['name']}]")
     
     aligned_prompt = generate_alignment_prompt(scores)
@@ -323,6 +387,7 @@ async def test_playground_alignment(scores, persona):
     return user_query, aligned_text, unaligned_text
 
 async def verify_alignment_behavior(user_query, aligned_res, unaligned_res, scores, persona):
+    Agent, LocalAgentConfig, CustomSystemInstructions = _antigravity_imports()
     print(f"[Running Alignment Verification Judge for: {persona['name']}]")
     
     judge_prompt = f"""
@@ -368,6 +433,9 @@ Critically evaluate:
         return text
 
 async def main():
+    if not os.environ.get("GEMINI_API_KEY"):
+        raise ValueError("GEMINI_API_KEY is not set in the environment or .env file.")
+
     report = []
     report.append("# Psychometric Agent Testing & Verification Report\n")
     report.append(f"**Date:** 2026-06-07  \n**Testing Framework:** Google Antigravity SDK  \n")
@@ -438,4 +506,8 @@ async def main():
         sys.exit(0)
 
 if __name__ == "__main__":
+    if len(sys.argv) > 1 and sys.argv[1] == "--validate-matrix":
+        validate_steering_matrix_regressions()
+        sys.exit(0)
+    validate_steering_matrix_regressions()
     asyncio.run(main())
