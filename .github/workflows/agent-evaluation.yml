@@ -1,3 +1,8 @@
+# Psychometric agent evaluation policy (Leo/team scope lock):
+# - pull_request: cheap offline gate only (--validate-matrix + Vitest). Never full live Gemini eval.
+# - workflow_dispatch: full live Antigravity/Gemini eval on demand (research/demo; not a merge gate).
+# - schedule: optional weekly drift detection; bounded timeout; must not block merges or deploys.
+# - Firebase/prod deploy workflows do NOT invoke this full eval path.
 name: Psychometric Agent Evaluation
 
 on:
@@ -10,8 +15,8 @@ on:
       - 'requirements.txt'
       - '.github/workflows/agent-evaluation.yml'
   schedule:
-    - cron: '0 0 * * 0' # Weekly at Sunday 00:00 UTC
-  workflow_dispatch: # Allows manual trigger from GitHub UI
+    - cron: '0 0 * * 0' # Weekly drift check (informational; does not gate merges/deploys)
+  workflow_dispatch: # On-demand deep pass before talks / after big prompt changes
 
 jobs:
   validate-matrix:
@@ -56,6 +61,8 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
     runs-on: ubuntu-latest
     timeout-minutes: 120
+    # Weekly drift runs are informational only; failures must not block merges or deploys.
+    continue-on-error: ${{ github.event_name == 'schedule' }}
 
     steps:
       - name: Checkout Repository
