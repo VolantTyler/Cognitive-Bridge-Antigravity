@@ -3,7 +3,29 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { OceanScores, SteeringDirective } from './types';
+import { AlignmentStrategy, OceanScores, SteeringDirective } from './types';
+
+/** UI copy for alignment strategy badges (matches ALIGNMENT THEORY in generateAlignmentPrompt). */
+export const ALIGNMENT_STRATEGY_INFO: Record<
+  AlignmentStrategy,
+  { label: string; tooltip: string }
+> = {
+  congruent: {
+    label: 'Congruent',
+    tooltip:
+      'Similarity alignment: the agent mirrors your level on this trait (similarity-attraction / congruence).',
+  },
+  compensatory: {
+    label: 'Compensatory',
+    tooltip:
+      'Need-complementarity: the agent counterbalances this trait to fill gaps and provide structure.',
+  },
+  complementary: {
+    label: 'Complementary',
+    tooltip:
+      'Complementarity: the agent differs in a useful way to balance the interaction without mirroring extremes.',
+  },
+};
 
 export const STEERING_LIBRARY: SteeringDirective[] = [
   // Openness — Congruent

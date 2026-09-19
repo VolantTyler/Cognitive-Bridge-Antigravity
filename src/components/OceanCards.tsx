@@ -7,6 +7,7 @@ import React from 'react';
 import { motion } from 'motion/react';
 import { OceanScores } from '../types';
 import { STEERING_LIBRARY } from '../constants';
+import StrategyBadge from './StrategyBadge';
 
 interface OceanCardsProps {
   scores: OceanScores | null;
@@ -77,27 +78,31 @@ export default function OceanCards({ scores }: OceanCardsProps) {
             key={trait}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className={`p-4 rounded-xl border border-border-primary ${config.bg} flex flex-col gap-3 relative overflow-hidden group transition-colors duration-300`}
+            className={`p-4 rounded-xl border border-border-primary ${config.bg} flex flex-col gap-3 relative group transition-colors duration-300`}
           >
-            {/* Shaded background based on score */}
-            {hasScore && (
-              <div 
-                className={`absolute left-0 top-0 bottom-0 ${config.bgShaded} opacity-20 pointer-events-none transition-all duration-700`}
-                style={{ width: `${value}%` }}
-              />
-            )}
-            
-            <div className="flex items-center gap-3 relative z-10">
-              <span className={`text-2xl font-black font-mono leading-none tracking-normal select-none ${config.color}`}>
-                {config.letter}
-              </span>
-              <span className="text-[10px] uppercase font-bold tracking-[0.1em] text-text-muted group-hover:text-text-secondary transition-colors truncate">
-                {config.label}
-              </span>
-              {activeDirective && (
-                <span className="text-[10px] px-2 py-0.5 rounded font-medium bg-bg-tertiary border border-border-secondary text-text-muted ml-auto shrink-0">
-                  {activeDirective.strategy}
+            {/* Shaded background — clipped separately so strategy tooltips are not cut off */}
+            <div className="absolute inset-0 rounded-xl overflow-hidden pointer-events-none" aria-hidden>
+              {hasScore && (
+                <div
+                  className={`absolute left-0 top-0 bottom-0 ${config.bgShaded} opacity-20 transition-all duration-700`}
+                  style={{ width: `${value}%` }}
+                />
+              )}
+            </div>
+
+            <div className="flex flex-col gap-2 relative z-10 min-w-0">
+              <div className="flex items-start gap-2 min-w-0">
+                <span
+                  className={`text-2xl font-black font-mono leading-none tracking-normal select-none shrink-0 ${config.color}`}
+                >
+                  {config.letter}
                 </span>
+                <span className="text-[10px] uppercase font-bold tracking-[0.1em] text-text-muted group-hover:text-text-secondary transition-colors leading-snug pt-0.5">
+                  {config.label}
+                </span>
+              </div>
+              {activeDirective && (
+                <StrategyBadge strategy={activeDirective.strategy} className="self-start" />
               )}
             </div>
             
