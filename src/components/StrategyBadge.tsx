@@ -20,8 +20,13 @@ export default function StrategyBadge({ strategy, className = '', 'data-testid':
   const tooltipId = useId();
   const info = ALIGNMENT_STRATEGY_INFO[strategy];
 
+  // Display classes belong on className so responsive hide/show (e.g. hidden md:inline-flex) is not overridden.
+  const rootClassName = className
+    ? `relative group/strategy ${className}`
+    : 'relative inline-flex group/strategy';
+
   return (
-    <span className={`relative inline-flex group/strategy ${className}`} data-testid={testId}>
+    <span className={rootClassName} data-testid={testId}>
       <button
         type="button"
         className={`${PILL_CLASS} cursor-help focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/60 focus-visible:ring-offset-1 focus-visible:ring-offset-transparent`}

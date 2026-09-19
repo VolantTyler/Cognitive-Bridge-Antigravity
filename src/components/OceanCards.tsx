@@ -128,7 +128,7 @@ export default function OceanCards({ scores }: OceanCardsProps) {
             {activeDirective && (
               <StrategyBadge
                 strategy={activeDirective.strategy}
-                className="md:hidden self-start relative z-10"
+                className="inline-flex md:hidden self-start relative z-10"
                 data-testid="ocean-strategy-badge-mobile"
               />
             )}

@@ -36,6 +36,11 @@ describe('OceanCards strategy badge layout', () => {
     }
     for (const badge of mobileBadges) {
       expect(badge.className).toMatch(/md:hidden/);
+      expect(badge.className).toMatch(/inline-flex/);
+    }
+
+    for (const badge of desktopBadges) {
+      expect(badge.className).not.toMatch(/(?:^|\s)inline-flex(?:\s|$)/);
     }
 
     expect(desktopBadges[0].querySelector('button')?.textContent).toBe('Compensatory');
