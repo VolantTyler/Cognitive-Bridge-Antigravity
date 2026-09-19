@@ -13,14 +13,15 @@ const PILL_CLASS =
 interface StrategyBadgeProps {
   strategy: AlignmentStrategy;
   className?: string;
+  'data-testid'?: string;
 }
 
-export default function StrategyBadge({ strategy, className = '' }: StrategyBadgeProps) {
+export default function StrategyBadge({ strategy, className = '', 'data-testid': testId }: StrategyBadgeProps) {
   const tooltipId = useId();
   const info = ALIGNMENT_STRATEGY_INFO[strategy];
 
   return (
-    <span className={`relative inline-flex group/strategy ${className}`}>
+    <span className={`relative inline-flex group/strategy ${className}`} data-testid={testId}>
       <button
         type="button"
         className={`${PILL_CLASS} cursor-help focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/60 focus-visible:ring-offset-1 focus-visible:ring-offset-transparent`}

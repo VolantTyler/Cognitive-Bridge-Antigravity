@@ -90,36 +90,48 @@ export default function OceanCards({ scores }: OceanCardsProps) {
               )}
             </div>
 
-            <div className="flex flex-col gap-2 relative z-10 min-w-0">
-              <div className="flex items-start gap-2 min-w-0">
-                <span
-                  className={`text-2xl font-black font-mono leading-none tracking-normal select-none shrink-0 ${config.color}`}
-                >
-                  {config.letter}
+            <div className="flex items-start gap-2 min-w-0 relative z-10">
+              <span
+                className={`text-2xl font-black font-mono leading-none tracking-normal select-none shrink-0 ${config.color}`}
+              >
+                {config.letter}
+              </span>
+              <span className="text-[10px] uppercase font-bold tracking-[0.1em] text-text-muted group-hover:text-text-secondary transition-colors leading-snug pt-0.5">
+                {config.label}
+              </span>
+            </div>
+
+            <div className="flex items-end justify-between gap-2 min-h-[2.25rem] relative z-10">
+              <div className="flex items-end gap-1 min-w-0">
+                <span className={`text-3xl font-mono font-bold tracking-tighter ${hasScore ? 'text-text-primary' : 'text-text-muted-darker'}`}>
+                  {hasScore ? value : '--'}
                 </span>
-                <span className="text-[10px] uppercase font-bold tracking-[0.1em] text-text-muted group-hover:text-text-secondary transition-colors leading-snug pt-0.5">
-                  {config.label}
-                </span>
+                <span className={`text-[10px] mb-1.5 ${hasScore ? 'text-text-muted-dark' : 'text-text-muted-darker'}`}>/100</span>
               </div>
               {activeDirective && (
-                <StrategyBadge strategy={activeDirective.strategy} className="self-start" />
+                <StrategyBadge
+                  strategy={activeDirective.strategy}
+                  className="hidden md:inline-flex shrink-0 self-end mb-0.5"
+                  data-testid="ocean-strategy-badge-desktop"
+                />
               )}
             </div>
-            
-            <div className="flex items-end gap-1 relative z-10">
-              <span className={`text-3xl font-mono font-bold tracking-tighter ${hasScore ? 'text-text-primary' : 'text-text-muted-darker'}`}>
-                {hasScore ? value : '--'}
-              </span>
-              <span className={`text-[10px] mb-1.5 ${hasScore ? 'text-text-muted-dark' : 'text-text-muted-darker'}`}>/100</span>
-            </div>
-            
+
             <div className="h-2 bg-black/40 rounded-full overflow-hidden relative z-10 border border-border-primary/10">
-              <motion.div 
+              <motion.div
                 initial={{ width: 0 }}
                 animate={{ width: hasScore ? `${value}%` : '0%' }}
                 className={`h-full ${config.bgBar} shadow-[0_0_10px_rgba(255,255,255,0.1)]`}
               />
             </div>
+
+            {activeDirective && (
+              <StrategyBadge
+                strategy={activeDirective.strategy}
+                className="md:hidden self-start relative z-10"
+                data-testid="ocean-strategy-badge-mobile"
+              />
+            )}
           </motion.div>
         );
       })}
