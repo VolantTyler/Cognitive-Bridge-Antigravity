@@ -94,7 +94,7 @@ export default function Tailor({ scores, onNext }: TailorProps) {
                     }`}>
                       {d.threshold === 'high' ? 'High' : 'Low'} {TRAIT_CONFIG[d.trait].label}
                     </span>
-                    <StrategyBadge strategy={d.strategy} />
+                    <StrategyBadge strategy={d.strategy} tooltipPlacement="above" />
                   </div>
                   <p className="text-sm text-text-secondary leading-relaxed italic">"{d.text}"</p>
                 </motion.div>

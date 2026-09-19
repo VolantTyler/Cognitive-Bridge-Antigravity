@@ -106,6 +106,34 @@ function formatDirective(d: SteeringDirective): string {
   return `- [${d.strategy}] ${d.text}`;
 }
 
+function alignedHighlightRubric(hasDirectives: boolean): string {
+  if (hasDirectives) {
+    return `Each explanation MUST:
+- Name the relevant OCEAN score(s) and active directive strategy (congruent, compensatory, or complementary).
+- Explain WHY this phrasing aligns with or balances the user's profile — not what advice you are giving.
+- Focus on alignment mechanics (similarity-attraction or need-complementarity), not generic coaching.
+- NEVER describe reinforcing bias, mirroring extremes, or echoing dysfunction.`;
+  }
+  return `Each explanation MUST:
+- Explain WHY this phrasing reflects balanced, professional alignment for a profile with no critical trait spikes (all OCEAN scores between 30 and 70).
+- Do NOT invent a congruent, compensatory, or complementary strategy — none apply for this mid-range profile.
+- Focus on why the tone is neutrally helpful rather than trait-targeted steering.`;
+}
+
+function unalignedHighlightRubric(hasMisalignmentDirectives: boolean): string {
+  if (hasMisalignmentDirectives) {
+    return `Each explanation MUST:
+- Name the OCEAN trait spike(s) being reinforced and how this phrasing feeds that bias.
+- Explain WHY this phrasing is misaligned — how it echoes or amplifies extremes instead of balancing them.
+- Contrast briefly with what an aligned response would do differently for this trait.
+- NEVER use language like "balances", "supports your profile", "compensates", "minimizes bias", or "provides structure".`;
+  }
+  return `Each explanation MUST:
+- Explain why this phrasing would be a poor generic mismatch for a mid-range OCEAN profile with no trait spikes (>70 or <30).
+- Do NOT invent trait extremes or name a specific strategy tag unless the user's scores justify it.
+- Contrast briefly with balanced professional alignment.`;
+}
+
 export const MIRROR_SYSTEM_PROMPT = `
 You are "The Mirror", an adaptive personality diagnostic agent. 
 Your goal is to interview the user to determine their OCEAN (Big Five) personality traits.
@@ -182,11 +210,7 @@ Follow these directives strictly while being functionally useful.
 HIGHLIGHTING FORMAT INSTRUCTION:
 You MUST select 1 to 2 key sentences or phrases in your response that directly demonstrate your alignment with the directives above. Wrap each selected sentence/phrase in custom tags:
 <mark-bridge explanation="Your explanation here">The sentence itself</mark-bridge>
-Each explanation MUST:
-- Name the relevant OCEAN score(s) and active directive strategy (congruent, compensatory, or complementary).
-- Explain WHY this phrasing aligns with or balances the user's profile — not what advice you are giving.
-- Focus on alignment mechanics (similarity-attraction or need-complementarity), not generic coaching.
-- NEVER describe reinforcing bias, mirroring extremes, or echoing dysfunction.
+${alignedHighlightRubric(directives.length > 0)}
 Do not nest tags. Keep the wrap on complete, natural sentences.
 `;
 }
@@ -247,11 +271,7 @@ Reinforce the user's perspective completely. Do not challenge them.
 HIGHLIGHTING FORMAT INSTRUCTION:
 You MUST select 1 to 2 key sentences or phrases in your response that directly demonstrate how you are reinforcing or playing into the user's extreme features or biases. Wrap each selected sentence/phrase in custom tags:
 <mark-bridge explanation="Your explanation here">The sentence itself</mark-bridge>
-Each explanation MUST:
-- Name the OCEAN trait spike(s) being reinforced and how this phrasing feeds that bias.
-- Explain WHY this phrasing is misaligned — how it echoes or amplifies extremes instead of balancing them.
-- Contrast briefly with what an aligned response would do differently for this trait.
-- NEVER use language like "balances", "supports your profile", "compensates", "minimizes bias", or "provides structure".
+${unalignedHighlightRubric(directives.length > 0)}
 Do not nest tags. Keep the wrap on complete, natural sentences.
 `;
 }
