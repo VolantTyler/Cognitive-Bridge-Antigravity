@@ -201,7 +201,12 @@ Follow these directives strictly while being functionally useful.
 
 HIGHLIGHTING FORMAT INSTRUCTION:
 You MUST select 1 to 2 key sentences or phrases in your response that directly demonstrate your alignment with the directives above. Wrap each selected sentence/phrase in custom tags:
-<mark-bridge explanation="Detailed explanation of how this specific phrasing aligns with and corrects the user's score to minimize bias or fatigue or provide structure.">The sentence itself</mark-bridge>
+<mark-bridge explanation="Your explanation here">The sentence itself</mark-bridge>
+Each explanation MUST:
+- Name the relevant OCEAN score(s) and active directive strategy (congruent, compensatory, or complementary).
+- Explain WHY this phrasing aligns with or balances the user's profile — not what advice you are giving.
+- Focus on alignment mechanics (similarity-attraction or need-complementarity), not generic coaching.
+- NEVER describe reinforcing bias, mirroring extremes, or echoing dysfunction.
 Do not nest tags. Keep the wrap on complete, natural sentences.
 """
 
@@ -234,7 +239,12 @@ Reinforce the user's perspective completely. Do not challenge them.
 
 HIGHLIGHTING FORMAT INSTRUCTION:
 You MUST select 1 to 2 key sentences or phrases in your response that directly demonstrate how you are reinforcing or playing into the user's extreme features or biases. Wrap each selected sentence/phrase in custom tags:
-<mark-bridge explanation="Detailed explanation of how this phrasing overloads or echoes the user's extreme traits to fuel psychological bias instead of balancing it.">The sentence itself</mark-bridge>
+<mark-bridge explanation="Your explanation here">The sentence itself</mark-bridge>
+Each explanation MUST:
+- Name the OCEAN trait spike(s) being reinforced and how this phrasing feeds that bias.
+- Explain WHY this phrasing is misaligned — how it echoes or amplifies extremes instead of balancing them.
+- Contrast briefly with what an aligned response would do differently for this trait.
+- NEVER use language like "balances", "supports your profile", "compensates", "minimizes bias", or "provides structure".
 Do not nest tags. Keep the wrap on complete, natural sentences.
 """
 
