@@ -54,6 +54,9 @@ describe('OceanCards strategy badge layout', () => {
     const button = desktopBadge.querySelector('button');
 
     expect(button).toHaveAttribute('aria-describedby');
-    expect(desktopBadge.querySelector('[role="tooltip"]')?.textContent).toMatch(/Need-complementarity/i);
+    const tooltip = desktopBadge.querySelector('[role="tooltip"]');
+    expect(tooltip?.textContent).toMatch(/Need-complementarity/i);
+    expect(tooltip?.className).toMatch(/bottom-full/);
+    expect(tooltip?.className).toMatch(/strategy-badge-tooltip/);
   });
 });

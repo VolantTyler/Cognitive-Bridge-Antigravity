@@ -101,7 +101,7 @@ export default function OceanCards({ scores }: OceanCardsProps) {
               </span>
             </div>
 
-            <div className="flex items-end justify-between gap-2 min-h-[2.25rem] relative z-10">
+            <div className="flex items-end justify-between gap-2 min-h-[2.25rem] relative z-20">
               <div className="flex items-end gap-1 min-w-0">
                 <span className={`text-3xl font-mono font-bold tracking-tighter ${hasScore ? 'text-text-primary' : 'text-text-muted-darker'}`}>
                   {hasScore ? value : '--'}
@@ -111,13 +111,14 @@ export default function OceanCards({ scores }: OceanCardsProps) {
               {activeDirective && (
                 <StrategyBadge
                   strategy={activeDirective.strategy}
+                  tooltipPlacement="above"
                   className="hidden md:inline-flex shrink-0 self-end mb-0.5"
                   data-testid="ocean-strategy-badge-desktop"
                 />
               )}
             </div>
 
-            <div className="h-2 bg-black/40 rounded-full overflow-hidden relative z-10 border border-border-primary/10">
+            <div className="h-2 bg-black/40 rounded-full overflow-hidden relative z-[1] border border-border-primary/10">
               <motion.div
                 initial={{ width: 0 }}
                 animate={{ width: hasScore ? `${value}%` : '0%' }}
