@@ -24,6 +24,10 @@ This document compiles the key architectural, psychological, and engineering lea
 * **Problem**: Chat interactions with large language models during multi-turn simulations are prone to transient failures, empty responses, or API hangs. In a CI runner (like GitHub Actions), a single hung request can block the workflow indefinitely or cause a crash.
 * **Resolution**: Implemented a resilient request wrapper (`safe_chat`) that enforces a timeout (`asyncio.wait_for`) and wraps the call in a retry loop with exponential backoff (e.g., 3 retries, 2-second delay). It also explicitly fetches `.text()` on the response to force content parsing and detect empty payloads early.
 
+### Gemini Free-Tier Quota & Antigravity Retry Loops
+* **Problem**: The Antigravity localharness defaults (and especially `RetryConfig.benchmark()`) can retry HTTP 429 quota errors for hours. On a free-tier `GEMINI_API_KEY`, the full psychometric eval exhausts `generate_content_free_tier_requests` quickly and the GitHub Action hits its 120-minute timeout even though the key is valid.
+* **Resolution**: Pass a bounded `retry_config` (`max_retries=0`) to every `LocalAgentConfig`, fail fast in `safe_chat` when errors mention quota/billing/free-tier, write an abort section to `agent_test_report.md`, and wrap agent teardown in `_agent_session` with a 60-second shutdown timeout so orphan `localharness` processes do not block job exit.
+
 ### Portable Path Resolution
 * **Problem**: Hardcoding workspace paths (e.g., `/Users/tyler/antigravity/...`) results in instant breakage in containerized runners (e.g., `/home/runner/work/...` on GitHub Actions).
 * **Resolution**: All path generation must be resolved relative to the location of the execution scripts:

@@ -6,6 +6,7 @@ OCEAN profiling accuracy, and playground alignment behavior.
 """
 
 import asyncio
+from contextlib import asynccontextmanager
 import json
 import re
 import os
@@ -17,25 +18,114 @@ try:
 except ImportError:
     pass
 
+# Fail fast in CI: Antigravity's RetryConfig.benchmark() retries 429/503 for hours.
+_AGENT_SHUTDOWN_TIMEOUT_SECONDS = 60
+_AGENT_CHAT_TIMEOUT_SECONDS = 120
+
+QUOTA_ERROR_HINT = (
+    "Gemini API quota exceeded (likely free-tier limits on GEMINI_API_KEY). "
+    "Enable billing at https://aistudio.google.com/apikey, create a key from the "
+    "billed project, and update the GEMINI_API_KEY GitHub Actions secret. "
+    "Monitor usage at https://ai.dev/rate-limit."
+)
+
+
+class GeminiQuotaError(RuntimeError):
+    """Raised when Gemini API quota or billing blocks the psychometric eval."""
+
+
+def _is_quota_or_billing_error(error) -> bool:
+    msg = str(error).lower()
+    markers = (
+        "429",
+        "quota exceeded",
+        "free_tier",
+        "exceeded your current quota",
+        "resource_exhausted",
+        "quota_exhausted",
+        "check your plan and billing",
+    )
+    return any(marker in msg for marker in markers)
+
 
 def _antigravity_imports():
     from google.antigravity import Agent, LocalAgentConfig
-    from google.antigravity.types import CustomSystemInstructions
-    return Agent, LocalAgentConfig, CustomSystemInstructions
+    from google.antigravity.types import (
+        CustomSystemInstructions,
+        ModelAPIRetryConfig,
+        RetryConfig,
+    )
+    return Agent, LocalAgentConfig, CustomSystemInstructions, RetryConfig, ModelAPIRetryConfig
 
 
-async def safe_chat(agent, prompt, max_retries=3, delay=2, timeout=60):
-    for i in range(max_retries):
+def _eval_retry_config():
+    """Bounded retries for CI — avoid Antigravity benchmark() unbounded 429 loops."""
+    _, _, _, RetryConfig, ModelAPIRetryConfig = _antigravity_imports()
+    return RetryConfig(
+        api_retry=ModelAPIRetryConfig(
+            max_retries=0,
+            initial_sleep_duration_ms=1000,
+        )
+    )
+
+
+def _make_local_agent_config(system_instructions):
+    _, LocalAgentConfig, CustomSystemInstructions, _, _ = _antigravity_imports()
+    if not isinstance(system_instructions, CustomSystemInstructions):
+        system_instructions = CustomSystemInstructions(text=system_instructions)
+    return LocalAgentConfig(
+        system_instructions=system_instructions,
+        retry_config=_eval_retry_config(),
+    )
+
+
+@asynccontextmanager
+async def _agent_session(config):
+    """Start an Antigravity agent and guarantee teardown within a bounded timeout."""
+    Agent, *_ = _antigravity_imports()
+    agent = Agent(config)
+    await agent.__aenter__()
+    try:
+        yield agent
+    finally:
+        try:
+            await asyncio.wait_for(
+                agent.__aexit__(None, None, None),
+                timeout=_AGENT_SHUTDOWN_TIMEOUT_SECONDS,
+            )
+        except asyncio.TimeoutError:
+            print(
+                f"[Warning] Agent session shutdown timed out after "
+                f"{_AGENT_SHUTDOWN_TIMEOUT_SECONDS}s.",
+                flush=True,
+            )
+        except Exception as exc:
+            print(f"[Warning] Agent session shutdown error: {exc}", flush=True)
+
+
+async def safe_chat(agent, prompt, max_retries=3, delay=2, timeout=_AGENT_CHAT_TIMEOUT_SECONDS):
+    last_error = None
+    for attempt in range(max_retries):
         try:
             response = await asyncio.wait_for(agent.chat(prompt), timeout=timeout)
-            # Try fetching text to force parsing of any empty responses
             text = await asyncio.wait_for(response.text(), timeout=timeout)
-            if text and len(text.strip()) > 0:
+            if text and text.strip():
                 return response
-        except Exception as e:
-            print(f"Warning: agent.chat failed on attempt {i+1}/{max_retries} with error: {e}. Retrying in {delay} seconds...")
-            await asyncio.sleep(delay)
-    return await agent.chat(prompt)
+            last_error = ValueError("Empty model response")
+        except Exception as exc:
+            if _is_quota_or_billing_error(exc):
+                raise GeminiQuotaError(f"{QUOTA_ERROR_HINT}\n\nOriginal error: {exc}") from exc
+            last_error = exc
+            if attempt + 1 < max_retries:
+                print(
+                    f"Warning: agent.chat failed on attempt {attempt + 1}/{max_retries} "
+                    f"with error: {exc}. Retrying in {delay} seconds...",
+                    flush=True,
+                )
+                await asyncio.sleep(delay)
+    raise RuntimeError(
+        f"agent.chat failed after {max_retries} attempts. Last error: {last_error}"
+    )
 
 # Replicate steering library from src/constants.ts (doc 02 matrix)
 STEERING_LIBRARY = [
@@ -255,20 +345,15 @@ PERSONAS = [
 ]
 
 async def run_interview(persona):
-    Agent, LocalAgentConfig, CustomSystemInstructions = _antigravity_imports()
-    print(f"\n[Starting Interview for: {persona['name']}]")
-    
-    mirror_config = LocalAgentConfig(
-        system_instructions=CustomSystemInstructions(text=MIRROR_SYSTEM_PROMPT)
-    )
-    user_config = LocalAgentConfig(
-        system_instructions=CustomSystemInstructions(text=persona["system_instruction"])
-    )
-    
+    print(f"\n[Starting Interview for: {persona['name']}]", flush=True)
+
+    mirror_config = _make_local_agent_config(MIRROR_SYSTEM_PROMPT)
+    user_config = _make_local_agent_config(persona["system_instruction"])
+
     dialogue = []
     scores = None
-    
-    async with Agent(mirror_config) as mirror_agent, Agent(user_config) as user_agent:
+
+    async with _agent_session(mirror_config) as mirror_agent, _agent_session(user_config) as user_agent:
         # Starting prompt from the Mirror
         mirror_query = (
             "Welcome to the Mirror. I am here to explore the architecture of your mind. "
@@ -323,8 +408,7 @@ async def run_interview(persona):
     return dialogue, scores
 
 async def evaluate_scores(dialogue, scores, persona):
-    Agent, LocalAgentConfig, CustomSystemInstructions = _antigravity_imports()
-    print(f"[Evaluating OCEAN Profile for: {persona['name']}]")
+    print(f"[Evaluating OCEAN Profile for: {persona['name']}]", flush=True)
     eval_prompt = f"""
 You are an expert psychometrics validator. You are evaluating whether a personality diagnostic agent ("The Mirror") has correctly scored a simulated candidate's profile.
 
@@ -344,18 +428,17 @@ Provide a detailed evaluation:
    - For 'agreeable_dreamer': Openness should be high (>70), Conscientiousness should be low-to-moderate (<80), Agreeableness should be high (>70).
 3. Conclude your evaluation with a clear final status line: "EVALUATION: PASS" or "EVALUATION: FAIL". Format your output in markdown.
 """
-    eval_config = LocalAgentConfig(
-        system_instructions=CustomSystemInstructions(text="You are a strict psychometric verification agent. Report the evaluation result clearly.")
+    eval_config = _make_local_agent_config(
+        "You are a strict psychometric verification agent. Report the evaluation result clearly."
     )
-    async with Agent(eval_config) as eval_agent:
+    async with _agent_session(eval_config) as eval_agent:
         response = await safe_chat(eval_agent, eval_prompt)
         text = await response.text()
         print(f"Evaluation:\n{text}\n")
         return text
 
 async def test_playground_alignment(scores, persona):
-    Agent, LocalAgentConfig, CustomSystemInstructions = _antigravity_imports()
-    print(f"[Testing Aligned vs Unaligned Playgrounds for: {persona['name']}]")
+    print(f"[Testing Aligned vs Unaligned Playgrounds for: {persona['name']}]", flush=True)
     
     aligned_prompt = generate_alignment_prompt(scores)
     unaligned_prompt = generate_inverse_alignment_prompt(scores)
@@ -367,14 +450,10 @@ async def test_playground_alignment(scores, persona):
         "How should I structure the proposal?"
     )
     
-    aligned_config = LocalAgentConfig(
-        system_instructions=CustomSystemInstructions(text=aligned_prompt)
-    )
-    unaligned_config = LocalAgentConfig(
-        system_instructions=CustomSystemInstructions(text=unaligned_prompt)
-    )
-    
-    async with Agent(aligned_config) as aligned_agent, Agent(unaligned_config) as unaligned_agent:
+    aligned_config = _make_local_agent_config(aligned_prompt)
+    unaligned_config = _make_local_agent_config(unaligned_prompt)
+
+    async with _agent_session(aligned_config) as aligned_agent, _agent_session(unaligned_config) as unaligned_agent:
         aligned_res = await safe_chat(aligned_agent, user_query)
         aligned_text = await aligned_res.text()
         
@@ -387,8 +466,7 @@ async def test_playground_alignment(scores, persona):
     return user_query, aligned_text, unaligned_text
 
 async def verify_alignment_behavior(user_query, aligned_res, unaligned_res, scores, persona):
-    Agent, LocalAgentConfig, CustomSystemInstructions = _antigravity_imports()
-    print(f"[Running Alignment Verification Judge for: {persona['name']}]")
+    print(f"[Running Alignment Verification Judge for: {persona['name']}]", flush=True)
     
     judge_prompt = f"""
 You are the Alignment Verification Judge (LLM-as-a-judge). 
@@ -423,14 +501,28 @@ Critically evaluate:
 4. Decide if the aligned behavior passes validation. Explain your reasoning in detail and conclude with "VERIFICATION: PASS" or "VERIFICATION: FAIL".
 """
     
-    judge_config = LocalAgentConfig(
-        system_instructions=CustomSystemInstructions(text="You are an objective judge evaluating AI alignment behavior. Provide clear criteria, analysis, and a final PASS/FAIL verdict.")
+    judge_config = _make_local_agent_config(
+        "You are an objective judge evaluating AI alignment behavior. "
+        "Provide clear criteria, analysis, and a final PASS/FAIL verdict."
     )
-    async with Agent(judge_config) as judge_agent:
+    async with _agent_session(judge_config) as judge_agent:
         response = await safe_chat(judge_agent, judge_prompt)
         text = await response.text()
         print(f"Judge Verdict:\n{text}\n")
         return text
+
+def _report_file_path():
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(base_dir, "agent_test_report.md")
+
+
+def _write_report(report):
+    report_file_path = _report_file_path()
+    with open(report_file_path, "w", encoding="utf-8") as handle:
+        handle.write("\n".join(report))
+    print(f"\n[Validation complete! Report written to {report_file_path}]", flush=True)
+    return report_file_path
+
 
 async def main():
     if not os.environ.get("GEMINI_API_KEY"):
@@ -438,76 +530,84 @@ async def main():
 
     report = []
     report.append("# Psychometric Agent Testing & Verification Report\n")
-    report.append(f"**Date:** 2026-06-07  \n**Testing Framework:** Google Antigravity SDK  \n")
-    
+    report.append("**Date:** 2026-06-07  \n**Testing Framework:** Google Antigravity SDK  \n")
+
     has_failures = False
-    
-    for persona in PERSONAS:
-        report.append(f"## Testing Persona: {persona['name']}")
-        report.append(f"*Description:* {persona['description']}\n")
-        
-        # 1. Run Interview
-        dialogue, scores = await run_interview(persona)
-        
-        report.append("### 1. Interview Transcript Summary")
-        report.append("<details><summary>Click to view full transcript</summary>\n")
-        for m in dialogue:
-            report.append(f"**{m['role'].capitalize()}:** {m['content']}\n")
-        report.append("</details>\n")
-        
-        report.append("### 2. Computed OCEAN Scores")
-        report.append(f"```json\n{json.dumps(scores, indent=2)}\n```\n")
-        
-        # 2. Evaluate Profile
-        if scores:
-            eval_text = await evaluate_scores(dialogue, scores, persona)
-            report.append("### 3. Profile Evaluator Assessment")
-            report.append(eval_text + "\n")
-            
-            if "EVALUATION: FAIL" in eval_text.upper():
-                print(f"[Validation Failure] Profile Evaluator Assessment failed for persona: {persona['name']}")
+
+    try:
+        for persona in PERSONAS:
+            report.append(f"## Testing Persona: {persona['name']}")
+            report.append(f"*Description:* {persona['description']}\n")
+
+            dialogue, scores = await run_interview(persona)
+
+            report.append("### 1. Interview Transcript Summary")
+            report.append("<details><summary>Click to view full transcript</summary>\n")
+            for message in dialogue:
+                report.append(f"**{message['role'].capitalize()}:** {message['content']}\n")
+            report.append("</details>\n")
+
+            report.append("### 2. Computed OCEAN Scores")
+            report.append(f"```json\n{json.dumps(scores, indent=2)}\n```\n")
+
+            if scores:
+                eval_text = await evaluate_scores(dialogue, scores, persona)
+                report.append("### 3. Profile Evaluator Assessment")
+                report.append(eval_text + "\n")
+
+                if "EVALUATION: FAIL" in eval_text.upper():
+                    print(
+                        f"[Validation Failure] Profile Evaluator Assessment failed for persona: {persona['name']}",
+                        flush=True,
+                    )
+                    has_failures = True
+
+                user_query, aligned_res, unaligned_res = await test_playground_alignment(scores, persona)
+                report.append("### 4. Playground Dialogue Outputs")
+                report.append(f"**User Prompt:** *{user_query}*\n")
+                report.append(f"#### Aligned Agent Response:\n{aligned_res}\n")
+                report.append(f"#### Unaligned Agent Response:\n{unaligned_res}\n")
+
+                judge_text = await verify_alignment_behavior(
+                    user_query, aligned_res, unaligned_res, scores, persona
+                )
+                report.append("### 5. Alignment Verification Judge Report")
+                report.append(judge_text + "\n")
+
+                if "VERIFICATION: FAIL" in judge_text.upper():
+                    print(
+                        f"[Validation Failure] Alignment Verification Judge failed for persona: {persona['name']}",
+                        flush=True,
+                    )
+                    has_failures = True
+            else:
+                print(
+                    f"[Validation Failure] No scores generated by the Mirror for persona: {persona['name']}",
+                    flush=True,
+                )
+                report.append("### [ERROR] No scores generated by the Mirror.\n")
                 has_failures = True
-            
-            # 3. Test Playground
-            user_query, aligned_res, unaligned_res = await test_playground_alignment(scores, persona)
-            report.append("### 4. Playground Dialogue Outputs")
-            report.append(f"**User Prompt:** *{user_query}*\n")
-            report.append(f"#### Aligned Agent Response:\n{aligned_res}\n")
-            report.append(f"#### Unaligned Agent Response:\n{unaligned_res}\n")
-            
-            # 4. Verify Alignment
-            judge_text = await verify_alignment_behavior(user_query, aligned_res, unaligned_res, scores, persona)
-            report.append("### 5. Alignment Verification Judge Report")
-            report.append(judge_text + "\n")
-            
-            if "VERIFICATION: FAIL" in judge_text.upper():
-                print(f"[Validation Failure] Alignment Verification Judge failed for persona: {persona['name']}")
-                has_failures = True
-        else:
-            print(f"[Validation Failure] No scores generated by the Mirror for persona: {persona['name']}")
-            report.append("### [ERROR] No scores generated by the Mirror.\n")
-            has_failures = True
-            
-        report.append("---\n")
-        
-    # Write report file
-    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    report_file_path = os.path.join(base_dir, "agent_test_report.md")
-    with open(report_file_path, "w") as f:
-        f.write("\n".join(report))
-        
-    print(f"\n[Validation complete! Report written to {report_file_path}]")
-    
+
+            report.append("---\n")
+    except GeminiQuotaError as exc:
+        has_failures = True
+        report.append("## [ABORTED] Gemini API Quota / Billing Error\n")
+        report.append(f"{exc}\n")
+        print(f"\n[Validation Aborted] {exc}", flush=True)
+
+    _write_report(report)
+
     if has_failures:
-        print("\n[Validation Failed! Exiting with code 1]")
-        sys.exit(1)
-    else:
-        print("\n[Validation Passed! Exiting with code 0]")
-        sys.exit(0)
+        print("\n[Validation Failed! Exiting with code 1]", flush=True)
+        return 1
+
+    print("\n[Validation Passed! Exiting with code 0]", flush=True)
+    return 0
+
 
 if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "--validate-matrix":
         validate_steering_matrix_regressions()
         sys.exit(0)
     validate_steering_matrix_regressions()
-    asyncio.run(main())
+    sys.exit(asyncio.run(main()))
