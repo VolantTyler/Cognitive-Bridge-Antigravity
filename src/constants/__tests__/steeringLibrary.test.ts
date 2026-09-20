@@ -3,6 +3,7 @@ import {
   STEERING_LIBRARY,
   getActiveDirectives,
   generateAlignmentPrompt,
+  generateInverseAlignmentPrompt,
   MIRROR_SYSTEM_PROMPT,
 } from '../../constants';
 import { OceanScores } from '../../types';
@@ -70,6 +71,50 @@ describe('STEERING_LIBRARY (doc 02 matrix)', () => {
     expect(prompt).toContain('ALIGNMENT THEORY (Cognitive Bridge)');
     expect(prompt).toContain('- [congruent]');
     expect(prompt).toContain('<mark-bridge');
+    expect(prompt).toContain('alignment mechanics');
+    expect(prompt).toContain('NEVER describe reinforcing bias');
+  });
+
+  it('generateAlignmentPrompt uses neutral highlight rubric when no directives apply', () => {
+    const scores: OceanScores = {
+      openness: 50,
+      conscientiousness: 50,
+      extroversion: 50,
+      agreeableness: 50,
+      neuroticism: 50,
+    };
+    const prompt = generateAlignmentPrompt(scores);
+    expect(getActiveDirectives(scores)).toHaveLength(0);
+    expect(prompt).toContain('no critical trait spikes');
+    expect(prompt).toContain('Do NOT invent a congruent, compensatory, or complementary strategy');
+    expect(prompt).not.toContain('active directive strategy (congruent, compensatory, or complementary)');
+  });
+
+  it('generateInverseAlignmentPrompt uses neutral highlight rubric when no misalignment directives apply', () => {
+    const scores: OceanScores = {
+      openness: 50,
+      conscientiousness: 50,
+      extroversion: 50,
+      agreeableness: 50,
+      neuroticism: 50,
+    };
+    const prompt = generateInverseAlignmentPrompt(scores);
+    expect(prompt).toContain('mid-range OCEAN profile with no trait spikes');
+    expect(prompt).not.toContain('Name the OCEAN trait spike(s) being reinforced');
+  });
+
+  it('generateInverseAlignmentPrompt forbids aligned explanation language', () => {
+    const scores: OceanScores = {
+      openness: 50,
+      conscientiousness: 15,
+      extroversion: 50,
+      agreeableness: 90,
+      neuroticism: 50,
+    };
+    const prompt = generateInverseAlignmentPrompt(scores);
+    expect(prompt).toContain('MIS-ALIGNMENT DIRECTIVES');
+    expect(prompt).toContain('NEVER use language like "balances"');
+    expect(prompt).toContain('what an aligned response would do differently');
   });
 });
 

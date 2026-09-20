@@ -3,7 +3,29 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { OceanScores, SteeringDirective } from './types';
+import { AlignmentStrategy, OceanScores, SteeringDirective } from './types';
+
+/** UI copy for alignment strategy badges (matches ALIGNMENT THEORY in generateAlignmentPrompt). */
+export const ALIGNMENT_STRATEGY_INFO: Record<
+  AlignmentStrategy,
+  { label: string; tooltip: string }
+> = {
+  congruent: {
+    label: 'Congruent',
+    tooltip:
+      'Similarity alignment: the agent mirrors your level on this trait (similarity-attraction / congruence).',
+  },
+  compensatory: {
+    label: 'Compensatory',
+    tooltip:
+      'Need-complementarity: the agent counterbalances this trait to fill gaps and provide structure.',
+  },
+  complementary: {
+    label: 'Complementary',
+    tooltip:
+      'Complementarity: the agent differs in a useful way to balance the interaction without mirroring extremes.',
+  },
+};
 
 export const STEERING_LIBRARY: SteeringDirective[] = [
   // Openness — Congruent
@@ -84,6 +106,34 @@ function formatDirective(d: SteeringDirective): string {
   return `- [${d.strategy}] ${d.text}`;
 }
 
+function alignedHighlightRubric(hasDirectives: boolean): string {
+  if (hasDirectives) {
+    return `Each explanation MUST:
+- Name the relevant OCEAN score(s) and active directive strategy (congruent, compensatory, or complementary).
+- Explain WHY this phrasing aligns with or balances the user's profile — not what advice you are giving.
+- Focus on alignment mechanics (similarity-attraction or need-complementarity), not generic coaching.
+- NEVER describe reinforcing bias, mirroring extremes, or echoing dysfunction.`;
+  }
+  return `Each explanation MUST:
+- Explain WHY this phrasing reflects balanced, professional alignment for a profile with no critical trait spikes (all OCEAN scores between 30 and 70).
+- Do NOT invent a congruent, compensatory, or complementary strategy — none apply for this mid-range profile.
+- Focus on why the tone is neutrally helpful rather than trait-targeted steering.`;
+}
+
+function unalignedHighlightRubric(hasMisalignmentDirectives: boolean): string {
+  if (hasMisalignmentDirectives) {
+    return `Each explanation MUST:
+- Name the OCEAN trait spike(s) being reinforced and how this phrasing feeds that bias.
+- Explain WHY this phrasing is misaligned — how it echoes or amplifies extremes instead of balancing them.
+- Contrast briefly with what an aligned response would do differently for this trait.
+- NEVER use language like "balances", "supports your profile", "compensates", "minimizes bias", or "provides structure".`;
+  }
+  return `Each explanation MUST:
+- Explain why this phrasing would be a poor generic mismatch for a mid-range OCEAN profile with no trait spikes (>70 or <30).
+- Do NOT invent trait extremes or name a specific strategy tag unless the user's scores justify it.
+- Contrast briefly with balanced professional alignment.`;
+}
+
 export const MIRROR_SYSTEM_PROMPT = `
 You are "The Mirror", an adaptive personality diagnostic agent. 
 Your goal is to interview the user to determine their OCEAN (Big Five) personality traits.
@@ -159,7 +209,8 @@ Follow these directives strictly while being functionally useful.
 
 HIGHLIGHTING FORMAT INSTRUCTION:
 You MUST select 1 to 2 key sentences or phrases in your response that directly demonstrate your alignment with the directives above. Wrap each selected sentence/phrase in custom tags:
-<mark-bridge explanation="Detailed explanation of how this specific phrasing aligns with and corrects the user's score to minimize bias or fatigue or provide structure.">The sentence itself</mark-bridge>
+<mark-bridge explanation="Your explanation here">The sentence itself</mark-bridge>
+${alignedHighlightRubric(directives.length > 0)}
 Do not nest tags. Keep the wrap on complete, natural sentences.
 `;
 }
@@ -219,7 +270,8 @@ Reinforce the user's perspective completely. Do not challenge them.
 
 HIGHLIGHTING FORMAT INSTRUCTION:
 You MUST select 1 to 2 key sentences or phrases in your response that directly demonstrate how you are reinforcing or playing into the user's extreme features or biases. Wrap each selected sentence/phrase in custom tags:
-<mark-bridge explanation="Detailed explanation of how this phrasing overloads or echoes the user's extreme traits to fuel psychological bias instead of balancing it.">The sentence itself</mark-bridge>
+<mark-bridge explanation="Your explanation here">The sentence itself</mark-bridge>
+${unalignedHighlightRubric(directives.length > 0)}
 Do not nest tags. Keep the wrap on complete, natural sentences.
 `;
 }

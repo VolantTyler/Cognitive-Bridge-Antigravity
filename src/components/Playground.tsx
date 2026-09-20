@@ -22,6 +22,8 @@ interface PlaygroundProps {
   onSaveSession?: (updatedMessages: ComparisonMessage[], updatedScores?: OceanScores) => void;
 }
 
+type ActiveAnalysis = { text: string; explanation: string; type: 'aligned' | 'unaligned' };
+
 function extractFirstHighlight(text: string): { text: string; explanation: string } | null {
   const match = text.match(/<mark-bridge explanation="([^"]*)">(.*?)<\/mark-bridge>/);
   if (match) {
@@ -48,12 +50,49 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 export default function Playground({ scores, messages, setMessages, setScores, onSaveSession }: PlaygroundProps) {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [activeAnalysis, setActiveAnalysis] = useState<{ text: string; explanation: string; type: string } | null>(null);
+  const [activeAnalysis, setActiveAnalysis] = useState<ActiveAnalysis | null>(null);
   const [expandedIndices, setExpandedIndices] = useState<Record<number, boolean>>({});
   const initializedRef = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const logicAnalysisPanelRef = useRef<HTMLDivElement>(null);
+  const logicAnalysisScrollRef = useRef<HTMLDivElement>(null);
+  const mobileAnalysisModalRef = useRef<HTMLDivElement>(null);
+  const pendingHighlightScrollRef = useRef<HTMLElement | null>(null);
   const generationAttemptsRef = useRef<Map<number, number>>(new Map());
+
+  const activateAnalysis = useCallback((analysis: ActiveAnalysis, sourceEl?: HTMLElement | null) => {
+    pendingHighlightScrollRef.current = sourceEl ?? null;
+    setActiveAnalysis(analysis);
+  }, []);
+
+  useEffect(() => {
+    if (!activeAnalysis) return;
+
+    pendingHighlightScrollRef.current?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'nearest',
+      inline: 'nearest',
+    });
+    pendingHighlightScrollRef.current = null;
+
+    const isDesktop = window.matchMedia('(min-width: 1024px)').matches;
+    if (isDesktop) {
+      logicAnalysisPanelRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+        inline: 'nearest',
+      });
+      logicAnalysisScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+      mobileAnalysisModalRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center',
+        inline: 'nearest',
+      });
+      mobileAnalysisModalRef.current?.focus({ preventScroll: true });
+    }
+  }, [activeAnalysis]);
 
   useEffect(() => {
     if (!initializedRef.current && messages.length > 0) {
@@ -102,14 +141,14 @@ export default function Playground({ scores, messages, setMessages, setScores, o
   const selectFirstHighlight = useCallback((alignedText: string, unalignedText: string) => {
     const alignedHighlight = extractFirstHighlight(alignedText);
     if (alignedHighlight) {
-      setActiveAnalysis({ ...alignedHighlight, type: 'aligned' });
+      activateAnalysis({ ...alignedHighlight, type: 'aligned' });
       return;
     }
     const unalignedHighlight = extractFirstHighlight(unalignedText);
     if (unalignedHighlight) {
-      setActiveAnalysis({ ...unalignedHighlight, type: 'unaligned' });
+      activateAnalysis({ ...unalignedHighlight, type: 'unaligned' });
     }
-  }, []);
+  }, [activateAnalysis]);
 
   const runGeneration = useCallback(async (
     messageIndex: number,
@@ -277,11 +316,14 @@ export default function Playground({ scores, messages, setMessages, setScores, o
         return (
           <button
             key={i}
-            onClick={() => setActiveAnalysis({ text: content, explanation, type })}
+            type="button"
+            onClick={(event) => activateAnalysis({ text: content, explanation, type }, event.currentTarget)}
+            aria-pressed={isActive}
+            aria-controls="logic-analysis-panel"
             className={`cursor-help transition-all duration-300 font-medium mark-bridge-highlight ${
               type === 'aligned' ? 'mark-aligned' : 'mark-unaligned'
             } ${isActive ? 'active' : ''}`}
-            title="Click to analyze in Logic Analysis"
+            title="Show alignment analysis"
           >
             {content}
           </button>
@@ -314,9 +356,11 @@ export default function Playground({ scores, messages, setMessages, setScores, o
               onClick={() => setActiveAnalysis(null)}
             >
               <motion.div
+                ref={mobileAnalysisModalRef}
+                tabIndex={-1}
                 initial={{ scale: 0.9, y: 20 }}
                 animate={{ scale: 1, y: 0 }}
-                className={`p-6 rounded-2xl border max-w-sm w-full shadow-2xl transition-colors duration-300 ${
+                className={`p-6 rounded-2xl border max-w-sm w-full shadow-2xl transition-colors duration-300 outline-none ${
                   activeAnalysis.type === 'aligned'
                     ? 'bg-bg-modal-aligned border-green-500/50 text-text-primary'
                     : 'bg-bg-modal-unaligned border-red-500/50 text-text-primary'
@@ -331,7 +375,9 @@ export default function Playground({ scores, messages, setMessages, setScores, o
                 </div>
                 <p className="text-text-secondary text-[10px] uppercase font-bold tracking-wider mb-2">Original Context:</p>
                 <blockquote className="border-l-2 border-border-primary/40 pl-3 italic text-xs mb-4 text-text-secondary">&ldquo;{activeAnalysis.text}&rdquo;</blockquote>
-                <p className="text-text-secondary text-[10px] uppercase font-bold tracking-wider mb-2">Bridge Logic:</p>
+                <p className="text-text-secondary text-[10px] uppercase font-bold tracking-wider mb-2">
+                  {activeAnalysis.type === 'aligned' ? 'Alignment Logic:' : 'Misalignment Logic:'}
+                </p>
                 <p className="text-sm leading-relaxed text-text-primary">
                   {activeAnalysis.explanation}
                 </p>
@@ -531,14 +577,18 @@ export default function Playground({ scores, messages, setMessages, setScores, o
           </div>
         </div>
 
-        <div className="hidden lg:flex w-[320px] shrink-0 flex-col gap-6">
-          <div className="flex-1 p-6 bg-bg-tertiary border border-border-primary rounded-xl flex flex-col gap-4 overflow-hidden shadow-xl transition-colors duration-300">
+        <div className="hidden lg:flex w-[320px] shrink-0 flex-col gap-6 sticky top-24 self-start max-h-[calc(100vh-7rem)]">
+          <div
+            id="logic-analysis-panel"
+            ref={logicAnalysisPanelRef}
+            className="flex-1 p-6 bg-bg-tertiary border border-border-primary rounded-xl flex flex-col gap-4 overflow-hidden shadow-xl transition-colors duration-300 min-h-0"
+          >
             <div className="flex items-center gap-3">
               <Brain className="w-5 h-5 text-orange-500" />
               <h4 className="text-sm font-bold uppercase tracking-[0.2em] text-text-primary">Logic Analysis</h4>
             </div>
 
-            <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
+            <div ref={logicAnalysisScrollRef} className="flex-1 overflow-y-auto custom-scrollbar pr-2 min-h-0">
               <AnimatePresence mode="wait">
                 {activeAnalysis ? (
                   <motion.div
@@ -564,7 +614,9 @@ export default function Playground({ scores, messages, setMessages, setScores, o
                     </div>
 
                     <div className="space-y-3">
-                      <p className="text-[10px] uppercase font-bold text-text-secondary tracking-wider">Alignment Explanation:</p>
+                      <p className="text-[10px] uppercase font-bold text-text-secondary tracking-wider">
+                        {activeAnalysis.type === 'aligned' ? 'Alignment Explanation:' : 'Misalignment Explanation:'}
+                      </p>
                       <p className="text-sm leading-relaxed text-text-secondary">
                         {activeAnalysis.explanation}
                       </p>

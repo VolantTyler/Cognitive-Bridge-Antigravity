@@ -197,6 +197,14 @@
   }
 }
 
+/* Strategy badge tooltips — opaque panel above card chrome */
+.strategy-badge-tooltip {
+  background-color: var(--bg-primary);
+  box-shadow:
+    0 4px 6px -1px rgb(0 0 0 / 0.15),
+    0 10px 20px -5px rgb(0 0 0 / 0.2);
+}
+
 /* Phase 3 Highlights style definitions */
 .mark-bridge-highlight {
   text-decoration-line: underline;
