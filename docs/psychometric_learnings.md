@@ -28,6 +28,10 @@ This document compiles the key architectural, psychological, and engineering lea
 * **Problem**: The Antigravity localharness defaults (and especially `RetryConfig.benchmark()`) can retry HTTP 429 quota errors for hours. On a free-tier `GEMINI_API_KEY`, the full psychometric eval exhausts `generate_content_free_tier_requests` quickly and the GitHub Action hits its 120-minute timeout even though the key is valid.
 * **Resolution**: Pass a bounded `retry_config` (`max_retries=0`) to every `LocalAgentConfig`, fail fast in `safe_chat` when errors mention quota/billing/free-tier, write an abort section to `agent_test_report.md`, and wrap agent teardown in `_agent_session` with a 60-second shutdown timeout so orphan `localharness` processes do not block job exit.
 
+### HTTP 503 High-Demand Should Fallback, Not Retry The Same Model
+* **Problem**: Antigravity defaults to `gemini-3.8-flash`. When that model is at capacity (`UNAVAILABLE` / HTTP 503 "high demand"), retrying it three times just burns the job — the websocket often dies after the first 503 (`received 1000 (OK)`), and the third attempt times out.
+* **Resolution**: `FallbackChatAgent` walks `gemini-3.8-flash` → `gemini-2.5-flash` → `gemini-2.5-pro` → `gemini-1.5-flash`. Capacity errors switch models immediately instead of retrying the overloaded one. Override with `GEMINI_EVAL_MODEL` / `GEMINI_EVAL_FALLBACK_MODELS`.
+
 ### Portable Path Resolution
 * **Problem**: Hardcoding workspace paths (e.g., `/Users/tyler/antigravity/...`) results in instant breakage in containerized runners (e.g., `/home/runner/work/...` on GitHub Actions).
 * **Resolution**: All path generation must be resolved relative to the location of the execution scripts:
