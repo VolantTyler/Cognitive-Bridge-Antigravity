@@ -84,6 +84,7 @@ jobs:
       - name: Run Multi-Agent Evaluation
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          PYTHONUNBUFFERED: "1"
         run: |
           source venv/bin/activate
           python scripts/agent_eval.py
