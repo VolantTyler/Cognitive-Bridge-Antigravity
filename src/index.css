@@ -15,8 +15,9 @@
   --text-primary: #ffffff;
   --text-secondary: #e5e7eb;
   --text-muted: #9ca3af;
-  --text-muted-dark: #6b7280;
-  --text-muted-darker: #4b5563;
+  /* Muted steps stay quieter than --text-muted while clearing WCAG AA on card surfaces. */
+  --text-muted-dark: #949ca6;
+  --text-muted-darker: #8e969f;
 
   /* Custom component values */
   --bg-chat-user: #2563eb; /* blue-600 */
@@ -46,6 +47,16 @@
   --accent-green-hover: #86efac;
   --accent-red: #f87171;
   --accent-red-hover: #fca5a5;
+
+  /* Status text that previously used raw Tailwind greens/reds/ambers. */
+  --status-success: #4ade80;
+  --status-danger: #ef4444;
+  --status-warning: #f59e0b;
+  --status-brand: #f97316;
+  --status-feature: #c084fc;
+  /* Solid brand buttons: white label text needs ≥4.5:1 (orange-500 is ~2.8:1). */
+  --button-brand: #c2410c;
+  --button-brand-hover: #9a3412;
 
   /* Trait-specific Backgrounds (dark mode translucent) */
   --bg-openness: rgba(88, 28, 135, 0.2);
@@ -93,19 +104,28 @@
   --bg-modal-aligned: #e8f5e9;
   --bg-modal-unaligned: #ffebee;
 
-  /* Custom Accent Colors for high contrast in light mode */
-  --accent-orange: #c2410c; /* orange-700 */
-  --accent-orange-hover: #9a3412; /* orange-800 */
-  --accent-yellow: #a16207; /* yellow-700 */
-  --accent-yellow-hover: #854d0e; /* yellow-800 */
+  /* Custom Accent Colors for high contrast in light mode (AA on oat surfaces) */
+  --accent-orange: #9a3412; /* orange-800 */
+  --accent-orange-hover: #7c2d12; /* orange-900 */
+  --accent-yellow: #854d0e; /* yellow-800 */
+  --accent-yellow-hover: #713f12; /* yellow-900 */
   --accent-purple: #7e22ce; /* purple-700 */
   --accent-purple-hover: #6b21a8; /* purple-800 */
   --accent-blue: #1d4ed8; /* blue-700 */
   --accent-blue-hover: #1e40af; /* blue-800 */
-  --accent-green: #15803d; /* green-700 */
-  --accent-green-hover: #166534; /* green-800 */
-  --accent-red: #b91c1c; /* red-700 */
-  --accent-red-hover: #991b1b; /* red-800 */
+  --accent-green: #14532d; /* green-900 — green-700 failed on tinted cards */
+  --accent-green-hover: #052e16;
+  --accent-red: #991b1b; /* red-800 */
+  --accent-red-hover: #7f1d1d; /* red-900 */
+
+  /* Bright Tailwind greens (~1.6:1 on oat) are unreadable in light mode. */
+  --status-success: #14532d;
+  --status-danger: #7f1d1d;
+  --status-warning: #78350f;
+  --status-brand: #7c2d12;
+  --status-feature: #6b21a8;
+  --button-brand: #c2410c;
+  --button-brand-hover: #9a3412;
 
   /* Trait-specific Backgrounds (light mode translucent) */
   --bg-openness: rgba(147, 51, 234, 0.08);
@@ -163,6 +183,14 @@
   --color-accent-green-hover: var(--accent-green-hover);
   --color-accent-red: var(--accent-red);
   --color-accent-red-hover: var(--accent-red-hover);
+
+  --color-status-success: var(--status-success);
+  --color-status-danger: var(--status-danger);
+  --color-status-warning: var(--status-warning);
+  --color-status-brand: var(--status-brand);
+  --color-status-feature: var(--status-feature);
+  --color-button-brand: var(--button-brand);
+  --color-button-brand-hover: var(--button-brand-hover);
 
   --color-trait-openness-bg: var(--bg-openness);
   --color-trait-openness-bg-shaded: var(--bg-openness-shaded);

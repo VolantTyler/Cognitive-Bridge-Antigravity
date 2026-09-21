@@ -368,7 +368,7 @@ export default function Playground({ scores, messages, setMessages, setScores, o
                 onClick={e => e.stopPropagation()}
               >
                 <div className="flex items-center gap-2 mb-4">
-                  <div className={`p-1.5 rounded-lg ${activeAnalysis.type === 'aligned' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                  <div className={`p-1.5 rounded-lg ${activeAnalysis.type === 'aligned' ? 'bg-green-500/20 text-status-success' : 'bg-red-500/20 text-status-danger'}`}>
                     {activeAnalysis.type === 'aligned' ? <Shield className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
                   </div>
                   <h4 className="font-bold text-sm uppercase tracking-widest">{activeAnalysis.type.toUpperCase()} ANALYSIS</h4>
@@ -397,8 +397,8 @@ export default function Playground({ scores, messages, setMessages, setScores, o
             <div className="p-4 flex items-center justify-between border-r border-border-primary">
               <div className="flex flex-col gap-0.5">
                 <div className="flex items-center gap-3">
-                  <Shield className="w-4 h-4 text-green-400" />
-                  <span className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-green-400">Aligned</span>
+                  <Shield className="w-4 h-4 text-status-success" />
+                  <span className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-status-success">Aligned</span>
                 </div>
                 <span className="text-[9px] text-text-muted italic pl-7">Complementarity + congruence (research matrix)</span>
               </div>
@@ -407,12 +407,12 @@ export default function Playground({ scores, messages, setMessages, setScores, o
             <div className="p-4 flex items-center justify-between">
               <div className="flex flex-col gap-0.5">
                 <div className="flex items-center gap-3">
-                  <AlertTriangle className="w-4 h-4 text-red-500" />
-                  <span className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-red-500">Unaligned</span>
+                  <AlertTriangle className="w-4 h-4 text-status-danger" />
+                  <span className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-status-danger">Unaligned</span>
                 </div>
                 <span className="text-[9px] text-text-muted italic pl-7">Similarity-attraction / amplify extremes</span>
               </div>
-              <Split className="w-3 h-3 text-red-800 hidden sm:block" />
+              <Split className="w-3 h-3 text-status-danger hidden sm:block" />
             </div>
           </div>
 
@@ -434,7 +434,8 @@ export default function Playground({ scores, messages, setMessages, setScores, o
               <button
                 onClick={handleSend}
                 disabled={isLoading || !input.trim()}
-                className="absolute right-3 bottom-3 p-2 bg-orange-600 hover:bg-orange-700 disabled:opacity-50 transition-all rounded-lg shadow-lg shadow-orange-600/20 cursor-pointer"
+                aria-label="Send prompt"
+                className="absolute right-3 bottom-3 p-2 bg-button-brand hover:bg-button-brand-hover disabled:opacity-50 transition-all rounded-lg shadow-lg shadow-orange-600/20 cursor-pointer"
               >
                 <Send className="w-4 h-4 text-white" />
               </button>
@@ -447,14 +448,14 @@ export default function Playground({ scores, messages, setMessages, setScores, o
           >
             {isLoading && (
               <div className="p-3 flex justify-center gap-2 bg-bg-secondary border-b border-border-primary transition-colors duration-300 shrink-0">
-                <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-500" />
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-accent-blue" />
                 <span className="text-[10px] uppercase font-bold tracking-widest text-text-secondary">Generating Aligned and Unaligned responses...</span>
               </div>
             )}
 
             {messages.length === 0 && !isLoading && (
               <div className="p-12 sm:p-16 flex flex-col items-center justify-center text-center">
-                <Sparkles className="w-12 h-12 mb-4 text-orange-500" />
+                <Sparkles className="w-12 h-12 mb-4 text-status-brand" />
                 <h4 className="text-lg font-semibold text-text-primary">Compare Aligned vs Unaligned</h4>
                 <p className="text-sm max-w-md mt-2 text-text-secondary leading-relaxed">
                   Ask any question below. Both columns will answer side-by-side so you can see how personality-aware steering changes the response.
@@ -462,7 +463,7 @@ export default function Playground({ scores, messages, setMessages, setScores, o
                 <button
                   type="button"
                   onClick={focusQuestionInput}
-                  className="mt-6 inline-flex items-center gap-2 px-6 py-3 bg-orange-600 hover:bg-orange-700 text-white font-bold text-sm uppercase tracking-wider rounded-xl shadow-lg shadow-orange-600/20 transition-all cursor-pointer"
+                  className="mt-6 inline-flex items-center gap-2 px-6 py-3 bg-button-brand hover:bg-button-brand-hover text-white font-bold text-sm uppercase tracking-wider rounded-xl shadow-lg shadow-orange-600/20 transition-all cursor-pointer"
                 >
                   <Send className="w-4 h-4" />
                   Ask your first question
@@ -488,8 +489,9 @@ export default function Playground({ scores, messages, setMessages, setScores, o
                         <div className="flex items-center gap-1 shrink-0">
                           <button
                             onClick={() => handleDelete(origIdx)}
-                            className="p-1.5 hover:bg-red-500/10 text-text-muted hover:text-red-500 rounded-lg transition-colors cursor-pointer"
+                            className="p-1.5 hover:bg-red-500/10 text-text-muted hover:text-status-danger rounded-lg transition-colors cursor-pointer"
                             title="Delete conversation"
+                            aria-label="Delete conversation"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -497,6 +499,7 @@ export default function Playground({ scores, messages, setMessages, setScores, o
                             onClick={() => setExpandedIndices(prev => ({ ...prev, [origIdx]: false }))}
                             className="p-1.5 hover:bg-bg-surface text-text-muted hover:text-text-primary rounded-lg transition-colors cursor-pointer"
                             title="Collapse conversation"
+                            aria-label="Collapse conversation"
                           >
                             <ChevronUp className="w-4 h-4" />
                           </button>
@@ -505,7 +508,7 @@ export default function Playground({ scores, messages, setMessages, setScores, o
 
                       {m.error ? (
                         <div className="p-8 flex flex-col items-center justify-center text-center gap-4 bg-bg-secondary">
-                          <AlertTriangle className="w-10 h-10 text-red-500" />
+                          <AlertTriangle className="w-10 h-10 text-status-danger" />
                           <div>
                             <p className="text-sm font-semibold text-text-primary">Generation failed or timed out</p>
                             <p className="text-xs text-text-secondary mt-1 max-w-sm">
@@ -516,7 +519,7 @@ export default function Playground({ scores, messages, setMessages, setScores, o
                             type="button"
                             onClick={() => handleRetry(origIdx)}
                             disabled={isLoading}
-                            className="inline-flex items-center gap-2 px-5 py-2.5 bg-orange-600 hover:bg-orange-700 disabled:opacity-50 text-white font-bold text-xs uppercase tracking-wider rounded-lg transition-all cursor-pointer"
+                            className="inline-flex items-center gap-2 px-5 py-2.5 bg-button-brand hover:bg-button-brand-hover disabled:opacity-50 text-white font-bold text-xs uppercase tracking-wider rounded-lg transition-all cursor-pointer"
                           >
                             <RotateCcw className="w-3.5 h-3.5" />
                             Retry
@@ -543,21 +546,22 @@ export default function Playground({ scores, messages, setMessages, setScores, o
                         onClick={() => setExpandedIndices(prev => ({ ...prev, [origIdx]: true }))}
                         className="flex-1 flex items-center gap-3 cursor-pointer select-none overflow-hidden mr-4"
                       >
-                        <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-blue-600/10 text-blue-400 border border-blue-500/20 shrink-0">
+                        <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-blue-600/10 text-accent-blue border border-blue-500/20 shrink-0">
                           Prompt
                         </span>
                         <span className="text-xs text-text-secondary truncate font-medium max-w-[80%]">
                           {m.user}
                         </span>
                         {m.error && (
-                          <span className="text-[10px] uppercase font-bold text-red-500 shrink-0">Failed</span>
+                          <span className="text-[10px] uppercase font-bold text-status-danger shrink-0">Failed</span>
                         )}
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
                         <button
                           onClick={() => handleDelete(origIdx)}
-                          className="p-1.5 hover:bg-red-500/10 text-text-muted hover:text-red-500 rounded-lg transition-colors cursor-pointer"
+                          className="p-1.5 hover:bg-red-500/10 text-text-muted hover:text-status-danger rounded-lg transition-colors cursor-pointer"
                           title="Delete conversation"
+                          aria-label="Delete conversation"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -565,6 +569,7 @@ export default function Playground({ scores, messages, setMessages, setScores, o
                           onClick={() => setExpandedIndices(prev => ({ ...prev, [origIdx]: true }))}
                           className="p-1.5 hover:bg-bg-surface text-text-muted hover:text-text-primary rounded-lg transition-colors cursor-pointer"
                           title="Expand conversation"
+                          aria-label="Expand conversation"
                         >
                           <ChevronDown className="w-4 h-4" />
                         </button>
@@ -581,10 +586,10 @@ export default function Playground({ scores, messages, setMessages, setScores, o
           <div
             id="logic-analysis-panel"
             ref={logicAnalysisPanelRef}
-            className="flex-1 p-6 bg-bg-tertiary border border-border-primary rounded-xl flex flex-col gap-4 overflow-hidden shadow-xl transition-colors duration-300 min-h-0"
+            className="flex-1 p-6 bg-bg-tertiary border border-border-primary rounded-xl flex flex-col gap-4 overflow-hidden shadow-xl transition-colors duration-300 min-h-[504px]"
           >
             <div className="flex items-center gap-3">
-              <Brain className="w-5 h-5 text-orange-500" />
+              <Brain className="w-5 h-5 text-status-brand" />
               <h4 className="text-sm font-bold uppercase tracking-[0.2em] text-text-primary">Logic Analysis</h4>
             </div>
 
@@ -600,7 +605,7 @@ export default function Playground({ scores, messages, setMessages, setScores, o
                   >
                     <div>
                       <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-widest ${
-                        activeAnalysis.type === 'aligned' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
+                        activeAnalysis.type === 'aligned' ? 'bg-green-500/20 text-status-success' : 'bg-red-500/20 text-status-danger'
                       }`}>
                         {activeAnalysis.type} Mode Active
                       </span>
@@ -647,16 +652,16 @@ export default function Playground({ scores, messages, setMessages, setScores, o
           </div>
 
           <div className="p-5 bg-blue-900/10 border border-blue-500/20 rounded-xl">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-blue-400 mb-3">Steering Mode</h4>
+            <h4 className="text-xs font-bold uppercase tracking-wider text-accent-blue mb-3">Steering Mode</h4>
             <div className="space-y-4">
               <div className="flex items-start gap-2">
-                <Shield className="w-3 h-3 text-green-500 mt-0.5 shrink-0" />
+                <Shield className="w-3 h-3 text-status-success mt-0.5 shrink-0" />
                 <p className="text-[11px] text-text-secondary leading-relaxed italic">
                   Aligned: Complementarity + congruence (research matrix). Applies congruent, complementary, or compensatory directives per trait.
                 </p>
               </div>
               <div className="flex items-start gap-2">
-                <AlertTriangle className="w-3 h-3 text-red-500 mt-0.5 shrink-0" />
+                <AlertTriangle className="w-3 h-3 text-status-danger mt-0.5 shrink-0" />
                 <p className="text-[11px] text-text-secondary leading-relaxed italic">
                   Unaligned: Similarity-attraction / amplify extremes. Inverts directive selection to reinforce trait spikes.
                 </p>

@@ -138,7 +138,7 @@ export default function SettingsModal({ isOpen, onClose, onConfigChange }: Setti
             {/* Header */}
             <div className="flex items-center justify-between mb-4 border-b border-border-primary pb-3">
               <div className="flex items-center gap-2">
-                <Cpu className="w-5 h-5 text-orange-500" />
+                <Cpu className="w-5 h-5 text-status-brand" />
                 <h3 className="text-lg font-bold tracking-tight text-text-primary uppercase">
                   Inference Settings
                 </h3>
@@ -162,10 +162,10 @@ export default function SettingsModal({ isOpen, onClose, onConfigChange }: Setti
                 <div
                   className={`p-3 border rounded-xl flex items-start gap-2.5 text-xs animate-shake ${
                     statusMessage.type === 'success'
-                      ? 'bg-green-500/10 border-green-500/20 text-green-400'
+                      ? 'bg-green-500/10 border-green-500/20 text-status-success'
                       : statusMessage.type === 'error'
-                      ? 'bg-red-500/10 border-red-500/20 text-red-400'
-                      : 'bg-blue-500/10 border-blue-500/20 text-blue-400'
+                      ? 'bg-red-500/10 border-red-500/20 text-status-danger'
+                      : 'bg-blue-500/10 border-blue-500/20 text-accent-blue'
                   }`}
                   role="alert"
                 >
@@ -193,7 +193,7 @@ export default function SettingsModal({ isOpen, onClose, onConfigChange }: Setti
                     onChange={(e) => setEnabled(e.target.checked)}
                     className="sr-only peer"
                   />
-                  <div className="w-11 h-6 bg-bg-tertiary peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-500"></div>
+                  <div className="w-11 h-6 bg-bg-tertiary peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-button-brand"></div>
                 </label>
               </div>
 
@@ -226,7 +226,7 @@ export default function SettingsModal({ isOpen, onClose, onConfigChange }: Setti
               <div className="space-y-1.5">
                 <label htmlFor="settings-url" className="text-[10px] font-bold uppercase tracking-wider text-text-secondary flex items-center justify-between">
                   <span>Ollama Endpoint URL</span>
-                  <span className="text-orange-500 font-mono text-[9px]">Required</span>
+                  <span className="text-status-brand font-mono text-[9px]">Required</span>
                 </label>
                 <input
                   type="text"
@@ -243,7 +243,7 @@ export default function SettingsModal({ isOpen, onClose, onConfigChange }: Setti
               <div className="space-y-1.5">
                 <label htmlFor="settings-model" className="text-[10px] font-bold uppercase tracking-wider text-text-secondary flex items-center justify-between">
                   <span>Model Tag Name</span>
-                  <span className="text-orange-500 font-mono text-[9px]">Required</span>
+                  <span className="text-status-brand font-mono text-[9px]">Required</span>
                 </label>
                 <input
                   type="text"
@@ -258,7 +258,7 @@ export default function SettingsModal({ isOpen, onClose, onConfigChange }: Setti
 
               {/* Connection note */}
               {baseUrl.indexOf('localhost') === -1 && baseUrl.indexOf('127.0.0.1') === -1 && (
-                <div className="p-3 bg-amber-500/5 border border-amber-500/10 rounded-xl flex items-start gap-2 text-[10px] text-amber-500 leading-normal">
+                <div className="p-3 bg-amber-500/5 border border-amber-500/10 rounded-xl flex items-start gap-2 text-[10px] text-status-warning leading-normal">
                   <Network className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                   <span>
                     When connecting to a remote network device, ensure its Ollama server runs with environment variable <strong>OLLAMA_ORIGINS="*"</strong> set, or your browser will block the API call due to CORS restrictions.
@@ -294,7 +294,7 @@ export default function SettingsModal({ isOpen, onClose, onConfigChange }: Setti
                   </button>
                   <button
                     type="submit"
-                    className="px-5 py-2.5 bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-xl text-xs font-bold uppercase shadow-lg shadow-orange-500/10 hover:shadow-orange-500/20 active:scale-95 transition-all cursor-pointer"
+                    className="px-5 py-2.5 bg-gradient-to-r from-button-brand to-red-800 text-white rounded-xl text-xs font-bold uppercase shadow-lg shadow-orange-500/10 hover:shadow-orange-500/20 active:scale-95 transition-all cursor-pointer"
                   >
                     Save & Close
                   </button>

@@ -201,7 +201,7 @@ export default function App() {
             alt="Cognitive Bridge"
             className="w-8 h-8 rounded shadow-lg shadow-orange-500/10"
           />
-          <span className="font-bold tracking-tight text-sm sm:text-lg">COGNITIVE BRIDGE <span className="hidden sm:inline-block text-[10px] font-mono text-orange-500 ml-1 border border-orange-500/30 px-1 rounded uppercase">v1.5</span></span>
+          <span className="font-bold tracking-tight text-sm sm:text-lg">COGNITIVE BRIDGE <span className="hidden sm:inline-block text-[10px] font-mono text-status-brand ml-1 border border-orange-500/30 px-1 rounded uppercase">v1.5</span></span>
         </div>
 
         <div className="flex items-center gap-4">
@@ -236,24 +236,24 @@ export default function App() {
                 {user.photoURL ? (
                   <img src={user.photoURL} alt="profile" className="w-5 h-5 rounded-md object-cover border border-border-secondary group-hover:border-orange-500/40" />
                 ) : (
-                  <div className="w-5 h-5 rounded-md bg-orange-500 flex items-center justify-center text-white text-[10px] font-bold">
+                  <div className="w-5 h-5 rounded-md bg-button-brand flex items-center justify-center text-white text-[10px] font-bold">
                     {(user.displayName || user.email || '?')[0].toUpperCase()}
                   </div>
                 )}
-                <span className="text-[10px] font-bold text-text-primary group-hover:text-orange-500 transition-colors">
+                <span className="text-[10px] font-bold text-text-primary group-hover:text-status-brand transition-colors">
                   {user.displayName || user.email?.split('@')[0]}
                 </span>
                 <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.6)]" />
-                <span className="text-[9px] uppercase tracking-wider text-green-400 font-bold hidden md:inline">Synced</span>
+                <span className="text-[9px] uppercase tracking-wider text-status-success font-bold hidden md:inline">Synced</span>
               </button>
             ) : (
               <button
                 onClick={() => setIsMenuOpen(prev => !prev)}
-                className="flex items-center justify-center gap-2 p-2 sm:px-3.5 sm:py-1.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-[10px] font-bold uppercase tracking-wider transition-all shadow-lg shadow-orange-600/10 cursor-pointer border border-orange-500/20"
+                className="flex items-center justify-center gap-2 p-2 sm:px-3.5 sm:py-1.5 rounded-xl bg-button-brand hover:bg-button-brand-hover text-white text-[10px] font-bold uppercase tracking-wider transition-all shadow-lg shadow-orange-600/10 cursor-pointer border border-orange-500/20"
                 title="Open menu / Login"
               >
-                <UserIcon className="w-3.5 h-3.5 text-orange-200 sm:hidden" />
-                <Brain className="w-3.5 h-3.5 text-orange-200 hidden sm:inline" />
+                <UserIcon className="w-3.5 h-3.5 text-white sm:hidden" />
+                <Brain className="w-3.5 h-3.5 text-white hidden sm:inline" />
                 <span className="hidden sm:inline">Login</span>
               </button>
             )}
@@ -276,7 +276,7 @@ export default function App() {
                         handleLogout();
                         setIsMenuOpen(false);
                       }}
-                      className="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg cursor-pointer transition-all text-left w-full border-0 bg-transparent"
+                      className="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-status-danger hover:bg-red-500/10 rounded-lg cursor-pointer transition-all text-left w-full border-0 bg-transparent"
                     >
                       <UserIcon className="w-4.5 h-4.5 shrink-0" />
                       <span>Log Out</span>
@@ -288,7 +288,7 @@ export default function App() {
                         handleLogin();
                         setIsMenuOpen(false);
                       }}
-                      className="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-orange-500 hover:text-orange-400 hover:bg-orange-500/10 rounded-lg cursor-pointer transition-all text-left w-full border-0 bg-transparent"
+                      className="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-status-brand hover:bg-orange-500/10 rounded-lg cursor-pointer transition-all text-left w-full border-0 bg-transparent"
                     >
                       <Brain className="w-4.5 h-4.5 shrink-0" />
                       <span>Log In with Google</span>
@@ -326,7 +326,7 @@ export default function App() {
                       }}
                       className={`flex items-center justify-between px-3 py-2 text-xs font-semibold rounded-lg cursor-pointer transition-all hover:bg-bg-tertiary w-full border-0 bg-transparent ${
                         ollamaConfig.enabled 
-                          ? 'text-purple-400 hover:text-purple-300' 
+                          ? 'text-status-feature hover:text-accent-purple-hover' 
                           : 'text-text-secondary hover:text-text-primary'
                       }`}
                     >
@@ -335,7 +335,7 @@ export default function App() {
                         <span>Local Inference</span>
                       </div>
                       <span className={`text-[9px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded ${
-                        ollamaConfig.enabled ? 'bg-purple-500/20 text-purple-400' : 'bg-bg-primary text-text-muted'
+                        ollamaConfig.enabled ? 'bg-purple-500/20 text-status-feature' : 'bg-bg-primary text-text-muted'
                       }`}>
                         {ollamaConfig.enabled ? ollamaConfig.model : 'Cloud'}
                       </span>
@@ -391,14 +391,14 @@ export default function App() {
           <div className="max-w-7xl mx-auto flex items-center justify-between">
             <div className="flex items-center gap-6">
               <div className="flex items-center gap-2">
-                <Zap className="w-3 h-3 text-orange-500" />
+                <Zap className="w-3 h-3 text-status-brand" />
                 <span className="text-[10px] uppercase font-bold text-text-muted-dark">Recursive Reasoning</span>
               </div>
               <div className="flex items-center gap-2">
-                <Target className="w-3 h-3 text-blue-500" />
+                <Target className="w-3 h-3 text-accent-blue" />
                 <span className="text-[10px] uppercase font-bold text-text-muted-dark">Bias Suppression</span>
               </div>
-              <div className="flex items-center gap-2 text-green-500">
+              <div className="flex items-center gap-2 text-status-success">
                 <ShieldCheck className="w-3 h-3" />
                 <span className="text-[10px] uppercase font-bold">Stable R&D Build</span>
               </div>
@@ -441,7 +441,7 @@ export default function App() {
               exit={{ opacity: 0, scale: 0.98 }}
               className="flex-1 flex flex-col"
             >
-              <div className="mb-8 flex items-end justify-between uppercase tracking-widest text-[10px] font-bold text-orange-500">
+              <div className="mb-8 flex items-end justify-between uppercase tracking-widest text-[10px] font-bold text-status-brand">
                 <span>Phase 2: Synthesis Complete</span>
                 <span className="text-text-muted-dark">Bridge Active</span>
               </div>
@@ -519,7 +519,7 @@ export default function App() {
           </button>
         </div>
         <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 md:gap-4 text-center">
-          <span className="text-orange-500/50">Model: {ollamaConfig.enabled ? `Ollama (${ollamaConfig.model})` : 'Gemini 3.1 Pro // Flash'}</span>
+          <span className="text-text-muted">Model: {ollamaConfig.enabled ? `Ollama (${ollamaConfig.model})` : 'Gemini 3.1 Pro // Flash'}</span>
           <span className="text-border-primary">/</span>
           <span>Procedural Skills Engine</span>
         </div>
