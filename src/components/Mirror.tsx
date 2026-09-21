@@ -157,7 +157,7 @@ export default function Mirror({ messages, setMessages, onComplete, onSaveSessio
       <div className="flex-1 flex flex-col bg-bg-secondary text-text-primary font-sans border border-border-primary rounded-xl overflow-hidden shadow-2xl relative transition-colors duration-300">
         <div className="sticky top-0 z-20 p-4 bg-bg-surface/95 backdrop-blur-sm border-b border-border-primary flex items-center justify-between transition-colors duration-300">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-orange-500 flex items-center justify-center shadow-lg shadow-orange-500/20">
+            <div className="w-10 h-10 rounded-full bg-button-brand flex items-center justify-center shadow-lg shadow-orange-500/20">
               <Sparkles className="w-5 h-5 text-white" />
             </div>
             <div>
@@ -205,8 +205,8 @@ export default function Mirror({ messages, setMessages, onComplete, onSaveSessio
                     {m.role === 'user' ? m.content : formatMirrorContent(m.content)}
                     {m.role === 'model' && m.content.includes('JSON_SCORES:') && (
                       <div className="mt-4 p-3 bg-green-900/20 border border-green-500/30 rounded-lg flex items-center gap-3 animate-pulse">
-                        <Sparkles className="text-green-500 w-4 h-4" />
-                        <span className="text-green-400 font-medium">Cognitive mapping complete.</span>
+                        <Sparkles className="text-status-success w-4 h-4" />
+                        <span className="text-status-success font-medium">Cognitive mapping complete.</span>
                       </div>
                     )}
                   </div>
@@ -232,7 +232,7 @@ export default function Mirror({ messages, setMessages, onComplete, onSaveSessio
               </div>
               <button
                 onClick={() => onComplete(completedScores)}
-                className="flex items-center gap-2 px-8 py-4 rounded-full bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white font-bold text-sm uppercase tracking-widest transition-all shadow-lg shadow-orange-500/20 hover:shadow-orange-500/40 cursor-pointer border border-orange-500/30 hover:scale-105 active:scale-95 duration-150"
+                className="flex items-center gap-2 px-8 py-4 rounded-full bg-gradient-to-r from-button-brand to-red-800 hover:from-button-brand-hover hover:to-red-900 text-white font-bold text-sm uppercase tracking-widest transition-all shadow-lg shadow-orange-500/20 hover:shadow-orange-500/40 cursor-pointer border border-orange-500/30 hover:scale-105 active:scale-95 duration-150"
               >
                 <span>Proceed to Phase 2: The Tailor</span>
                 <ArrowRight className="w-4 h-4" />
@@ -252,7 +252,8 @@ export default function Mirror({ messages, setMessages, onComplete, onSaveSessio
                 <button
                   onClick={handleSend}
                   disabled={isLoading || !input.trim()}
-                  className="absolute right-2 p-2 bg-orange-500 rounded-full hover:bg-orange-600 disabled:opacity-50 disabled:bg-bg-tertiary transition-all shadow-lg cursor-pointer"
+                  aria-label="Send response"
+                  className="absolute right-2 p-2 bg-button-brand rounded-full hover:bg-button-brand-hover disabled:opacity-50 disabled:bg-bg-tertiary transition-all shadow-lg cursor-pointer"
                 >
                   <Send className="w-4 h-4 text-white" />
                 </button>

@@ -51,7 +51,7 @@ export default function ReleaseNotesModal({ isOpen, onClose }: ReleaseNotesModal
             {/* Header */}
             <div className="flex items-center justify-between mb-6 pb-4 border-b border-border-primary shrink-0">
               <div className="flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-orange-500" />
+                <Sparkles className="w-5 h-5 text-status-brand" />
                 <h3 className="text-lg font-bold tracking-tight text-text-primary uppercase">
                   Release Notes
                 </h3>
@@ -83,7 +83,7 @@ export default function ReleaseNotesModal({ isOpen, onClose }: ReleaseNotesModal
                         <div className="flex items-center gap-2">
                           <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded uppercase tracking-wider ${
                             note.type === 'major'
-                              ? 'bg-orange-500/10 text-orange-500 border border-orange-500/20'
+                              ? 'bg-orange-500/10 text-status-brand border border-orange-500/20'
                               : 'bg-bg-tertiary text-text-secondary border border-border-primary'
                           }`}>
                             {note.version}
@@ -105,7 +105,7 @@ export default function ReleaseNotesModal({ isOpen, onClose }: ReleaseNotesModal
                       <div className="space-y-1.5">
                         {note.highlights.map((highlight, index) => (
                           <div key={index} className="flex items-start gap-2 text-xs text-text-secondary">
-                            <ChevronRight className="w-3.5 h-3.5 text-orange-500/70 shrink-0 mt-0.5" />
+                            <ChevronRight className="w-3.5 h-3.5 text-status-brand shrink-0 mt-0.5" />
                             <span>{highlight}</span>
                           </div>
                         ))}

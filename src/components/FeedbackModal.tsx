@@ -129,7 +129,7 @@ export default function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
                 className="flex flex-col items-center justify-center py-8 text-center"
                 data-testid="success-view"
               >
-                <div className="p-3 bg-green-500/10 text-green-400 rounded-full mb-4">
+                <div className="p-3 bg-green-500/10 text-status-success rounded-full mb-4">
                   <CheckCircle2 className="w-10 h-10" />
                 </div>
                 <h4 className="text-lg font-bold text-text-primary mb-2">Thank you!</h4>
@@ -151,7 +151,7 @@ export default function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
 
                 {errorMsg && (
                   <div
-                    className="p-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl flex items-start gap-2.5 text-xs animate-shake"
+                    className="p-3 bg-red-500/10 border border-red-500/20 text-status-danger rounded-xl flex items-start gap-2.5 text-xs animate-shake"
                     role="alert"
                     data-testid="error-banner"
                   >
@@ -179,7 +179,7 @@ export default function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
                 {/* Email */}
                 <div className="space-y-1.5">
                   <label htmlFor="feedback-email" className="text-[10px] font-bold uppercase tracking-wider text-text-secondary">
-                    Email Address <span className="text-orange-500">*</span>
+                    Email Address <span className="text-status-brand">*</span>
                   </label>
                   <input
                     type="email"
@@ -196,7 +196,7 @@ export default function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
                 {/* Message */}
                 <div className="space-y-1.5">
                   <label htmlFor="feedback-message" className="text-[10px] font-bold uppercase tracking-wider text-text-secondary">
-                    Message <span className="text-orange-500">*</span>
+                    Message <span className="text-status-brand">*</span>
                   </label>
                   <textarea
                     id="feedback-message"
@@ -222,7 +222,7 @@ export default function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
                   </button>
                   <button
                     type="submit"
-                    className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-xl text-xs font-bold uppercase shadow-lg shadow-orange-500/10 hover:shadow-orange-500/20 active:scale-95 disabled:opacity-50 disabled:scale-100 disabled:shadow-none transition-all cursor-pointer"
+                    className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-button-brand to-red-800 text-white rounded-xl text-xs font-bold uppercase shadow-lg shadow-orange-500/10 hover:shadow-orange-500/20 active:scale-95 disabled:opacity-50 disabled:scale-100 disabled:shadow-none transition-all cursor-pointer"
                     disabled={status === 'submitting'}
                   >
                     {status === 'submitting' ? (

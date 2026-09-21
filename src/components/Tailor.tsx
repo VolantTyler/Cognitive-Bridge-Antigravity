@@ -42,7 +42,7 @@ export default function Tailor({ scores, onNext }: TailorProps) {
       <OceanCards scores={scores} />
 
       {showBleedChip && (
-        <div className="px-4 py-2 bg-amber-500/10 border border-amber-500/30 rounded-lg text-[11px] text-amber-300 font-medium">
+        <div className="px-4 py-2 bg-amber-500/10 border border-amber-500/30 rounded-lg text-[11px] text-status-warning font-medium">
           Possible A↔C bleed — prefer Compassion vs Industriousness reading from interview
         </div>
       )}
@@ -51,14 +51,14 @@ export default function Tailor({ scores, onNext }: TailorProps) {
         <div className="flex flex-col gap-4 overflow-hidden">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Brain className="w-5 h-5 text-orange-500" />
+              <Brain className="w-5 h-5 text-status-brand" />
               <h3 className="text-lg font-medium">Alignment Directives</h3>
             </div>
             <button 
               onClick={handleCopy}
               className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all text-[10px] uppercase font-bold tracking-widest ${
                 copied 
-                  ? 'bg-green-500/20 border-green-500/50 text-green-400' 
+                  ? 'bg-green-500/20 border-green-500/50 text-status-success' 
                   : 'bg-bg-surface border border-border-secondary text-text-muted hover:text-text-primary hover:border-text-muted'
               }`}
             >
@@ -71,8 +71,8 @@ export default function Tailor({ scores, onNext }: TailorProps) {
             {/* Meta context explanation */}
             <div className="p-4 bg-orange-500/5 border border-orange-500/20 rounded-lg">
                <div className="flex items-center gap-2 mb-2">
-                  <FileCode className="w-4 h-4 text-orange-400" />
-                  <span className="text-xs font-bold text-orange-400">ALIGNMENT.md Generator</span>
+                  <FileCode className="w-4 h-4 text-status-brand" />
+                  <span className="text-xs font-bold text-status-brand">ALIGNMENT.md Generator</span>
                </div>
                <p className="text-[11px] text-text-secondary leading-relaxed italic">
                  Click the export button above to copy a portable markdown snippet. You can paste this into ChatGPT, Claude, or any other AI to align that session with your Cognitive Bridge profile.
@@ -90,7 +90,7 @@ export default function Tailor({ scores, onNext }: TailorProps) {
                 >
                   <div className="flex items-center gap-2 mb-2 flex-wrap">
                     <span className={`text-[10px] px-2 py-0.5 rounded uppercase font-bold ${
-                      d.threshold === 'high' ? 'bg-orange-500/20 text-orange-400' : 'bg-blue-500/20 text-blue-400'
+                      d.threshold === 'high' ? 'bg-orange-500/20 text-status-brand' : 'bg-blue-500/20 text-accent-blue'
                     }`}>
                       {d.threshold === 'high' ? 'High' : 'Low'} {TRAIT_CONFIG[d.trait].label}
                     </span>
@@ -117,7 +117,7 @@ export default function Tailor({ scores, onNext }: TailorProps) {
           <div className="space-y-4">
             <div className="flex items-start gap-4">
               <div className="w-8 h-8 rounded-full bg-orange-500/20 flex items-center justify-center shrink-0">
-                <Activity className="w-4 h-4 text-orange-500" />
+                <Activity className="w-4 h-4 text-status-brand" />
               </div>
               <div>
                 <h4 className="text-sm font-semibold">Recursive Memory</h4>
@@ -126,7 +126,7 @@ export default function Tailor({ scores, onNext }: TailorProps) {
             </div>
             <div className="flex items-start gap-4">
               <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center shrink-0">
-                <Heart className="w-4 h-4 text-blue-500" />
+                <Heart className="w-4 h-4 text-accent-blue" />
               </div>
               <div>
                 <h4 className="text-sm font-semibold">Bias Mitigation</h4>
@@ -138,7 +138,7 @@ export default function Tailor({ scores, onNext }: TailorProps) {
           <div className="mt-auto pt-6 border-t border-border-primary">
             <button 
               onClick={onNext}
-              className="w-full py-4 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl transition-all shadow-xl shadow-orange-500/20 flex items-center justify-center gap-2 group"
+              className="w-full py-4 bg-button-brand hover:bg-button-brand-hover text-white font-bold rounded-xl transition-all shadow-xl shadow-orange-500/20 flex items-center justify-center gap-2 group"
             >
               Initialize Aligned Agent
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />

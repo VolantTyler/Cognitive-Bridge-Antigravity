@@ -58,6 +58,7 @@ describe('Playground highlight activation', () => {
     expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
     const panel = document.getElementById('logic-analysis-panel');
     expect(panel).toBeTruthy();
+    expect(panel!.className).toMatch(/min-h-\[504px\]/);
     expect(within(panel!).getByText('Alignment Explanation:')).toBeInTheDocument();
     expect(
       within(panel!).getByText(/Compensatory scaffolding for low Conscientiousness/i)

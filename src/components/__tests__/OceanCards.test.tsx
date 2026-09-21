@@ -22,41 +22,38 @@ describe('OceanCards strategy badge layout', () => {
     expect(conscientiousnessHeader?.textContent).not.toMatch(/Compensatory|Congruent/);
   });
 
-  it('places responsive strategy badges beside scores on md+ and below bars on mobile', () => {
+  it('places strategy badges below the score bar at every breakpoint', () => {
     render(<OceanCards scores={scoresWithDirectives} />);
 
-    const desktopBadges = screen.getAllByTestId('ocean-strategy-badge-desktop');
-    const mobileBadges = screen.getAllByTestId('ocean-strategy-badge-mobile');
+    const badges = screen.getAllByTestId('ocean-strategy-badge');
+    expect(badges).toHaveLength(2);
 
-    expect(desktopBadges).toHaveLength(2);
-    expect(mobileBadges).toHaveLength(2);
-
-    for (const badge of desktopBadges) {
-      expect(badge.className).toMatch(/hidden md:inline-flex/);
-    }
-    for (const badge of mobileBadges) {
-      expect(badge.className).toMatch(/md:hidden/);
+    for (const badge of badges) {
       expect(badge.className).toMatch(/inline-flex/);
+      expect(badge.className).not.toMatch(/md:hidden|md:inline-flex/);
+      const card = badge.parentElement;
+      const bar = card?.querySelector('.h-2');
+      expect(bar).toBeTruthy();
+      expect(bar!.compareDocumentPosition(badge) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      const score = card?.querySelector('.text-3xl');
+      expect(score).toBeTruthy();
+      expect(score!.compareDocumentPosition(badge) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     }
 
-    for (const badge of desktopBadges) {
-      expect(badge.className).not.toMatch(/(?:^|\s)inline-flex(?:\s|$)/);
-    }
-
-    expect(desktopBadges[0].querySelector('button')?.textContent).toBe('Compensatory');
-    expect(mobileBadges[0].querySelector('button')?.textContent).toBe('Compensatory');
+    expect(badges[0].querySelector('button')?.textContent).toBe('Compensatory');
+    expect(badges[1].querySelector('button')?.textContent).toBe('Congruent');
   });
 
-  it('keeps strategy badge tooltips accessible on both responsive instances', () => {
+  it('keeps strategy badge tooltips accessible below the badge', () => {
     render(<OceanCards scores={scoresWithDirectives} />);
 
-    const desktopBadge = screen.getAllByTestId('ocean-strategy-badge-desktop')[0];
-    const button = desktopBadge.querySelector('button');
+    const badge = screen.getAllByTestId('ocean-strategy-badge')[0];
+    const button = badge.querySelector('button');
 
     expect(button).toHaveAttribute('aria-describedby');
-    const tooltip = desktopBadge.querySelector('[role="tooltip"]');
+    const tooltip = badge.querySelector('[role="tooltip"]');
     expect(tooltip?.textContent).toMatch(/Need-complementarity/i);
-    expect(tooltip?.className).toMatch(/bottom-full/);
+    expect(tooltip?.className).toMatch(/top-full/);
     expect(tooltip?.className).toMatch(/strategy-badge-tooltip/);
   });
 });
