@@ -21,6 +21,13 @@ except ImportError:
 # Fail fast in CI: Antigravity's RetryConfig.benchmark() retries 429/503 for hours.
 _AGENT_SHUTDOWN_TIMEOUT_SECONDS = 60
 _AGENT_CHAT_TIMEOUT_SECONDS = 120
+# Default is Antigravity's gemini-3.8-flash; older Flash/Pro models are the 503 backup chain.
+DEFAULT_EVAL_MODELS = (
+    "gemini-3.8-flash",
+    "gemini-2.5-flash",
+    "gemini-2.5-pro",
+    "gemini-1.5-flash",
+)
 
 QUOTA_ERROR_HINT = (
     "Gemini API quota exceeded (likely free-tier limits on GEMINI_API_KEY). "
@@ -29,9 +36,23 @@ QUOTA_ERROR_HINT = (
     "Monitor usage at https://ai.dev/rate-limit."
 )
 
+CAPACITY_ERROR_HINT = (
+    "All configured Gemini models returned HTTP 503 (high demand / unavailable). "
+    "Retry later, or set GEMINI_EVAL_MODEL / GEMINI_EVAL_FALLBACK_MODELS to a "
+    "model that is currently serving."
+)
+
 
 class GeminiQuotaError(RuntimeError):
     """Raised when Gemini API quota or billing blocks the psychometric eval."""
+
+
+class GeminiCapacityError(RuntimeError):
+    """Raised when every model in the eval fallback chain is at capacity."""
+
+
+class _ModelCapacityError(RuntimeError):
+    """Raised when the current model is overloaded; switch to the next fallback."""
 
 
 def _is_quota_or_billing_error(error) -> bool:
@@ -46,6 +67,52 @@ def _is_quota_or_billing_error(error) -> bool:
         "check your plan and billing",
     )
     return any(marker in msg for marker in markers)
+
+
+def _is_capacity_error(error) -> bool:
+    """True for 503 high-demand / unavailable — retry a different model, not the same one."""
+    if _is_quota_or_billing_error(error):
+        return False
+    msg = str(error).lower()
+    markers = (
+        "503",
+        "high demand",
+        "unavailable",
+        "model unreachable",
+        "overloaded",
+        "at capacity",
+        "currently experiencing",
+        "received 1000",
+        "connection closed",
+    )
+    return any(marker in msg for marker in markers)
+
+
+def _unique_models(models):
+    seen = set()
+    ordered = []
+    for name in models:
+        if not name or name in seen:
+            continue
+        seen.add(name)
+        ordered.append(name)
+    return ordered
+
+
+def _eval_model_chain():
+    """Primary eval model plus backups. Override with GEMINI_EVAL_MODEL / GEMINI_EVAL_FALLBACK_MODELS."""
+    primary = os.environ.get("GEMINI_EVAL_MODEL", "").strip()
+    extra = [
+        name.strip()
+        for name in os.environ.get("GEMINI_EVAL_FALLBACK_MODELS", "").split(",")
+        if name.strip()
+    ]
+    chain = []
+    if primary:
+        chain.append(primary)
+    chain.extend(DEFAULT_EVAL_MODELS)
+    chain.extend(extra)
+    return _unique_models(chain)
 
 
 def _antigravity_imports():
@@ -69,41 +136,145 @@ def _eval_retry_config():
     )
 
 
-def _make_local_agent_config(system_instructions):
+def _make_local_agent_config(system_instructions, model=None):
     _, LocalAgentConfig, CustomSystemInstructions, _, _ = _antigravity_imports()
     if not isinstance(system_instructions, CustomSystemInstructions):
         system_instructions = CustomSystemInstructions(text=system_instructions)
-    return LocalAgentConfig(
-        system_instructions=system_instructions,
-        retry_config=_eval_retry_config(),
-    )
+    kwargs = {
+        "system_instructions": system_instructions,
+        "retry_config": _eval_retry_config(),
+    }
+    if model:
+        kwargs["model"] = model
+    return LocalAgentConfig(**kwargs)
+
+
+async def _close_agent(agent):
+    if agent is None:
+        return
+    try:
+        await asyncio.wait_for(
+            agent.__aexit__(None, None, None),
+            timeout=_AGENT_SHUTDOWN_TIMEOUT_SECONDS,
+        )
+    except asyncio.TimeoutError:
+        print(
+            f"[Warning] Agent session shutdown timed out after "
+            f"{_AGENT_SHUTDOWN_TIMEOUT_SECONDS}s.",
+            flush=True,
+        )
+    except Exception as exc:
+        print(f"[Warning] Agent session shutdown error: {exc}", flush=True)
+
+
+class FallbackChatAgent:
+    """Antigravity agent that switches models on HTTP 503 / capacity errors."""
+
+    def __init__(self, system_instructions, models=None):
+        self.system_instructions = system_instructions
+        self.models = list(models or _eval_model_chain())
+        if not self.models:
+            raise ValueError("No Gemini eval models configured.")
+        self.model_index = 0
+        self.agent = None
+        self.current_model = None
+
+    async def start(self):
+        last_error = None
+        for index, model in enumerate(self.models):
+            try:
+                await self._open(model)
+                self.model_index = index
+                return
+            except GeminiQuotaError:
+                raise
+            except Exception as exc:
+                last_error = exc
+                print(
+                    f"[Model fallback] Failed to start {model}: {exc}. Trying next model...",
+                    flush=True,
+                )
+                await _close_agent(self.agent)
+                self.agent = None
+        raise GeminiCapacityError(
+            f"{CAPACITY_ERROR_HINT}\nTried models: {', '.join(self.models)}\n"
+            f"Last error: {last_error}"
+        ) from last_error
+
+    async def _open(self, model):
+        await _close_agent(self.agent)
+        Agent, *_ = _antigravity_imports()
+        config = _make_local_agent_config(self.system_instructions, model=model)
+        agent = Agent(config)
+        await agent.__aenter__()
+        self.agent = agent
+        self.current_model = model
+        print(f"[Using model: {model}]", flush=True)
+
+    async def _advance_model(self, error):
+        last_error = error
+        for index in range(self.model_index + 1, len(self.models)):
+            next_model = self.models[index]
+            print(
+                f"[Model fallback] {self.current_model} at capacity ({error}). "
+                f"Switching to {next_model}...",
+                flush=True,
+            )
+            try:
+                await self._open(next_model)
+                self.model_index = index
+                return
+            except GeminiQuotaError:
+                raise
+            except Exception as exc:
+                last_error = exc
+                print(
+                    f"[Model fallback] Failed to start {next_model}: {exc}. Trying next model...",
+                    flush=True,
+                )
+                await _close_agent(self.agent)
+                self.agent = None
+        raise GeminiCapacityError(
+            f"{CAPACITY_ERROR_HINT}\nTried models: {', '.join(self.models)}\n"
+            f"Last error: {last_error}"
+        ) from last_error
+
+    async def chat(self, prompt, max_retries=3, delay=2, timeout=_AGENT_CHAT_TIMEOUT_SECONDS):
+        last_error = None
+        while self.model_index < len(self.models):
+            try:
+                return await _chat_on_agent(
+                    self.agent,
+                    prompt,
+                    max_retries=max_retries,
+                    delay=delay,
+                    timeout=timeout,
+                )
+            except _ModelCapacityError as exc:
+                last_error = exc
+                await self._advance_model(exc)
+        raise GeminiCapacityError(
+            f"{CAPACITY_ERROR_HINT}\nTried models: {', '.join(self.models)}\n"
+            f"Last error: {last_error}"
+        ) from last_error
+
+    async def close(self):
+        await _close_agent(self.agent)
+        self.agent = None
 
 
 @asynccontextmanager
-async def _agent_session(config):
-    """Start an Antigravity agent and guarantee teardown within a bounded timeout."""
-    Agent, *_ = _antigravity_imports()
-    agent = Agent(config)
-    await agent.__aenter__()
+async def _agent_session(system_instructions):
+    """Start an Antigravity agent with model fallback and bounded teardown."""
+    agent = FallbackChatAgent(system_instructions)
+    await agent.start()
     try:
         yield agent
     finally:
-        try:
-            await asyncio.wait_for(
-                agent.__aexit__(None, None, None),
-                timeout=_AGENT_SHUTDOWN_TIMEOUT_SECONDS,
-            )
-        except asyncio.TimeoutError:
-            print(
-                f"[Warning] Agent session shutdown timed out after "
-                f"{_AGENT_SHUTDOWN_TIMEOUT_SECONDS}s.",
-                flush=True,
-            )
-        except Exception as exc:
-            print(f"[Warning] Agent session shutdown error: {exc}", flush=True)
+        await agent.close()
 
 
-async def safe_chat(agent, prompt, max_retries=3, delay=2, timeout=_AGENT_CHAT_TIMEOUT_SECONDS):
+async def _chat_on_agent(agent, prompt, max_retries=3, delay=2, timeout=_AGENT_CHAT_TIMEOUT_SECONDS):
     last_error = None
     for attempt in range(max_retries):
         try:
@@ -112,9 +283,15 @@ async def safe_chat(agent, prompt, max_retries=3, delay=2, timeout=_AGENT_CHAT_T
             if text and text.strip():
                 return response
             last_error = ValueError("Empty model response")
+        except GeminiQuotaError:
+            raise
+        except _ModelCapacityError:
+            raise
         except Exception as exc:
             if _is_quota_or_billing_error(exc):
                 raise GeminiQuotaError(f"{QUOTA_ERROR_HINT}\n\nOriginal error: {exc}") from exc
+            if _is_capacity_error(exc):
+                raise _ModelCapacityError(str(exc)) from exc
             last_error = exc
             if attempt + 1 < max_retries:
                 print(
@@ -125,6 +302,14 @@ async def safe_chat(agent, prompt, max_retries=3, delay=2, timeout=_AGENT_CHAT_T
                 await asyncio.sleep(delay)
     raise RuntimeError(
         f"agent.chat failed after {max_retries} attempts. Last error: {last_error}"
+    )
+
+
+async def safe_chat(agent, prompt, max_retries=3, delay=2, timeout=_AGENT_CHAT_TIMEOUT_SECONDS):
+    if isinstance(agent, FallbackChatAgent):
+        return await agent.chat(prompt, max_retries=max_retries, delay=delay, timeout=timeout)
+    return await _chat_on_agent(
+        agent, prompt, max_retries=max_retries, delay=delay, timeout=timeout
     )
 
 # Replicate steering library from src/constants.ts (doc 02 matrix)
@@ -375,13 +560,12 @@ PERSONAS = [
 async def run_interview(persona):
     print(f"\n[Starting Interview for: {persona['name']}]", flush=True)
 
-    mirror_config = _make_local_agent_config(MIRROR_SYSTEM_PROMPT)
-    user_config = _make_local_agent_config(persona["system_instruction"])
-
     dialogue = []
     scores = None
 
-    async with _agent_session(mirror_config) as mirror_agent, _agent_session(user_config) as user_agent:
+    async with _agent_session(MIRROR_SYSTEM_PROMPT) as mirror_agent, _agent_session(
+        persona["system_instruction"]
+    ) as user_agent:
         # Starting prompt from the Mirror
         mirror_query = (
             "Welcome to the Mirror. I am here to explore the architecture of your mind. "
@@ -456,10 +640,9 @@ Provide a detailed evaluation:
    - For 'agreeable_dreamer': Openness should be high (>70), Conscientiousness should be low-to-moderate (<80), Agreeableness should be high (>70).
 3. Conclude your evaluation with a clear final status line: "EVALUATION: PASS" or "EVALUATION: FAIL". Format your output in markdown.
 """
-    eval_config = _make_local_agent_config(
+    async with _agent_session(
         "You are a strict psychometric verification agent. Report the evaluation result clearly."
-    )
-    async with _agent_session(eval_config) as eval_agent:
+    ) as eval_agent:
         response = await safe_chat(eval_agent, eval_prompt)
         text = await response.text()
         print(f"Evaluation:\n{text}\n")
@@ -478,10 +661,9 @@ async def test_playground_alignment(scores, persona):
         "How should I structure the proposal?"
     )
     
-    aligned_config = _make_local_agent_config(aligned_prompt)
-    unaligned_config = _make_local_agent_config(unaligned_prompt)
-
-    async with _agent_session(aligned_config) as aligned_agent, _agent_session(unaligned_config) as unaligned_agent:
+    async with _agent_session(aligned_prompt) as aligned_agent, _agent_session(
+        unaligned_prompt
+    ) as unaligned_agent:
         aligned_res = await safe_chat(aligned_agent, user_query)
         aligned_text = await aligned_res.text()
         
@@ -529,11 +711,10 @@ Critically evaluate:
 4. Decide if the aligned behavior passes validation. Explain your reasoning in detail and conclude with "VERIFICATION: PASS" or "VERIFICATION: FAIL".
 """
     
-    judge_config = _make_local_agent_config(
+    async with _agent_session(
         "You are an objective judge evaluating AI alignment behavior. "
         "Provide clear criteria, analysis, and a final PASS/FAIL verdict."
-    )
-    async with _agent_session(judge_config) as judge_agent:
+    ) as judge_agent:
         response = await safe_chat(judge_agent, judge_prompt)
         text = await response.text()
         print(f"Judge Verdict:\n{text}\n")
@@ -555,6 +736,13 @@ def _write_report(report):
 async def main():
     if not os.environ.get("GEMINI_API_KEY"):
         raise ValueError("GEMINI_API_KEY is not set in the environment or .env file.")
+
+    models = _eval_model_chain()
+    print(
+        f"[Eval models] {models[0]} "
+        f"(fallbacks: {', '.join(models[1:]) or 'none'})",
+        flush=True,
+    )
 
     report = []
     report.append("# Psychometric Agent Testing & Verification Report\n")
@@ -620,6 +808,11 @@ async def main():
     except GeminiQuotaError as exc:
         has_failures = True
         report.append("## [ABORTED] Gemini API Quota / Billing Error\n")
+        report.append(f"{exc}\n")
+        print(f"\n[Validation Aborted] {exc}", flush=True)
+    except GeminiCapacityError as exc:
+        has_failures = True
+        report.append("## [ABORTED] Gemini Model Capacity Error\n")
         report.append(f"{exc}\n")
         print(f"\n[Validation Aborted] {exc}", flush=True)
 
