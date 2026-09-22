@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Brain, Dna, ArrowRight, Zap, Target, ShieldCheck, Github, User as UserIcon, Settings, Cpu } from 'lucide-react';
+import { Brain, User as UserIcon, Cpu } from 'lucide-react';
 import { ModuleId, OceanScores, Message, ComparisonMessage } from './types';
 import { INITIAL_OCEAN, INITIAL_MIRROR_MESSAGE } from './constants';
 import Mirror from './components/Mirror';
@@ -385,28 +385,6 @@ export default function App() {
         ))}
       </div>
 
-      {/* Hero / Information Bar (Only on Mirror) */}
-      {activeModule === 'mirror' && (
-        <div className="bg-bg-tertiary border-b border-border-primary py-3 px-6 overflow-hidden transition-colors duration-300">
-          <div className="max-w-7xl mx-auto flex items-center justify-between">
-            <div className="flex items-center gap-6">
-              <div className="flex items-center gap-2">
-                <Zap className="w-3 h-3 text-status-brand" />
-                <span className="text-[10px] uppercase font-bold text-text-muted-dark">Recursive Reasoning</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Target className="w-3 h-3 text-accent-blue" />
-                <span className="text-[10px] uppercase font-bold text-text-muted-dark">Bias Suppression</span>
-              </div>
-              <div className="flex items-center gap-2 text-status-success">
-                <ShieldCheck className="w-3 h-3" />
-                <span className="text-[10px] uppercase font-bold">Stable R&D Build</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-6 md:p-10 flex flex-col min-h-0 overflow-hidden">
         <AnimatePresence mode="wait">
@@ -441,10 +419,6 @@ export default function App() {
               exit={{ opacity: 0, scale: 0.98 }}
               className="flex-1 flex flex-col"
             >
-              <div className="mb-8 flex items-end justify-between uppercase tracking-widest text-[10px] font-bold text-status-brand">
-                <span>Phase 2: Synthesis Complete</span>
-                <span className="text-text-muted-dark">Bridge Active</span>
-              </div>
               <div className="flex-1">
                 <Tailor
                   scores={scores}
@@ -465,10 +439,6 @@ export default function App() {
               exit={{ opacity: 0, y: 20 }}
               className="flex-1 flex flex-col"
             >
-              <div className="mb-6">
-                <h2 className="text-3xl font-bold tracking-tight">Interfacing with Aligned Intelligence</h2>
-                <p className="text-text-muted mt-1">Directives mapped. Prompt fatigue eliminated. Communicate with your matched model.</p>
-              </div>
               <div className="flex-1 min-h-0">
                 <Playground
                   scores={scores}
