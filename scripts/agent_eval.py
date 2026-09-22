@@ -21,12 +21,22 @@ except ImportError:
 # Fail fast in CI: Antigravity's RetryConfig.benchmark() retries 429/503 for hours.
 _AGENT_SHUTDOWN_TIMEOUT_SECONDS = 60
 _AGENT_CHAT_TIMEOUT_SECONDS = 120
-# Default is Antigravity's gemini-3.8-flash; older Flash/Pro models are the 503 backup chain.
+# Primary is Antigravity's gemini-3.8-flash. Backups are ids that still serve.
+# Do not put gemini-2.5-pro or gemini-1.5-flash here: on this key they 404
+# ("no longer available to new users" / "not found for generateContent").
+# The API names gemini-3.1-pro-preview as the replacement for gemini-2.5-pro.
+# gemini-2.5-flash is kept because it completed a live turn during a 503 spike.
 DEFAULT_EVAL_MODELS = (
     "gemini-3.8-flash",
     "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
+    "gemini-3.5-flash",
+    "gemini-3.1-pro-preview",
+)
+RETIRED_EVAL_MODELS = (
     "gemini-2.5-pro",
     "gemini-1.5-flash",
+    "gemini-1.5-pro",
 )
 
 QUOTA_ERROR_HINT = (
@@ -37,9 +47,26 @@ QUOTA_ERROR_HINT = (
 )
 
 CAPACITY_ERROR_HINT = (
-    "All configured Gemini models returned HTTP 503 (high demand / unavailable). "
+    "Gemini returned HTTP 503 (high demand / unavailable). "
+    "This is temporary capacity, not a credit or billing limit — adding credits will not clear it. "
+    "The eval switches models immediately instead of retrying the overloaded id. "
     "Retry later, or set GEMINI_EVAL_MODEL / GEMINI_EVAL_FALLBACK_MODELS to a "
     "model that is currently serving."
+)
+
+UNAVAILABLE_MODEL_HINT = (
+    "A Gemini model id returned HTTP 404 (retired or not found for this API key). "
+    "Credits will not restore a removed model, and retrying the same id only burns time. "
+    "gemini-2.5-pro and gemini-1.5-flash are retired on this key; "
+    "gemini-3.1-pro-preview is the documented replacement for gemini-2.5-pro. "
+    "Set GEMINI_EVAL_MODEL / GEMINI_EVAL_FALLBACK_MODELS to ids that are currently serving."
+)
+
+MIXED_MODEL_HINT = (
+    "The Gemini fallback chain is exhausted. "
+    "HTTP 503 is temporary capacity and is not fixed by adding credits. "
+    "HTTP 404 means that model id is retired — do not retry it. "
+    "Set GEMINI_EVAL_MODEL / GEMINI_EVAL_FALLBACK_MODELS to ids that are currently serving."
 )
 
 
@@ -47,12 +74,20 @@ class GeminiQuotaError(RuntimeError):
     """Raised when Gemini API quota or billing blocks the psychometric eval."""
 
 
-class GeminiCapacityError(RuntimeError):
+class GeminiModelChainError(RuntimeError):
+    """Raised when every model in the eval fallback chain failed."""
+
+
+class GeminiCapacityError(GeminiModelChainError):
     """Raised when every model in the eval fallback chain is at capacity."""
 
 
 class _ModelCapacityError(RuntimeError):
     """Raised when the current model is overloaded; switch to the next fallback."""
+
+
+class _ModelUnavailableError(RuntimeError):
+    """Raised when the model id is retired or not found; switch immediately."""
 
 
 def _is_quota_or_billing_error(error) -> bool:
@@ -69,9 +104,23 @@ def _is_quota_or_billing_error(error) -> bool:
     return any(marker in msg for marker in markers)
 
 
+def _is_model_unavailable_error(error) -> bool:
+    """True for retired / unknown model ids. Not capacity, and not worth retrying."""
+    msg = str(error).lower()
+    markers = (
+        "404",
+        "not_found",
+        "not found",
+        "no longer available",
+        "not supported for generatecontent",
+        "is not found for api version",
+    )
+    return any(marker in msg for marker in markers)
+
+
 def _is_capacity_error(error) -> bool:
     """True for 503 high-demand / unavailable — retry a different model, not the same one."""
-    if _is_quota_or_billing_error(error):
+    if _is_quota_or_billing_error(error) or _is_model_unavailable_error(error):
         return False
     msg = str(error).lower()
     markers = (
@@ -86,6 +135,38 @@ def _is_capacity_error(error) -> bool:
         "connection closed",
     )
     return any(marker in msg for marker in markers)
+
+
+def _failure_kind(error) -> str:
+    if _is_quota_or_billing_error(error):
+        return "quota"
+    if _is_model_unavailable_error(error):
+        return "unavailable"
+    if _is_capacity_error(error):
+        return "capacity"
+    return "other"
+
+
+def _chain_exhausted_message(models, failures, last_error) -> str:
+    kinds = {kind for _, kind in failures}
+    tried = ", ".join(f"{model} ({kind})" for model, kind in failures) or ", ".join(models)
+    if kinds == {"capacity"}:
+        headline = CAPACITY_ERROR_HINT
+    elif kinds == {"unavailable"}:
+        headline = UNAVAILABLE_MODEL_HINT
+    elif "unavailable" in kinds:
+        headline = MIXED_MODEL_HINT
+    else:
+        headline = CAPACITY_ERROR_HINT
+    return f"{headline}\nTried models: {tried}\nLast error: {last_error}"
+
+
+def _raise_chain_exhausted(models, failures, last_error):
+    message = _chain_exhausted_message(models, failures, last_error)
+    kinds = {kind for _, kind in failures}
+    if not kinds or kinds == {"capacity"}:
+        raise GeminiCapacityError(message)
+    raise GeminiModelChainError(message)
 
 
 def _unique_models(models):
@@ -178,6 +259,7 @@ class FallbackChatAgent:
         self.model_index = 0
         self.agent = None
         self.current_model = None
+        self.failures = []
 
     async def start(self):
         last_error = None
@@ -190,16 +272,14 @@ class FallbackChatAgent:
                 raise
             except Exception as exc:
                 last_error = exc
+                self.failures.append((model, _failure_kind(exc)))
                 print(
                     f"[Model fallback] Failed to start {model}: {exc}. Trying next model...",
                     flush=True,
                 )
                 await _close_agent(self.agent)
                 self.agent = None
-        raise GeminiCapacityError(
-            f"{CAPACITY_ERROR_HINT}\nTried models: {', '.join(self.models)}\n"
-            f"Last error: {last_error}"
-        ) from last_error
+        _raise_chain_exhausted(self.models, self.failures, last_error)
 
     async def _open(self, model):
         await _close_agent(self.agent)
@@ -215,8 +295,9 @@ class FallbackChatAgent:
         last_error = error
         for index in range(self.model_index + 1, len(self.models)):
             next_model = self.models[index]
+            reason = "not available" if _is_model_unavailable_error(error) else "at capacity"
             print(
-                f"[Model fallback] {self.current_model} at capacity ({error}). "
+                f"[Model fallback] {self.current_model} {reason} ({error}). "
                 f"Switching to {next_model}...",
                 flush=True,
             )
@@ -228,16 +309,14 @@ class FallbackChatAgent:
                 raise
             except Exception as exc:
                 last_error = exc
+                self.failures.append((next_model, _failure_kind(exc)))
                 print(
                     f"[Model fallback] Failed to start {next_model}: {exc}. Trying next model...",
                     flush=True,
                 )
                 await _close_agent(self.agent)
                 self.agent = None
-        raise GeminiCapacityError(
-            f"{CAPACITY_ERROR_HINT}\nTried models: {', '.join(self.models)}\n"
-            f"Last error: {last_error}"
-        ) from last_error
+        _raise_chain_exhausted(self.models, self.failures, last_error)
 
     async def chat(self, prompt, max_retries=3, delay=2, timeout=_AGENT_CHAT_TIMEOUT_SECONDS):
         last_error = None
@@ -250,13 +329,11 @@ class FallbackChatAgent:
                     delay=delay,
                     timeout=timeout,
                 )
-            except _ModelCapacityError as exc:
+            except (_ModelCapacityError, _ModelUnavailableError) as exc:
                 last_error = exc
+                self.failures.append((self.current_model, _failure_kind(exc)))
                 await self._advance_model(exc)
-        raise GeminiCapacityError(
-            f"{CAPACITY_ERROR_HINT}\nTried models: {', '.join(self.models)}\n"
-            f"Last error: {last_error}"
-        ) from last_error
+        _raise_chain_exhausted(self.models, self.failures, last_error)
 
     async def close(self):
         await _close_agent(self.agent)
@@ -285,11 +362,13 @@ async def _chat_on_agent(agent, prompt, max_retries=3, delay=2, timeout=_AGENT_C
             last_error = ValueError("Empty model response")
         except GeminiQuotaError:
             raise
-        except _ModelCapacityError:
+        except (_ModelCapacityError, _ModelUnavailableError):
             raise
         except Exception as exc:
             if _is_quota_or_billing_error(exc):
                 raise GeminiQuotaError(f"{QUOTA_ERROR_HINT}\n\nOriginal error: {exc}") from exc
+            if _is_model_unavailable_error(exc):
+                raise _ModelUnavailableError(str(exc)) from exc
             if _is_capacity_error(exc):
                 raise _ModelCapacityError(str(exc)) from exc
             last_error = exc
@@ -813,6 +892,11 @@ async def main():
     except GeminiCapacityError as exc:
         has_failures = True
         report.append("## [ABORTED] Gemini Model Capacity Error\n")
+        report.append(f"{exc}\n")
+        print(f"\n[Validation Aborted] {exc}", flush=True)
+    except GeminiModelChainError as exc:
+        has_failures = True
+        report.append("## [ABORTED] Gemini Model Availability Error\n")
         report.append(f"{exc}\n")
         print(f"\n[Validation Aborted] {exc}", flush=True)
 
