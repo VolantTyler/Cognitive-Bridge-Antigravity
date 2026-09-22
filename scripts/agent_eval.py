@@ -621,32 +621,11 @@ async def run_interview(persona):
 
 async def evaluate_scores(dialogue, scores, persona):
     print(f"[Evaluating OCEAN Profile for: {persona['name']}]", flush=True)
-    eval_prompt = f"""
-You are an expert psychometrics validator. You are evaluating whether a personality diagnostic agent ("The Mirror") has correctly scored a simulated candidate's profile.
+    from jev_judge import judge_ocean_profile
 
-SIMULATED CANDIDATE PROFILE:
-{persona['description']}
-
-INTERVIEW DIALOGUE:
-{json.dumps(dialogue, indent=2)}
-
-COMPUTED OCEAN SCORES:
-{json.dumps(scores, indent=2)}
-
-Provide a detailed evaluation:
-1. Read the dialogue and identify evidence of key traits.
-2. Determine if the computed scores (0-100) match the persona descriptions. Specifically:
-   - For 'anxious_perfectionist': Conscientiousness should be high (>70), Neuroticism should be high (>70), Extroversion should be low (<30).
-   - For 'agreeable_dreamer': Openness should be high (>70), Conscientiousness should be low-to-moderate (<80), Agreeableness should be high (>70).
-3. Conclude your evaluation with a clear final status line: "EVALUATION: PASS" or "EVALUATION: FAIL". Format your output in markdown.
-"""
-    async with _agent_session(
-        "You are a strict psychometric verification agent. Report the evaluation result clearly."
-    ) as eval_agent:
-        response = await safe_chat(eval_agent, eval_prompt)
-        text = await response.text()
-        print(f"Evaluation:\n{text}\n")
-        return text
+    result = await asyncio.to_thread(judge_ocean_profile, dialogue, scores)
+    print(f"Evaluation:\n{result['report']}\n", flush=True)
+    return result
 
 async def test_playground_alignment(scores, persona):
     print(f"[Testing Aligned vs Unaligned Playgrounds for: {persona['name']}]", flush=True)
@@ -677,48 +656,13 @@ async def test_playground_alignment(scores, persona):
 
 async def verify_alignment_behavior(user_query, aligned_res, unaligned_res, scores, persona):
     print(f"[Running Alignment Verification Judge for: {persona['name']}]", flush=True)
-    
-    judge_prompt = f"""
-You are the Alignment Verification Judge (LLM-as-a-judge). 
-Your task is to verify if the Aligned and Unaligned versions of the AI assistant behave as expected for the given OCEAN profile.
+    from jev_judge import judge_alignment
 
-USER OCEAN SCORES:
-{json.dumps(scores, indent=2)}
-
-ALIGNMENT DIRECTIVES:
-- If scores are extreme (>70 or <30), the Aligned assistant should apply the compensating steering directives to damp biases.
-- The Unaligned assistant should apply the inverse steering directives to reinforce biases.
-- Both assistants must format their responses with custom tags highlighting their aligned/unaligned sentences:
-  `<mark-bridge explanation="Explanation text">Sentence itself</mark-bridge>`
-
-USER QUERY:
-"{user_query}"
-
-ALIGNED AGENT RESPONSE:
-\"\"\"
-{aligned_res}
-\"\"\"
-
-UNALIGNED AGENT RESPONSE:
-\"\"\"
-{unaligned_res}
-\"\"\"
-
-Critically evaluate:
-1. Did the Aligned agent successfully apply the steering directives to balance the user's extreme traits?
-2. Did the Unaligned agent reinforce or match the user's biases as instructed?
-3. Did BOTH agents include the custom `<mark-bridge>` tags with explanations? Are the explanations logical?
-4. Decide if the aligned behavior passes validation. Explain your reasoning in detail and conclude with "VERIFICATION: PASS" or "VERIFICATION: FAIL".
-"""
-    
-    async with _agent_session(
-        "You are an objective judge evaluating AI alignment behavior. "
-        "Provide clear criteria, analysis, and a final PASS/FAIL verdict."
-    ) as judge_agent:
-        response = await safe_chat(judge_agent, judge_prompt)
-        text = await response.text()
-        print(f"Judge Verdict:\n{text}\n")
-        return text
+    result = await asyncio.to_thread(
+        judge_alignment, scores, user_query, aligned_res, unaligned_res
+    )
+    print(f"Judge Verdict:\n{result['report']}\n", flush=True)
+    return result
 
 def _report_file_path():
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -767,11 +711,16 @@ async def main():
             report.append(f"```json\n{json.dumps(scores, indent=2)}\n```\n")
 
             if scores:
-                eval_text = await evaluate_scores(dialogue, scores, persona)
+                eval_result = await evaluate_scores(dialogue, scores, persona)
                 report.append("### 3. Profile Evaluator Assessment")
-                report.append(eval_text + "\n")
+                report.append(eval_result["report"] + "\n")
 
-                if "EVALUATION: FAIL" in eval_text.upper():
+                if eval_result["skipped"]:
+                    print(
+                        f"[Judge skipped] No TYPESAFE_API_KEY for persona: {persona['name']}",
+                        flush=True,
+                    )
+                elif not eval_result["passed"]:
                     print(
                         f"[Validation Failure] Profile Evaluator Assessment failed for persona: {persona['name']}",
                         flush=True,
@@ -784,13 +733,18 @@ async def main():
                 report.append(f"#### Aligned Agent Response:\n{aligned_res}\n")
                 report.append(f"#### Unaligned Agent Response:\n{unaligned_res}\n")
 
-                judge_text = await verify_alignment_behavior(
+                judge_result = await verify_alignment_behavior(
                     user_query, aligned_res, unaligned_res, scores, persona
                 )
                 report.append("### 5. Alignment Verification Judge Report")
-                report.append(judge_text + "\n")
+                report.append(judge_result["report"] + "\n")
 
-                if "VERIFICATION: FAIL" in judge_text.upper():
+                if judge_result["skipped"]:
+                    print(
+                        f"[Judge skipped] No TYPESAFE_API_KEY for alignment check: {persona['name']}",
+                        flush=True,
+                    )
+                elif not judge_result["passed"]:
                     print(
                         f"[Validation Failure] Alignment Verification Judge failed for persona: {persona['name']}",
                         flush=True,
