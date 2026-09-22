@@ -393,6 +393,18 @@ export default function Playground({ scores, messages, setMessages, setScores, o
         </AnimatePresence>
 
         <div className="flex-1 flex flex-col bg-bg-secondary border border-border-primary rounded-xl overflow-hidden shadow-2xl relative min-w-0 transition-colors duration-300">
+          <div className="p-4 bg-bg-surface/95 backdrop-blur-sm border-b border-border-primary flex items-center justify-between transition-colors duration-300">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-button-brand flex items-center justify-center shadow-lg shadow-orange-500/20">
+                <Sparkles className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h2 className="font-medium tracking-tight text-text-primary">The Bridge</h2>
+                <p className="text-xs text-text-muted uppercase tracking-widest">Intelligence Aligned to You</p>
+              </div>
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 bg-bg-surface border-b border-border-primary transition-colors duration-300">
             <div className="p-4 flex items-center justify-between border-r border-border-primary">
               <div className="flex flex-col gap-0.5">
@@ -479,11 +491,11 @@ export default function Playground({ scores, messages, setMessages, setScores, o
                 <div key={origIdx} className="flex flex-col">
                   {isExpanded ? (
                     <>
-                      <div className="bg-bg-tertiary p-4 flex justify-between items-center border-b border-border-primary transition-colors duration-300">
-                        <div className="flex-1 flex justify-center">
-                          <div className="flex items-center gap-3 bg-bg-playground-user-bubble px-4 py-2 rounded-full border border-border-playground-user-bubble max-w-[90%] overflow-hidden">
-                            <User className="w-3 h-3 text-icon-playground-user-bubble shrink-0" />
-                            <span className="text-xs font-medium text-text-playground-user-bubble italic truncate">{m.user}</span>
+                      <div className="bg-bg-tertiary p-4 flex justify-between items-start gap-3 border-b border-border-primary transition-colors duration-300">
+                        <div className="flex-1 flex justify-center min-w-0">
+                          <div className="flex items-start gap-3 bg-bg-playground-user-bubble px-4 py-2 rounded-2xl border border-border-playground-user-bubble w-full max-w-full min-w-0">
+                            <User className="w-3 h-3 text-icon-playground-user-bubble shrink-0 mt-0.5" />
+                            <span className="text-xs font-medium text-text-playground-user-bubble italic break-words whitespace-pre-wrap min-w-0">{m.user}</span>
                           </div>
                         </div>
                         <div className="flex items-center gap-1 shrink-0">
@@ -541,15 +553,15 @@ export default function Playground({ scores, messages, setMessages, setScores, o
                       )}
                     </>
                   ) : (
-                    <div className="bg-bg-tertiary/60 hover:bg-bg-tertiary p-3 flex justify-between items-center transition-colors duration-200">
+                    <div className="bg-bg-tertiary/60 hover:bg-bg-tertiary p-3 flex justify-between items-start gap-3 transition-colors duration-200">
                       <div
                         onClick={() => setExpandedIndices(prev => ({ ...prev, [origIdx]: true }))}
-                        className="flex-1 flex items-center gap-3 cursor-pointer select-none overflow-hidden mr-4"
+                        className="flex-1 flex items-start gap-3 cursor-pointer select-none min-w-0"
                       >
-                        <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-blue-600/10 text-accent-blue border border-blue-500/20 shrink-0">
+                        <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-blue-600/10 text-accent-blue border border-blue-500/20 shrink-0 mt-0.5">
                           Prompt
                         </span>
-                        <span className="text-xs text-text-secondary truncate font-medium max-w-[80%]">
+                        <span className="text-xs text-text-secondary break-words whitespace-pre-wrap font-medium min-w-0">
                           {m.user}
                         </span>
                         {m.error && (
