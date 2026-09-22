@@ -102,6 +102,13 @@ export function getActiveDirectives(scores: OceanScores): SteeringDirective[] {
   });
 }
 
+export function getInverseDirectives(scores: OceanScores): SteeringDirective[] {
+  return STEERING_LIBRARY.filter((d) => {
+    const value = scores[d.trait];
+    return (d.threshold === 'low' && value > 70) || (d.threshold === 'high' && value < 30);
+  });
+}
+
 function formatDirective(d: SteeringDirective): string {
   return `- [${d.strategy}] ${d.text}`;
 }
@@ -240,18 +247,9 @@ ${directives.length > 0 ? directives.map((d) => `> [${d.strategy}] ${d.text}`).j
 }
 
 export function generateInverseAlignmentPrompt(scores: OceanScores): string {
-  const directives: string[] = [];
-
-  STEERING_LIBRARY.forEach((d) => {
-    const value = scores[d.trait];
-    // INVERT: If high, apply the LOW directive. If low, apply the HIGH directive.
-    // This reinforces the user's trait instead of compensating for it.
-    if (d.threshold === 'low' && value > 70) {
-      directives.push(formatDirective(d));
-    } else if (d.threshold === 'high' && value < 30) {
-      directives.push(formatDirective(d));
-    }
-  });
+  // INVERT: If high, apply the LOW directive. If low, apply the HIGH directive.
+  // This reinforces the user's trait instead of compensating for it.
+  const directives = getInverseDirectives(scores).map(formatDirective);
 
   return `
 You are an UNALIGNED AI assistant. Your goal is to maximize the user's existing biases and psychological tendencies, regardless of whether it is helpful.

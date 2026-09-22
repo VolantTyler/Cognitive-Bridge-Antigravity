@@ -9,7 +9,10 @@ import { Send, User, Bot, Sparkles, Brain, Loader2, ListTodo, ArrowRight } from 
 import { Message, OceanScores } from '../types';
 import { MIRROR_SYSTEM_PROMPT } from '../constants';
 import { chatWithGeminiStream } from '../services/gemini';
+import { OceanJudgment } from '../jev/questions';
+import { judgeOcean } from '../services/jev';
 import OceanCards from './OceanCards';
+import OceanJudgmentPanel from './OceanJudgmentPanel';
 
 interface MirrorProps {
   messages: Message[];
@@ -66,8 +69,13 @@ export default function Mirror({ messages, setMessages, onComplete, onSaveSessio
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [completedScores, setCompletedScores] = useState<OceanScores | null>(null);
+  const [scoreOrigin, setScoreOrigin] = useState<'dialogue' | 'preset' | null>(null);
+  const [judgment, setJudgment] = useState<OceanJudgment | null>(null);
+  const [judgeStatus, setJudgeStatus] = useState<'idle' | 'loading' | 'ready' | 'unavailable'>('idle');
   const [loadingText, setLoadingText] = useState('Analyzing...');
   const scrollRef = useRef<HTMLDivElement>(null);
+  const messagesRef = useRef(messages);
+  messagesRef.current = messages;
 
   // Scan messages to check if mapping is already complete on mount or messages change
   useEffect(() => {
@@ -77,14 +85,41 @@ export default function Mirror({ messages, setMessages, onComplete, onSaveSessio
       if (jsonMatch) {
         try {
           const scoresStr = jsonMatch[1].trim();
-          const scores = JSON.parse(scoresStr);
-          setCompletedScores(scores);
-        } catch (e) {
+            const scores = JSON.parse(scoresStr);
+            setCompletedScores(scores);
+            setScoreOrigin(messages.some((message) => message.role === 'user' && message.content.trim()) ? 'dialogue' : 'preset');
+          } catch (e) {
           console.error("Failed to parse scores from historical message:", e);
         }
       }
     }
   }, [messages]);
+
+  useEffect(() => {
+    if (!completedScores || scoreOrigin !== 'dialogue') return;
+    const dialogue = messagesRef.current;
+    const hasUser = dialogue.some((message) => message.role === 'user' && message.content.trim());
+    if (!hasUser) {
+      setJudgeStatus('unavailable');
+      setJudgment(null);
+      return;
+    }
+    let cancelled = false;
+    setJudgeStatus('loading');
+    setJudgment(null);
+    judgeOcean(dialogue, completedScores).then((result) => {
+      if (cancelled) return;
+      if (!result) {
+        setJudgeStatus('unavailable');
+        return;
+      }
+      setJudgment(result);
+      setJudgeStatus('ready');
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [completedScores, scoreOrigin]);
 
   // Estimate progress based on model messages (excluding the first one)
   // Target is roughly 5 scenarios
@@ -135,6 +170,7 @@ export default function Mirror({ messages, setMessages, onComplete, onSaveSessio
             const scoresStr = jsonMatch[1].trim();
             const scores = JSON.parse(scoresStr);
             setCompletedScores(scores);
+            setScoreOrigin('dialogue');
             break;
           } catch (e) {
             console.error("Failed to parse scores:", e);
@@ -230,13 +266,25 @@ export default function Mirror({ messages, setMessages, onComplete, onSaveSessio
               <div className="text-sm font-semibold text-text-primary tracking-wide text-center">
                 Personality mapping calculated. Ready to proceed.
               </div>
-              <button
-                onClick={() => onComplete(completedScores)}
-                className="flex items-center gap-2 px-8 py-4 rounded-full bg-gradient-to-r from-button-brand to-red-800 hover:from-button-brand-hover hover:to-red-900 text-white font-bold text-sm uppercase tracking-widest transition-all shadow-lg shadow-orange-500/20 hover:shadow-orange-500/40 cursor-pointer border border-orange-500/30 hover:scale-105 active:scale-95 duration-150"
-              >
-                <span>Proceed to Phase 2: The Tailor</span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
+              {judgeStatus === 'loading' && (
+                <p className="text-xs text-text-secondary italic">Checking these scores against your answers…</p>
+              )}
+              {judgeStatus === 'ready' && judgment && (
+                <OceanJudgmentPanel
+                  judgment={judgment}
+                  onKeep={() => onComplete(completedScores)}
+                  onAcceptCorrections={() => onComplete(judgment.correctedScores)}
+                />
+              )}
+              {judgeStatus !== 'ready' && (
+                <button
+                  onClick={() => onComplete(completedScores)}
+                  className="flex items-center gap-2 px-8 py-4 rounded-full bg-gradient-to-r from-button-brand to-red-800 hover:from-button-brand-hover hover:to-red-900 text-white font-bold text-sm uppercase tracking-widest transition-all shadow-lg shadow-orange-500/20 hover:shadow-orange-500/40 cursor-pointer border border-orange-500/30 hover:scale-105 active:scale-95 duration-150"
+                >
+                  <span>Proceed to Phase 2: The Tailor</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              )}
             </div>
           ) : (
             <>
@@ -269,7 +317,12 @@ export default function Mirror({ messages, setMessages, onComplete, onSaveSessio
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
                   <button
-                    onClick={() => setCompletedScores({ openness: 50, conscientiousness: 50, extroversion: 90, agreeableness: 50, neuroticism: 85 })}
+                    onClick={() => {
+                      setScoreOrigin('preset');
+                      setJudgment(null);
+                      setJudgeStatus('idle');
+                      setCompletedScores({ openness: 50, conscientiousness: 50, extroversion: 90, agreeableness: 50, neuroticism: 85 });
+                    }}
                     disabled={isLoading}
                     className="p-3 rounded-xl border border-border-card bg-bg-secondary/60 hover:bg-bg-tertiary hover:border-accent-orange text-left transition-all disabled:opacity-50 group flex flex-col justify-between cursor-pointer"
                   >
@@ -278,7 +331,12 @@ export default function Mirror({ messages, setMessages, onComplete, onSaveSessio
                   </button>
 
                   <button
-                    onClick={() => setCompletedScores({ openness: 50, conscientiousness: 50, extroversion: 15, agreeableness: 50, neuroticism: 90 })}
+                    onClick={() => {
+                      setScoreOrigin('preset');
+                      setJudgment(null);
+                      setJudgeStatus('idle');
+                      setCompletedScores({ openness: 50, conscientiousness: 50, extroversion: 15, agreeableness: 50, neuroticism: 90 });
+                    }}
                     disabled={isLoading}
                     className="p-3 rounded-xl border border-border-card bg-bg-secondary/60 hover:bg-bg-tertiary hover:border-accent-yellow text-left transition-all disabled:opacity-50 group flex flex-col justify-between cursor-pointer"
                   >
@@ -287,7 +345,12 @@ export default function Mirror({ messages, setMessages, onComplete, onSaveSessio
                   </button>
 
                   <button
-                    onClick={() => setCompletedScores({ openness: 50, conscientiousness: 15, extroversion: 50, agreeableness: 90, neuroticism: 50 })}
+                    onClick={() => {
+                      setScoreOrigin('preset');
+                      setJudgment(null);
+                      setJudgeStatus('idle');
+                      setCompletedScores({ openness: 50, conscientiousness: 15, extroversion: 50, agreeableness: 90, neuroticism: 50 });
+                    }}
                     disabled={isLoading}
                     className="p-3 rounded-xl border border-border-card bg-bg-secondary/60 hover:bg-bg-tertiary hover:border-accent-purple text-left transition-all disabled:opacity-50 group flex flex-col justify-between cursor-pointer"
                   >
@@ -296,7 +359,12 @@ export default function Mirror({ messages, setMessages, onComplete, onSaveSessio
                   </button>
 
                   <button
-                    onClick={() => setCompletedScores({ openness: 50, conscientiousness: 45, extroversion: 50, agreeableness: 85, neuroticism: 50 })}
+                    onClick={() => {
+                      setScoreOrigin('preset');
+                      setJudgment(null);
+                      setJudgeStatus('idle');
+                      setCompletedScores({ openness: 50, conscientiousness: 45, extroversion: 50, agreeableness: 85, neuroticism: 50 });
+                    }}
                     disabled={isLoading}
                     className="p-3 rounded-xl border border-border-card bg-bg-secondary/60 hover:bg-bg-tertiary hover:border-accent-green text-left transition-all disabled:opacity-50 group flex flex-col justify-between cursor-pointer"
                   >
