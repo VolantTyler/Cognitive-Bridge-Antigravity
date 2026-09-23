@@ -3,7 +3,6 @@ import {
   STEERING_LIBRARY,
   getActiveDirectives,
   generateAlignmentPrompt,
-  generateAgentCheatSheet,
   generateInverseAlignmentPrompt,
   generatePortableMetadata,
   MIRROR_SYSTEM_PROMPT,
@@ -131,31 +130,16 @@ describe('portable exports', () => {
     neuroticism: 20,
   };
 
-  it('includes strategy definitions, in-repo research framing, and the app link', () => {
+  it('includes strategy definitions and the app link, without a research section', () => {
     const markdown = generatePortableMetadata(scores);
 
+    expect(markdown).toContain('## Strategy definitions');
     expect(markdown).toContain(ALIGNMENT_STRATEGY_INFO.congruent.tooltip);
     expect(markdown).toContain(ALIGNMENT_STRATEGY_INFO.compensatory.tooltip);
     expect(markdown).toContain(ALIGNMENT_STRATEGY_INFO.complementary.tooltip);
-    expect(markdown).toContain('Complementarity + congruence (research matrix)');
-    expect(markdown).toContain('Similarity-attraction / amplify extremes');
     expect(markdown).toContain(COGNITIVE_BRIDGE_APP_URL);
-    expect(markdown).toContain('does not include bibliographic citations or article URLs');
-    expect(markdown).not.toMatch(/doi\.org|arxiv\.org/);
-  });
-
-  it('agent cheat sheet maps each active trait to its directive and badge', () => {
-    const sheet = generateAgentCheatSheet(scores);
-
-    expect(sheet).toContain('**Openness** (high, 85/100) — badge: congruent');
-    expect(sheet).toContain('Explore novel angles, theoretical mechanisms');
-    expect(sheet).toContain('**Conscientiousness** (low, 15/100) — badge: compensatory');
-    expect(sheet).toContain('**Agreeableness** (high, 90/100) — badge: congruent');
-    expect(sheet).toContain('**Neuroticism** (low, 20/100) — badge: complementary');
-    expect(sheet).toContain('* **Extroversion:** 50/100');
-    expect(sheet).not.toMatch(/\*\*Extroversion\*\* \(/);
-    expect(sheet).toContain(ALIGNMENT_STRATEGY_INFO.congruent.tooltip);
-    expect(sheet).toContain(COGNITIVE_BRIDGE_APP_URL);
+    expect(markdown).not.toContain('## Research references');
+    expect(markdown).not.toContain('bibliographic citations');
   });
 });
 

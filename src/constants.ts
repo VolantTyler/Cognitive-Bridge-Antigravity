@@ -19,14 +19,6 @@ export const RESEARCH_FRAMING = {
     'Prefer need-complementarity / compensatory counterbalance where marked complementary or compensatory; prefer similarity-attraction (congruence) where marked congruent. Never claim clinical validation.',
 } as const;
 
-const TRAIT_LABELS: Record<keyof OceanScores, string> = {
-  openness: 'Openness',
-  conscientiousness: 'Conscientiousness',
-  extroversion: 'Extroversion',
-  agreeableness: 'Agreeableness',
-  neuroticism: 'Neuroticism',
-};
-
 /** UI copy for alignment strategy badges (matches ALIGNMENT THEORY in generateAlignmentPrompt). */
 export const ALIGNMENT_STRATEGY_INFO: Record<
   AlignmentStrategy,
@@ -247,15 +239,6 @@ function formatStrategyDefinitions(): string {
     .join('\n');
 }
 
-function formatResearchReferences(): string {
-  return `## Research references
-This repository does not include bibliographic citations or article URLs for the alignment research. The product copy names these mechanisms only:
-
-* **Aligned column:** ${RESEARCH_FRAMING.aligned}
-* **Unaligned column:** ${RESEARCH_FRAMING.unaligned}
-* **Alignment theory:** ${RESEARCH_FRAMING.theory}`;
-}
-
 function formatAppLink(): string {
   return `## App
 [Cognitive Bridge](${COGNITIVE_BRIDGE_APP_URL})`;
@@ -282,50 +265,12 @@ ${directives.length > 0 ? directives.map((d) => `> [${d.strategy}] ${d.text}`).j
 ## Strategy definitions
 ${formatStrategyDefinitions()}
 
-${formatResearchReferences()}
-
 ${formatAppLink()}
 
 ---
 **Instruction for AI Model:**
 *Adopt the persona and constraints defined above for all future interactions in this session. Prioritize these directives to bridge the cognitive gap with the user.*
 ---`;
-}
-
-/** Compact, agent-ready sheet of the active steering directives. */
-export function generateAgentCheatSheet(scores: OceanScores): string {
-  const directives = getActiveDirectives(scores);
-  const directiveLines =
-    directives.length > 0
-      ? directives
-          .map(
-            (d) =>
-              `- **${TRAIT_LABELS[d.trait]}** (${d.threshold}, ${scores[d.trait]}/100) — badge: ${d.strategy}\n  ${d.text}`
-          )
-          .join('\n')
-      : '- No critical trait spikes (every score is between 30 and 70). Default: maintain a balanced, helpful, and professional tone.';
-
-  const profileLines = (Object.keys(TRAIT_LABELS) as (keyof OceanScores)[])
-    .map((trait) => `* **${TRAIT_LABELS[trait]}:** ${scores[trait]}/100`)
-    .join('\n');
-
-  return `# Agent cheat sheet
-App: ${COGNITIVE_BRIDGE_APP_URL}
-
-## Profile
-${profileLines}
-
-## Active steering directives
-${directiveLines}
-
-## Strategy definitions
-${formatStrategyDefinitions()}
-
-${formatResearchReferences()}
-
-## Instruction
-Follow the active directives above for this session. Use the badge to choose similarity-attraction (congruent) or need-complementarity (compensatory or complementary). Do not invent a strategy for a mid-range trait. Never claim clinical validation.
-`;
 }
 
 export function generateInverseAlignmentPrompt(scores: OceanScores): string {
