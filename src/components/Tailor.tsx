@@ -6,7 +6,7 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { OceanScores } from '../types';
-import { getActiveDirectives, generatePortableMetadata } from '../constants';
+import { getActiveDirectives, generateAgentCheatSheet, generatePortableMetadata } from '../constants';
 import { Brain, ArrowRight, Dna, Activity, Users, ShieldAlert, Heart, Copy, Check, FileCode } from 'lucide-react';
 import OceanCards from './OceanCards';
 import StrategyBadge from './StrategyBadge';
@@ -25,16 +25,23 @@ const TRAIT_CONFIG = {
 };
 
 export default function Tailor({ scores, onNext }: TailorProps) {
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<'context' | 'cheat' | null>(null);
   
   const activeDirectives = getActiveDirectives(scores);
   const showBleedChip = scores.agreeableness > 70 && scores.conscientiousness > 70;
 
-  const handleCopy = () => {
-    const text = generatePortableMetadata(scores);
+  const copyText = (kind: 'context' | 'cheat', text: string) => {
     navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    setCopied(kind);
+    setTimeout(() => setCopied(null), 2000);
+  };
+
+  const handleCopy = () => {
+    copyText('context', generatePortableMetadata(scores));
+  };
+
+  const handleCopyCheatSheet = () => {
+    copyText('cheat', generateAgentCheatSheet(scores));
   };
 
   return (
@@ -68,17 +75,30 @@ export default function Tailor({ scores, onNext }: TailorProps) {
               <Brain className="w-5 h-5 text-status-brand" />
               <h3 className="text-lg font-medium">Alignment Directives</h3>
             </div>
-            <button 
-              onClick={handleCopy}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all text-[10px] uppercase font-bold tracking-widest ${
-                copied 
-                  ? 'bg-green-500/20 border-green-500/50 text-status-success' 
-                  : 'bg-bg-surface border border-border-secondary text-text-muted hover:text-text-primary hover:border-text-muted'
-              }`}
-            >
-              {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-              {copied ? 'Copied to Clipboard' : 'Export Portable Context'}
-            </button>
+            <div className="flex items-center gap-2 flex-wrap justify-end">
+              <button
+                onClick={handleCopyCheatSheet}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all text-[10px] uppercase font-bold tracking-widest ${
+                  copied === 'cheat'
+                    ? 'bg-green-500/20 border-green-500/50 text-status-success'
+                    : 'bg-bg-surface border border-border-secondary text-text-muted hover:text-text-primary hover:border-text-muted'
+                }`}
+              >
+                {copied === 'cheat' ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                {copied === 'cheat' ? 'Cheat sheet copied' : 'Agent cheat sheet'}
+              </button>
+              <button
+                onClick={handleCopy}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all text-[10px] uppercase font-bold tracking-widest ${
+                  copied === 'context'
+                    ? 'bg-green-500/20 border-green-500/50 text-status-success'
+                    : 'bg-bg-surface border border-border-secondary text-text-muted hover:text-text-primary hover:border-text-muted'
+                }`}
+              >
+                {copied === 'context' ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                {copied === 'context' ? 'Copied to Clipboard' : 'Export Portable Context'}
+              </button>
+            </div>
           </div>
           
           <div className="flex-1 overflow-y-auto pr-2 space-y-3 custom-scrollbar">
@@ -89,7 +109,7 @@ export default function Tailor({ scores, onNext }: TailorProps) {
                   <span className="text-xs font-bold text-status-brand">ALIGNMENT.md Generator</span>
                </div>
                <p className="text-[11px] text-text-secondary leading-relaxed italic">
-                 Click the export button above to copy a portable markdown snippet. You can paste this into ChatGPT, Claude, or any other AI to align that session with your Cognitive Bridge profile.
+                 Copy a portable markdown snippet or the agent cheat sheet. Paste either into ChatGPT, Claude, or any other AI to align that session with your Cognitive Bridge profile.
                </p>
             </div>
 
