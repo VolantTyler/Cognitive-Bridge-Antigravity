@@ -12,13 +12,20 @@ from agent_eval import (
     DEFAULT_EVAL_MODELS,
     FallbackChatAgent,
     GeminiCapacityError,
+    GeminiModelChainError,
     GeminiQuotaError,
+    MIXED_MODEL_HINT,
     QUOTA_ERROR_HINT,
+    RETIRED_EVAL_MODELS,
+    UNAVAILABLE_MODEL_HINT,
+    _chain_exhausted_message,
     _chat_on_agent,
     _eval_model_chain,
     _is_capacity_error,
+    _is_model_unavailable_error,
     _is_quota_or_billing_error,
     _ModelCapacityError,
+    _ModelUnavailableError,
     _unique_models,
 )
 
@@ -75,7 +82,40 @@ class CapacityErrorDetectionTests(unittest.TestCase):
 
     def test_capacity_hint_mentions_override_env(self):
         self.assertIn("GEMINI_EVAL_MODEL", CAPACITY_ERROR_HINT)
+        self.assertIn("not a credit", CAPACITY_ERROR_HINT)
         self.assertTrue(issubclass(GeminiCapacityError, RuntimeError))
+
+    def test_retired_model_404_is_not_capacity(self):
+        error = (
+            "request failed (code 404): This model models/gemini-2.5-pro is no longer "
+            "available to new users. Please update your code to use models/gemini-3.1-pro-preview. "
+            "Status: NOT_FOUND"
+        )
+        self.assertTrue(_is_model_unavailable_error(error))
+        self.assertFalse(_is_capacity_error(error))
+
+    def test_404_with_websocket_close_stays_unavailable(self):
+        error = (
+            "request failed (code 404): models/gemini-1.5-flash is not found for API version v1beta "
+            "received 1000 (OK); then sent 1000 (OK)"
+        )
+        self.assertTrue(_is_model_unavailable_error(error))
+        self.assertFalse(_is_capacity_error(error))
+
+    def test_mixed_exhaustion_message_names_both_failures(self):
+        message = _chain_exhausted_message(
+            DEFAULT_EVAL_MODELS,
+            [
+                ("gemini-3.8-flash", "capacity"),
+                ("gemini-2.5-pro", "unavailable"),
+                ("gemini-1.5-flash", "unavailable"),
+            ],
+            "received 1000 (OK); then sent 1000 (OK)",
+        )
+        self.assertIn(MIXED_MODEL_HINT, message)
+        self.assertIn("gemini-2.5-pro (unavailable)", message)
+        self.assertNotIn("All configured Gemini models returned HTTP 503", message)
+        self.assertIn("GEMINI_EVAL_MODEL", UNAVAILABLE_MODEL_HINT)
 
 
 class ModelChainTests(unittest.TestCase):
@@ -99,6 +139,10 @@ class ModelChainTests(unittest.TestCase):
         self.assertIn("gemini-2.5-flash", chain)
         self.assertGreaterEqual(len(chain), 3)
         self.assertEqual(chain, _unique_models(DEFAULT_EVAL_MODELS))
+        self.assertIn("gemini-3.1-pro-preview", chain)
+        self.assertIn("gemini-2.5-flash-lite", chain)
+        for retired in RETIRED_EVAL_MODELS:
+            self.assertNotIn(retired, chain)
 
     def test_env_primary_is_tried_first(self):
         os.environ["GEMINI_EVAL_MODEL"] = "gemini-2.0-flash"
@@ -144,6 +188,23 @@ class ChatRetryTests(unittest.IsolatedAsyncioTestCase):
             await _chat_on_agent(agent, "hi", max_retries=3, delay=0)
         self.assertEqual(agent.calls, 1)
 
+    async def test_retired_model_404_does_not_retry_same_model(self):
+        class MissingAgent:
+            def __init__(self):
+                self.calls = 0
+
+            async def chat(self, prompt):
+                self.calls += 1
+                raise RuntimeError(
+                    "request failed (code 404): This model models/gemini-2.5-pro is no longer "
+                    "available to new users. Please update your code to use models/gemini-3.1-pro-preview."
+                )
+
+        agent = MissingAgent()
+        with self.assertRaises(_ModelUnavailableError):
+            await _chat_on_agent(agent, "hi", max_retries=3, delay=0)
+        self.assertEqual(agent.calls, 1)
+
 
 class FallbackAgentTests(unittest.IsolatedAsyncioTestCase):
     async def test_switches_to_backup_model_on_503(self):
@@ -178,6 +239,43 @@ class FallbackAgentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(await response.text(), "hello from backup")
         self.assertEqual(opened, ["gemini-3.8-flash", "gemini-2.5-flash"])
         self.assertEqual(agent.current_model, "gemini-2.5-flash")
+
+    async def test_switches_immediately_on_retired_model(self):
+        class OkResponse:
+            async def text(self):
+                return "hello from live model"
+
+        class OkAgent:
+            async def chat(self, prompt):
+                return OkResponse()
+
+        opened = []
+        agent = FallbackChatAgent(
+            "sys",
+            models=["gemini-2.5-pro", "gemini-3.1-pro-preview"],
+        )
+
+        async def fake_open(model):
+            opened.append(model)
+            if model == "gemini-2.5-pro":
+                class Missing:
+                    async def chat(self, prompt):
+                        raise RuntimeError(
+                            "request failed (code 404): This model models/gemini-2.5-pro "
+                            "is no longer available to new users."
+                        )
+
+                agent.agent = Missing()
+            else:
+                agent.agent = OkAgent()
+            agent.current_model = model
+
+        agent._open = fake_open
+        await fake_open("gemini-2.5-pro")
+        response = await agent.chat("hi", delay=0)
+        self.assertEqual(await response.text(), "hello from live model")
+        self.assertEqual(opened, ["gemini-2.5-pro", "gemini-3.1-pro-preview"])
+        self.assertTrue(issubclass(GeminiModelChainError, RuntimeError))
 
 
 if __name__ == "__main__":

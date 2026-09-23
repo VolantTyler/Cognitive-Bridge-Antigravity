@@ -8,11 +8,11 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Send, Sparkles, User, Shield, Info, Loader2, AlertTriangle, Zap, Split, Brain, Trash2, ChevronDown, ChevronUp, RotateCcw } from 'lucide-react';
 import { OceanScores, Message, ComparisonMessage } from '../types';
 import { generateAlignmentPrompt, generateInverseAlignmentPrompt } from '../constants';
-import { chatWithGeminiStream } from '../services/gemini';
+import { chatWithGeminiStream, DEFAULT_GEMINI_MODEL } from '../services/gemini';
 import OceanCards from './OceanCards';
 import { isStreamErrorText } from './playgroundUtils';
 
-const GENERATION_TIMEOUT_MS = 25000;
+const GENERATION_TIMEOUT_MS = 90000;
 
 interface PlaygroundProps {
   scores: OceanScores;
@@ -50,6 +50,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 export default function Playground({ scores, messages, setMessages, setScores, onSaveSession }: PlaygroundProps) {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [generationStatus, setGenerationStatus] = useState('Generating Aligned and Unaligned responses...');
   const [activeAnalysis, setActiveAnalysis] = useState<ActiveAnalysis | null>(null);
   const [expandedIndices, setExpandedIndices] = useState<Record<number, boolean>>({});
   const initializedRef = useRef(false);
@@ -169,6 +170,7 @@ export default function Playground({ scores, messages, setMessages, setScores, o
       aligned: '',
       unaligned: '',
     });
+    setGenerationStatus('Generating Aligned and Unaligned responses...');
     setIsLoading(true);
 
     const conversationHistory: Message[] = messages
@@ -187,8 +189,9 @@ export default function Playground({ scores, messages, setMessages, setScores, o
         const stream = chatWithGeminiStream(
           [...conversationHistory, currentInput],
           alignedPrompt,
-          'gemini-2.5-pro',
-          'playground-aligned'
+          DEFAULT_GEMINI_MODEL,
+          'playground-aligned',
+          (_failed, next) => setGenerationStatus(`Switching to ${next} after a model capacity error...`)
         );
         for await (const chunk of stream) {
           alignedText += chunk;
@@ -199,8 +202,9 @@ export default function Playground({ scores, messages, setMessages, setScores, o
         const stream = chatWithGeminiStream(
           [...conversationHistory, currentInput],
           unalignedPrompt,
-          'gemini-2.5-pro',
-          'playground-unaligned'
+          DEFAULT_GEMINI_MODEL,
+          'playground-unaligned',
+          (_failed, next) => setGenerationStatus(`Switching to ${next} after a model capacity error...`)
         );
         for await (const chunk of stream) {
           unalignedText += chunk;
@@ -461,7 +465,7 @@ export default function Playground({ scores, messages, setMessages, setScores, o
             {isLoading && (
               <div className="p-3 flex justify-center gap-2 bg-bg-secondary border-b border-border-primary transition-colors duration-300 shrink-0">
                 <Loader2 className="w-3.5 h-3.5 animate-spin text-accent-blue" />
-                <span className="text-[10px] uppercase font-bold tracking-widest text-text-secondary">Generating Aligned and Unaligned responses...</span>
+                <span className="text-[10px] uppercase font-bold tracking-widest text-text-secondary">{generationStatus}</span>
               </div>
             )}
 

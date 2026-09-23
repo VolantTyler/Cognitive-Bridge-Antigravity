@@ -489,7 +489,7 @@ export default function App() {
           </button>
         </div>
         <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 md:gap-4 text-center">
-          <span className="text-text-muted">Model: {ollamaConfig.enabled ? `Ollama (${ollamaConfig.model})` : 'Gemini 3.1 Pro // Flash'}</span>
+          <span className="text-text-muted">Model: {ollamaConfig.enabled ? `Ollama (${ollamaConfig.model})` : 'Gemini 2.5 Flash (live fallbacks)'}</span>
           <span className="text-border-primary">/</span>
           <span>Procedural Skills Engine</span>
         </div>

@@ -30,7 +30,11 @@ This document compiles the key architectural, psychological, and engineering lea
 
 ### HTTP 503 High-Demand Should Fallback, Not Retry The Same Model
 * **Problem**: Antigravity defaults to `gemini-3.8-flash`. When that model is at capacity (`UNAVAILABLE` / HTTP 503 "high demand"), retrying it three times just burns the job — the websocket often dies after the first 503 (`received 1000 (OK)`), and the third attempt times out.
-* **Resolution**: `FallbackChatAgent` walks `gemini-3.8-flash` → `gemini-2.5-flash` → `gemini-2.5-pro` → `gemini-1.5-flash`. Capacity errors switch models immediately instead of retrying the overloaded one. Override with `GEMINI_EVAL_MODEL` / `GEMINI_EVAL_FALLBACK_MODELS`.
+* **Resolution**: `FallbackChatAgent` walks `gemini-3.8-flash` → `gemini-2.5-flash` → `gemini-2.5-flash-lite` → `gemini-3.5-flash` → `gemini-3.1-pro-preview`. Capacity errors switch models immediately instead of retrying the overloaded one. Override with `GEMINI_EVAL_MODEL` / `GEMINI_EVAL_FALLBACK_MODELS`.
+
+### HTTP 404 Retired Models Are Not Capacity And Must Not Be Retried
+* **Problem**: After `gemini-3.8-flash` and `gemini-2.5-flash` returned HTTP 503, the backup chain called `gemini-2.5-pro` and `gemini-1.5-flash`. Both 404 (`no longer available to new users` / `not found for generateContent`). The 404 was retried, the follow-up websocket close (`received 1000`) was misread as another 503, and the job aborted with "All configured Gemini models returned HTTP 503". Adding credits does not bring a retired model back, and longer timeouts do not help errors that already returned.
+* **Resolution**: Classify 404 / `no longer available` / `not found` as model-unavailable, skip that id immediately, and keep retired ids out of `DEFAULT_EVAL_MODELS`. The API's named replacement for `gemini-2.5-pro` is `gemini-3.1-pro-preview`. `gemini-2.5-flash` stays in the chain because it still served a full turn during the same spike.
 
 ### Portable Path Resolution
 * **Problem**: Hardcoding workspace paths (e.g., `/Users/tyler/antigravity/...`) results in instant breakage in containerized runners (e.g., `/home/runner/work/...` on GitHub Actions).
