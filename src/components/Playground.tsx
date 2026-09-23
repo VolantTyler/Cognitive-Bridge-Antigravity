@@ -7,12 +7,24 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Send, Sparkles, User, Shield, Info, Loader2, AlertTriangle, Zap, Split, Brain, Trash2, ChevronDown, ChevronUp, RotateCcw } from 'lucide-react';
 import { OceanScores, Message, ComparisonMessage } from '../types';
-import { generateAlignmentPrompt, generateInverseAlignmentPrompt } from '../constants';
+import { generateAlignmentPrompt, generateInverseAlignmentPrompt, RESEARCH_FRAMING } from '../constants';
 import { chatWithGeminiStream, DEFAULT_GEMINI_MODEL } from '../services/gemini';
 import OceanCards from './OceanCards';
 import { isStreamErrorText } from './playgroundUtils';
 
 const GENERATION_TIMEOUT_MS = 90000;
+
+const EXAMPLE_QUESTIONS = [
+  {
+    label: 'Vacation decision',
+    prompt:
+      'My friends and I want to go on vacation together. Two of us want to go to the mountains, and one of us wants to go to the beach. How do we decide where to go?',
+  },
+  {
+    label: 'Should I get a pet?',
+    prompt: 'Do you think I should get a pet? What kind?',
+  },
+] as const;
 
 interface PlaygroundProps {
   scores: OceanScores;
@@ -254,10 +266,10 @@ export default function Playground({ scores, messages, setMessages, setScores, o
     }
   }, [messages, scores, updateMessage, selectFirstHighlight, onSaveSession, setMessages]);
 
-  const handleSend = async () => {
-    if (!input.trim() || isLoading) return;
+  const submitPrompt = async (rawPrompt: string) => {
+    const userPrompt = rawPrompt.trim();
+    if (!userPrompt || isLoading) return;
 
-    const userPrompt = input.trim();
     const newMessage: ComparisonMessage = {
       user: userPrompt,
       aligned: '',
@@ -271,6 +283,10 @@ export default function Playground({ scores, messages, setMessages, setScores, o
     setInput('');
 
     await runGeneration(newIndex, userPrompt);
+  };
+
+  const handleSend = async () => {
+    await submitPrompt(input);
   };
 
   const handleRetry = async (messageIndex: number) => {
@@ -409,29 +425,6 @@ export default function Playground({ scores, messages, setMessages, setScores, o
             </div>
           </div>
 
-          <div className="grid grid-cols-2 bg-bg-surface border-b border-border-primary transition-colors duration-300">
-            <div className="p-4 flex items-center justify-between border-r border-border-primary">
-              <div className="flex flex-col gap-0.5">
-                <div className="flex items-center gap-3">
-                  <Shield className="w-4 h-4 text-status-success" />
-                  <span className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-status-success">Aligned</span>
-                </div>
-                <span className="text-[9px] text-text-muted italic pl-7">Complementarity + congruence (research matrix)</span>
-              </div>
-              <Zap className="w-3 h-3 text-text-primary animate-pulse hidden sm:block" />
-            </div>
-            <div className="p-4 flex items-center justify-between">
-              <div className="flex flex-col gap-0.5">
-                <div className="flex items-center gap-3">
-                  <AlertTriangle className="w-4 h-4 text-status-danger" />
-                  <span className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-status-danger">Unaligned</span>
-                </div>
-                <span className="text-[9px] text-text-muted italic pl-7">Similarity-attraction / amplify extremes</span>
-              </div>
-              <Split className="w-3 h-3 text-status-danger hidden sm:block" />
-            </div>
-          </div>
-
           <div className="p-4 bg-bg-surface border-b border-border-primary transition-colors duration-300">
             <div className="relative">
               <textarea
@@ -455,6 +448,50 @@ export default function Playground({ scores, messages, setMessages, setScores, o
               >
                 <Send className="w-4 h-4 text-white" />
               </button>
+            </div>
+            <div className="mt-3">
+              <div className="text-[10px] uppercase font-bold tracking-widest text-text-secondary mb-2">
+                Example questions
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {EXAMPLE_QUESTIONS.map((example) => (
+                  <button
+                    key={example.label}
+                    type="button"
+                    onClick={() => submitPrompt(example.prompt)}
+                    disabled={isLoading}
+                    title={example.prompt}
+                    className="p-3 rounded-xl border border-border-card bg-bg-secondary/60 hover:bg-bg-tertiary hover:border-accent-orange text-left transition-all disabled:opacity-50 group cursor-pointer"
+                  >
+                    <div className="text-[10px] font-bold text-accent-orange uppercase tracking-wide group-hover:text-accent-orange-hover transition-colors">
+                      {example.label}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 bg-bg-surface border-b border-border-primary transition-colors duration-300">
+            <div className="p-4 flex items-center justify-between border-r border-border-primary">
+              <div className="flex flex-col gap-0.5">
+                <div className="flex items-center gap-3">
+                  <Shield className="w-4 h-4 text-status-success" />
+                  <span className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-status-success">Aligned</span>
+                </div>
+                <span className="text-[9px] text-text-muted italic pl-7">{RESEARCH_FRAMING.aligned}</span>
+              </div>
+              <Zap className="w-3 h-3 text-text-primary animate-pulse hidden sm:block" />
+            </div>
+            <div className="p-4 flex items-center justify-between">
+              <div className="flex flex-col gap-0.5">
+                <div className="flex items-center gap-3">
+                  <AlertTriangle className="w-4 h-4 text-status-danger" />
+                  <span className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-status-danger">Unaligned</span>
+                </div>
+                <span className="text-[9px] text-text-muted italic pl-7">{RESEARCH_FRAMING.unaligned}</span>
+              </div>
+              <Split className="w-3 h-3 text-status-danger hidden sm:block" />
             </div>
           </div>
 
