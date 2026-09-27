@@ -1,6 +1,7 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { vi, describe, it, expect } from 'vitest';
+import { APP_VERSION_LABEL } from '../../appVersion';
 import ReleaseNotesModal from '../ReleaseNotesModal';
 
 describe('ReleaseNotesModal Component', () => {
@@ -13,6 +14,7 @@ describe('ReleaseNotesModal Component', () => {
     render(<ReleaseNotesModal isOpen={true} onClose={() => {}} />);
     
     expect(screen.getByText('Release Notes')).toBeInTheDocument();
+    expect(screen.getByText(APP_VERSION_LABEL)).toBeInTheDocument();
     expect(screen.getByText('v1.5.0')).toBeInTheDocument();
     expect(screen.getByText('Release Notes & Stability improvements')).toBeInTheDocument();
     expect(screen.getByText('v1.0.0')).toBeInTheDocument();

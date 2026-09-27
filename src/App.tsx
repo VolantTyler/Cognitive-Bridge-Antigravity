@@ -7,6 +7,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Brain, User as UserIcon, Cpu } from 'lucide-react';
 import { ModuleId, OceanScores, Message, ComparisonMessage } from './types';
+import { APP_VERSION_LABEL } from './appVersion';
 import { INITIAL_OCEAN, INITIAL_MIRROR_MESSAGE } from './constants';
 import Mirror from './components/Mirror';
 import Tailor from './components/Tailor';
@@ -201,7 +202,7 @@ export default function App() {
             alt="Cognitive Bridge"
             className="w-8 h-8 rounded shadow-lg shadow-orange-500/10"
           />
-          <span className="font-bold tracking-tight text-sm sm:text-lg">COGNITIVE BRIDGE <span className="hidden sm:inline-block text-[10px] font-mono text-status-brand ml-1 border border-orange-500/30 px-1 rounded uppercase">v1.5</span></span>
+          <span className="font-bold tracking-tight text-sm sm:text-lg">COGNITIVE BRIDGE <span className="hidden sm:inline-block text-[10px] font-mono text-status-brand ml-1 border border-orange-500/30 px-1 rounded uppercase">{APP_VERSION_LABEL}</span></span>
         </div>
 
         <div className="flex items-center gap-4">
@@ -485,7 +486,7 @@ export default function App() {
             className="hover:text-text-primary transition-colors cursor-pointer border-0 bg-transparent uppercase tracking-[0.3em] font-bold text-[9px] text-text-muted-darker"
             title="View Release Notes"
           >
-            Cognitive Bridge v1.5
+            Cognitive Bridge {APP_VERSION_LABEL}
           </button>
         </div>
         <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 md:gap-4 text-center">

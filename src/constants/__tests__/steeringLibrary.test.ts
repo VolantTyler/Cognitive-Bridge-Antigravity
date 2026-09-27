@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { APP_VERSION_LABEL } from '../../appVersion';
 import {
   STEERING_LIBRARY,
   getActiveDirectives,
@@ -133,6 +134,8 @@ describe('portable exports', () => {
   it('includes strategy definitions and the app link, without a research section', () => {
     const markdown = generatePortableMetadata(scores);
 
+    expect(markdown).toContain(`ALIGNMENT.md (${APP_VERSION_LABEL})`);
+    expect(markdown).toContain(`Cognitive Bridge ${APP_VERSION_LABEL}`);
     expect(markdown).toContain('## Strategy definitions');
     expect(markdown).toContain(ALIGNMENT_STRATEGY_INFO.congruent.tooltip);
     expect(markdown).toContain(ALIGNMENT_STRATEGY_INFO.compensatory.tooltip);
