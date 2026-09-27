@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { APP_VERSION_LABEL } from './appVersion';
 import { AlignmentStrategy, OceanScores, SteeringDirective } from './types';
 
 /** Hosted app. Included in portable exports so an agent can return to the source. */
@@ -248,9 +249,9 @@ export function generatePortableMetadata(scores: OceanScores): string {
   const directives = getActiveDirectives(scores);
 
   return `---
-# 📑 ALIGNMENT.md (v1.5)
+# 📑 ALIGNMENT.md (${APP_VERSION_LABEL})
 **Context:** User Cognitive Alignment Shard
-**Source:** Cognitive Bridge v1.5
+**Source:** Cognitive Bridge ${APP_VERSION_LABEL}
 
 ## User Profile: OCEAN Scores
 * **Openness:** ${scores.openness}/100
