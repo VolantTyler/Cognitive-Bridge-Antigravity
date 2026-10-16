@@ -1,5 +1,19 @@
 # AGENTS.md
 
+## Agent skills
+
+### Issue tracker
+
+GitHub issues (`gh` CLI). See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Canonical triage roles mapped 1:1 (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context layout (`CONTEXT.md` + `docs/adr/`). See `docs/agents/domain.md`.
+
 ## Cursor Cloud specific instructions
 
 Cognitive Bridge is a single-page **Vite + React 19 + TypeScript** web app (an AI Studio applet) that maps a user's OCEAN personality traits to AI steering directives. It uses the **Gemini API** (`@google/genai`) for chat and **Firebase** (Firestore/Auth/Analytics) for persistence. Standard commands live in `package.json` `scripts`.

@@ -21,9 +21,12 @@ function getProxyUrl(): string {
 }
 
 // Constants for retry logic
-const MAX_ATTEMPTS_PER_MODEL = 2;
-const RETRY_DELAY_MS = 1000;
-const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+export const MAX_ATTEMPTS_PER_MODEL = 2;
+export let retryDelayMs = typeof process !== 'undefined' && process.env?.NODE_ENV === 'test' ? 0 : 1000;
+export function setRetryDelayMs(ms: number) {
+  retryDelayMs = ms;
+}
+const sleep = (ms: number) => ms > 0 ? new Promise(resolve => setTimeout(resolve, ms)) : Promise.resolve();
 
 export interface ModelInfo {
   name: string;
@@ -412,46 +415,135 @@ async function* chatWithOllamaStream(
   }
 }
 
+export function sanitizeAndPruneMessages(
+  messages: Message[],
+  maxTurns: number = 30
+): Message[] {
+  if (!messages || messages.length === 0) return [];
+
+  // Filter out empty messages and ensure consistent roles
+  const clean: Message[] = messages
+    .filter(m => m && typeof m.content === 'string' && m.content.trim().length > 0)
+    .map(m => ({
+      role: (m.role as string) === 'assistant' ? 'model' : m.role,
+      content: m.content.trim()
+    }));
+
+  if (clean.length <= maxTurns) {
+    return clean;
+  }
+
+  // Preserve the first user turn for task context, plus the most recent (maxTurns - 1) turns
+  const firstMessage = clean[0];
+  const recentSlice = clean.slice(-(maxTurns - 1));
+
+  if (recentSlice.includes(firstMessage)) {
+    return recentSlice;
+  }
+
+  return [firstMessage, ...recentSlice];
+}
+
+export function isContextLengthError(error: any): boolean {
+  if (!error) return false;
+  const msg = String(error.message || (error.error && error.error.message) || error).toLowerCase();
+  return (
+    msg.includes('context length') ||
+    msg.includes('token limit') ||
+    msg.includes('too many tokens') ||
+    msg.includes('maximum context') ||
+    msg.includes('payload too large') ||
+    error.status === 413 ||
+    error.code === 413
+  );
+}
+
 export async function chatWithGemini(
   messages: Message[],
   systemInstruction?: string,
   modelName: string = "gemini-2.5-flash",
-  feature?: string
+  feature?: string,
+  onFallback?: (failedModel: string, nextModel: string) => void
 ): Promise<string> {
   const ollamaConfig = getOllamaConfig();
   if (ollamaConfig.enabled) {
     return chatWithOllama(messages, systemInstruction, ollamaConfig);
   }
 
-  try {
-    const url = getProxyUrl();
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        messages,
-        systemInstruction,
-        modelName,
-        stream: false
-      })
-    });
+  let sanitizedMessages = sanitizeAndPruneMessages(messages);
+  const candidateModels = getDynamicModelFallbacks(modelName);
+  let lastError: any = null;
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+  for (let modelIdx = 0; modelIdx < candidateModels.length; modelIdx++) {
+    const currentModel = candidateModels[modelIdx];
+
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS_PER_MODEL; attempt++) {
+      try {
+        const url = getProxyUrl();
+        const response = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            messages: sanitizedMessages,
+            systemInstruction,
+            modelName: currentModel,
+            stream: false
+          })
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          let parsedError: any;
+          try {
+            parsedError = JSON.parse(errorText);
+          } catch {
+            parsedError = { message: errorText };
+          }
+          const errObj = new Error(
+            parsedError.error?.message || parsedError.message || `HTTP error! status: ${response.status}`
+          );
+          (errObj as any).status = response.status;
+          throw errObj;
+        }
+
+        const data = await response.json();
+        if (data.error) {
+          throw new Error(data.error);
+        }
+        return data.text || "";
+      } catch (err: any) {
+        lastError = err;
+        console.warn(`[chatWithGemini] Attempt ${attempt} failed on model ${currentModel}:`, err);
+
+        // Check if context length error: prune and retry immediately
+        if (isContextLengthError(err) && sanitizedMessages.length > 4) {
+          sanitizedMessages = sanitizeAndPruneMessages(sanitizedMessages, Math.floor(sanitizedMessages.length / 2));
+          continue;
+        }
+
+        // If not transient and reached max attempts, break to next model
+        if (!isTransientError(err) && attempt >= MAX_ATTEMPTS_PER_MODEL) {
+          break;
+        }
+
+        if (attempt < MAX_ATTEMPTS_PER_MODEL) {
+          await sleep(retryDelayMs * Math.pow(2, attempt - 1));
+        }
+      }
     }
 
-    const data = await response.json();
-    if (data.error) {
-      throw new Error(data.error);
+    // Model exhausted - trigger fallback if another candidate exists
+    if (modelIdx < candidateModels.length - 1) {
+      const nextModel = candidateModels[modelIdx + 1];
+      console.warn(`[chatWithGemini] Falling back from ${currentModel} to ${nextModel}`);
+      onFallback?.(currentModel, nextModel);
     }
-    return data.text || "";
-  } catch (error) {
-    console.error("Gemini API Error (via Proxy):", error);
-    return "I encountered an error connecting to the intelligence bridge.";
   }
+
+  console.error("Gemini API Error (via Proxy) after all recovery attempts:", lastError);
+  return "I encountered an error connecting to the intelligence bridge.";
 }
 
 export async function* chatWithGeminiStream(
@@ -467,73 +559,127 @@ export async function* chatWithGeminiStream(
     return;
   }
 
-  try {
-    const url = getProxyUrl();
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        messages,
-        systemInstruction,
-        modelName,
-        stream: true
-      })
-    });
+  let sanitizedMessages = sanitizeAndPruneMessages(messages);
+  const candidateModels = getDynamicModelFallbacks(modelName);
+  let hasYieldedAnyText = false;
+  let lastError: any = null;
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
-    }
+  for (let modelIdx = 0; modelIdx < candidateModels.length; modelIdx++) {
+    const currentModel = candidateModels[modelIdx];
 
-    if (!response.body) {
-      throw new Error("Response body is not readable.");
-    }
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS_PER_MODEL; attempt++) {
+      try {
+        const url = getProxyUrl();
+        const response = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            messages: sanitizedMessages,
+            systemInstruction,
+            modelName: currentModel,
+            stream: true
+          })
+        });
 
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder("utf-8");
-    let buffer = "";
-
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
-
-        for (const line of lines) {
-          const cleanLine = line.trim();
-          if (!cleanLine.startsWith("data: ")) continue;
-
-          const dataStr = cleanLine.substring(6).trim();
-          if (dataStr === "[DONE]") {
-            return;
-          }
-
-          let parsed: any;
+        if (!response.ok) {
+          const errorText = await response.text();
+          let parsedError: any;
           try {
-            parsed = JSON.parse(dataStr);
-          } catch (e) {
-            console.error("Failed to parse stream chunk:", e, "Chunk string:", dataStr);
-            continue;
+            parsedError = JSON.parse(errorText);
+          } catch {
+            parsedError = { message: errorText };
           }
+          const errObj = new Error(
+            parsedError.error?.message || parsedError.message || `HTTP error! status: ${response.status}`
+          );
+          (errObj as any).status = response.status;
+          throw errObj;
+        }
 
-          if (parsed.error) {
-            throw new Error(parsed.error);
+        if (!response.body) {
+          throw new Error("Response body is not readable.");
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+        let buffer = "";
+
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split("\n");
+            buffer = lines.pop() || "";
+
+            for (const line of lines) {
+              const cleanLine = line.trim();
+              if (!cleanLine.startsWith("data: ")) continue;
+
+              const dataStr = cleanLine.substring(6).trim();
+              if (dataStr === "[DONE]") {
+                return;
+              }
+
+              let parsed: any;
+              try {
+                parsed = JSON.parse(dataStr);
+              } catch (e) {
+                console.error("Failed to parse stream chunk:", e, "Chunk string:", dataStr);
+                continue;
+              }
+
+              if (parsed.error) {
+                throw new Error(parsed.error);
+              }
+              if (parsed.text) {
+                hasYieldedAnyText = true;
+                yield parsed.text;
+              }
+            }
           }
-          if (parsed.text) {
-            yield parsed.text;
-          }
+          return;
+        } finally {
+          reader.releaseLock();
+        }
+      } catch (err: any) {
+        lastError = err;
+        console.warn(`[chatWithGeminiStream] Attempt ${attempt} failed on model ${currentModel}:`, err);
+
+        // If we already started streaming text to the user, notify and terminate cleanly
+        if (hasYieldedAnyText) {
+          yield "\n\n[Note: The stream connection was interrupted. Please retry to complete.]";
+          return;
+        }
+
+        // Check context length error
+        if (isContextLengthError(err) && sanitizedMessages.length > 4) {
+          sanitizedMessages = sanitizeAndPruneMessages(sanitizedMessages, Math.floor(sanitizedMessages.length / 2));
+          continue;
+        }
+
+        // If not transient and reached max attempts, break to next model
+        if (!isTransientError(err) && attempt >= MAX_ATTEMPTS_PER_MODEL) {
+          break;
+        }
+
+        if (attempt < MAX_ATTEMPTS_PER_MODEL) {
+          await sleep(retryDelayMs * Math.pow(2, attempt - 1));
         }
       }
-    } finally {
-      reader.releaseLock();
     }
-  } catch (finalError) {
-    console.error("Gemini Streaming Error (via Proxy):", finalError);
-    yield "Error connecting to the stream.";
+
+    // Model exhausted - trigger fallback if another candidate exists and we haven't yielded partial text
+    if (!hasYieldedAnyText && modelIdx < candidateModels.length - 1) {
+      const nextModel = candidateModels[modelIdx + 1];
+      console.warn(`[chatWithGeminiStream] Falling back from ${currentModel} to ${nextModel}`);
+      onFallback?.(currentModel, nextModel);
+    }
   }
+
+  console.error("Gemini Streaming Error (via Proxy) after all recovery attempts:", lastError);
+  yield "Error connecting to the stream.";
 }

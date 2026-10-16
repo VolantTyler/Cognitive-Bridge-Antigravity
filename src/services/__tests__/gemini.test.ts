@@ -8,6 +8,8 @@ import {
   parseModelName,
   getDynamicModelFallbacks,
   isTransientError,
+  isContextLengthError,
+  sanitizeAndPruneMessages,
   chatWithGemini,
   chatWithGeminiStream,
   activeModelsCache
@@ -64,6 +66,47 @@ describe('Gemini Service Unit Tests', () => {
     });
   });
 
+  describe('isContextLengthError', () => {
+    it('correctly identifies context length and token limit errors', () => {
+      expect(isContextLengthError({ status: 413 })).toBe(true);
+      expect(isContextLengthError({ code: 413 })).toBe(true);
+      expect(isContextLengthError(new Error('Maximum context length exceeded'))).toBe(true);
+      expect(isContextLengthError(new Error('Too many tokens in prompt'))).toBe(true);
+      expect(isContextLengthError(new Error('Payload too large'))).toBe(true);
+      expect(isContextLengthError(new Error('Normal network error'))).toBe(false);
+      expect(isContextLengthError(null)).toBe(false);
+    });
+  });
+
+  describe('sanitizeAndPruneMessages', () => {
+    it('removes empty messages and normalizes assistant roles', () => {
+      const messages = [
+        { role: 'user' as const, content: '  ' },
+        { role: 'user' as const, content: 'Hello' },
+        { role: 'assistant' as const, content: 'Hi there' },
+      ];
+      const result = sanitizeAndPruneMessages(messages as any);
+      expect(result).toEqual([
+        { role: 'user', content: 'Hello' },
+        { role: 'model', content: 'Hi there' },
+      ]);
+    });
+
+    it('prunes middle messages when exceeding max turns while preserving initial turn', () => {
+      const longConversation: { role: 'user' | 'model'; content: string }[] = Array.from({ length: 10 }, (_, i) => ({
+        role: i % 2 === 0 ? 'user' : 'model',
+        content: `Message ${i + 1}`,
+      }));
+
+      const pruned = sanitizeAndPruneMessages(longConversation, 4);
+      expect(pruned.length).toBe(4);
+      expect(pruned[0].content).toBe('Message 1'); // Preserved first turn
+      expect(pruned[1].content).toBe('Message 8');
+      expect(pruned[2].content).toBe('Message 9');
+      expect(pruned[3].content).toBe('Message 10');
+    });
+  });
+
   describe('getDynamicModelFallbacks', () => {
     it('returns static fallback hierarchy when activeModelsCache is empty', () => {
       const fallbacks = getDynamicModelFallbacks('gemini-3-flash-preview');
@@ -86,16 +129,46 @@ describe('Gemini Service Unit Tests', () => {
       expect(mockFetch).toHaveBeenCalledTimes(1);
     });
 
-    it('handles HTTP error gracefully', async () => {
+    it('falls back to secondary model when primary fails with transient error', async () => {
+      // Primary model (gemini-2.5-flash) fails with 503
       mockFetch.mockResolvedValueOnce({
         ok: false,
+        status: 503,
+        text: async () => JSON.stringify({ message: 'Service Unavailable' })
+      });
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 503,
+        text: async () => JSON.stringify({ message: 'Service Unavailable' })
+      });
+      // Fallback model succeeds
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ text: 'Fallback response recovered!' })
+      });
+
+      const fallbackSpy = vi.fn();
+      const response = await chatWithGemini(
+        [{ role: 'user', content: 'Hi' }],
+        undefined,
+        'gemini-2.5-flash',
+        'test',
+        fallbackSpy
+      );
+
+      expect(response).toBe('Fallback response recovered!');
+      expect(fallbackSpy).toHaveBeenCalled();
+    });
+
+    it('handles total exhaustion gracefully', async () => {
+      mockFetch.mockResolvedValue({
+        ok: false,
         status: 500,
-        text: async () => 'Internal Server Error'
+        text: async () => 'Fatal Error'
       });
 
       const response = await chatWithGemini([{ role: 'user', content: 'Hi' }]);
-      expect(response).toBe('I encountered an error connecting to the intelligence bridge.');
-      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(response).toContain('encountered an error connecting');
     });
   });
 
@@ -126,7 +199,7 @@ describe('Gemini Service Unit Tests', () => {
     });
 
     it('handles stream errors gracefully', async () => {
-      mockFetch.mockResolvedValueOnce({
+      mockFetch.mockResolvedValue({
         ok: false,
         status: 500,
         text: async () => 'Internal Server Error'
@@ -142,3 +215,4 @@ describe('Gemini Service Unit Tests', () => {
     });
   });
 });
+
