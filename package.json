@@ -10,6 +10,8 @@
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
     "test": "vitest run",
+    "benchmark": "tsx scripts/benchmark/cli.ts",
+    "benchmark:dry-run": "tsx scripts/benchmark/cli.ts --dry-run",
     "test:watch": "vitest",
     "deploy:rules": "npx firebase-tools deploy --only firestore:rules"
   },

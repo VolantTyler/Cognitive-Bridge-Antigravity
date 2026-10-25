@@ -1,0 +1,211 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import { describe, expect, it } from 'vitest';
+import { STEERING_LIBRARY, getActiveDirectives } from '../../../src/constants';
+import type { OceanScores } from '../../../src/types';
+import { buildScoreFile, type CompletedModelRun } from '../scorefile';
+import { STRATEGY_TABLE, matchModels, placement } from '../match';
+import { HYPOTHESIS_LABEL, type OceanTrait, type StrategyRow } from '../types';
+import { neutralScores, scoresFor } from './fixture';
+
+const published = {
+  openness: 'normal' as const,
+  conscientiousness: 'normal' as const,
+  extroversion: 'normal' as const,
+  agreeableness: 'normal' as const,
+  neuroticism: 'normal' as const,
+};
+
+function fileFor(trait: OceanTrait, values: number[], id = 'openai/gpt-5-nano') {
+  const model: CompletedModelRun = {
+    id,
+    costUsd: 0.2,
+    timestamp: '2026-10-25T00:00:00.000Z',
+    repeats: scoresFor(trait, values).map((scores, index) => ({
+      repeat: index + 1,
+      modelVersion: `${id}-v1`,
+      judgeVersion: 'judge-v1',
+      scores,
+    })),
+  };
+  return buildScoreFile({
+    models: [model],
+    judge: { modelId: 'google/gemini-2.5-flash-lite', version: 'judge-v1', temperature: 0 },
+    interviewTemperature: 0.8,
+    repeats: values.length,
+    generatedAt: '2026-10-25T00:00:00.000Z',
+    priceDate: '2026-10-05',
+    wideRangeThreshold: 40,
+    spreadThreshold: 10,
+    traitConfidence: published,
+  });
+}
+
+describe('strategy table', () => {
+  it('matches every steering-library row and flags the two research caveats', () => {
+    expect(STRATEGY_TABLE).toHaveLength(STEERING_LIBRARY.length);
+    for (const directive of STEERING_LIBRARY) {
+      const row = STRATEGY_TABLE.find((candidate) => candidate.trait === directive.trait && candidate.threshold === directive.threshold);
+      expect(row?.strategy).toBe(directive.strategy);
+    }
+    expect(STRATEGY_TABLE.find((row) => row.trait === 'extroversion' && row.threshold === 'high')).toMatchObject({
+      strategy: 'complementary',
+      target_direction: 'low',
+      confidence: 'low',
+    });
+    expect(STRATEGY_TABLE.find((row) => row.trait === 'neuroticism' && row.threshold === 'low')).toMatchObject({
+      strategy: 'complementary',
+      confidence: 'not_scored',
+      exclude_from_tiering: true,
+      target_direction: null,
+    });
+  });
+});
+
+describe('match tiers', () => {
+  const rows: Array<{
+    trait: OceanTrait;
+    user: number;
+    target: 'high' | 'low' | null;
+    strategy: StrategyRow['strategy'];
+    confidence: StrategyRow['confidence'];
+    excluded?: boolean;
+  }> = [
+    { trait: 'openness', user: 85, target: 'high', strategy: 'congruent', confidence: 'normal' },
+    { trait: 'openness', user: 15, target: 'low', strategy: 'congruent', confidence: 'normal' },
+    { trait: 'conscientiousness', user: 85, target: 'high', strategy: 'congruent', confidence: 'normal' },
+    { trait: 'conscientiousness', user: 15, target: 'high', strategy: 'compensatory', confidence: 'normal' },
+    { trait: 'extroversion', user: 85, target: 'low', strategy: 'complementary', confidence: 'low' },
+    { trait: 'extroversion', user: 15, target: 'low', strategy: 'congruent', confidence: 'normal' },
+    { trait: 'agreeableness', user: 85, target: 'high', strategy: 'congruent', confidence: 'normal' },
+    { trait: 'agreeableness', user: 15, target: 'low', strategy: 'congruent', confidence: 'normal' },
+    { trait: 'neuroticism', user: 85, target: 'low', strategy: 'compensatory', confidence: 'normal' },
+    { trait: 'neuroticism', user: 15, target: null, strategy: 'complementary', confidence: 'not_scored', excluded: true },
+  ];
+
+  it('covers every strategy row, including compensatory and complementary targets', () => {
+    for (const row of rows) {
+      const user = neutralScores({ [row.trait]: row.user });
+      if (row.excluded) {
+        const result = matchModels(user, fileFor(row.trait, [10, 90]));
+        expect(result.recommendation).toBe('no strong recommendation');
+        expect(result.models).toEqual([]);
+        expect(result.label).toBe(HYPOTHESIS_LABEL);
+        expect(result.targets[0]).toMatchObject({ confidence: 'not_scored', target_direction: null });
+        continue;
+      }
+      const onTarget = row.target === 'high' ? [70, 90] : [10, 30];
+      const wrong = row.target === 'high' ? [10, 20] : [80, 90];
+      const strong = matchModels(user, fileFor(row.trait, onTarget));
+      expect(strong.recommendation).toBe('tiers');
+      expect(strong.label).toBe(HYPOTHESIS_LABEL);
+      expect(strong.models[0].tier).toBe('strong');
+      expect(strong.models[0].driving_traits).toEqual([row.trait]);
+      expect(strong.models[0].traits[row.trait]).toMatchObject({
+        strategy: row.strategy,
+        target_direction: row.target,
+        confidence: row.confidence,
+        included_in_tier: true,
+      });
+      expect(strong.targets.map((target) => target.trait)).toEqual([row.trait]);
+      expect(matchModels(user, fileFor(row.trait, wrong)).models[0].tier).toBe('poor');
+    }
+  });
+
+  it('returns no tiers when nothing is strictly active', () => {
+    const inactive: OceanScores[] = [
+      neutralScores(),
+      neutralScores({ openness: 70, conscientiousness: 30, extroversion: 70, agreeableness: 30, neuroticism: 70 }),
+    ];
+    for (const user of inactive) {
+      expect(getActiveDirectives(user)).toHaveLength(0);
+      const result = matchModels(user, fileFor('openness', [80, 90]));
+      expect(result.recommendation).toBe('no strong recommendation');
+      expect(result.models).toEqual([]);
+      expect(result.driving_traits).toEqual([]);
+    }
+    expect(getActiveDirectives(neutralScores({ openness: 71 }))).toHaveLength(1);
+    expect(getActiveDirectives(neutralScores({ openness: 29 }))).toHaveLength(1);
+  });
+
+  it('excludes neuroticism-low from tiering even when another trait is active', () => {
+    const user = neutralScores({ openness: 90, neuroticism: 10 });
+    const result = matchModels(user, fileFor('openness', [80, 95]));
+    expect(result.driving_traits).toEqual(['openness']);
+    expect(result.models[0].tier).toBe('strong');
+    expect(result.models[0].traits.neuroticism).toMatchObject({
+      confidence: 'not_scored',
+      included_in_tier: false,
+      target_direction: null,
+    });
+    expect(result.models[0].driving_traits).not.toContain('neuroticism');
+  });
+
+  it('grades decent when the mean is on the target side but the range is not wholly past 50', () => {
+    const user = neutralScores({ openness: 88, agreeableness: 12 });
+    const decent = matchModels(user, buildMixed({
+      openness: [40, 80],
+      agreeableness: [10, 20],
+    }));
+    expect(decent.models[0].tier).toBe('decent');
+
+    const touched = matchModels(neutralScores({ openness: 88 }), fileFor('openness', [50, 80]));
+    expect(touched.models[0].tier).toBe('decent');
+    expect(placement(50, 80, 65, 'high')).toBe('decent');
+
+    const midpoint = matchModels(neutralScores({ openness: 88 }), fileFor('openness', [50]));
+    expect(midpoint.models[0].tier).toBe('poor');
+
+    const poor = matchModels(user, buildMixed({
+      openness: [80, 90],
+      agreeableness: [70, 80],
+    }));
+    expect(poor.models[0].tier).toBe('poor');
+  });
+
+  it('uses a swapped table without changing the match function', () => {
+    const table: StrategyRow[] = STRATEGY_TABLE.map((row) => (
+      row.trait === 'openness' && row.threshold === 'high'
+        ? { ...row, confidence: 'not_scored' as const, exclude_from_tiering: true, target_direction: null }
+        : row
+    ));
+    const result = matchModels(neutralScores({ openness: 90 }), fileFor('openness', [80]), table);
+    expect(result.recommendation).toBe('no strong recommendation');
+  });
+});
+
+function buildMixed(values: Partial<Record<OceanTrait, number[]>>) {
+  const length = Math.max(...Object.values(values).map((series) => series?.length ?? 0));
+  const repeats = Array.from({ length }, (_, index) => {
+    const scores = neutralScores();
+    for (const trait of Object.keys(values) as OceanTrait[]) {
+      const series = values[trait] ?? [];
+      scores[trait] = series[Math.min(index, series.length - 1)];
+    }
+    return {
+      repeat: index + 1,
+      modelVersion: 'openai/gpt-5-nano-v1',
+      judgeVersion: 'judge-v1',
+      scores,
+    };
+  });
+  return buildScoreFile({
+    models: [{
+      id: 'openai/gpt-5-nano',
+      costUsd: 0.1,
+      timestamp: '2026-10-25T00:00:00.000Z',
+      repeats,
+    }],
+    judge: { modelId: 'google/gemini-2.5-flash-lite', version: 'judge-v1', temperature: 0 },
+    interviewTemperature: 0.8,
+    repeats: length,
+    generatedAt: '2026-10-25T00:00:00.000Z',
+    priceDate: '2026-10-05',
+    wideRangeThreshold: 40,
+    spreadThreshold: 10,
+    traitConfidence: published,
+  });
+}

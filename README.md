@@ -93,6 +93,25 @@ When a user clicks "Leave Feedback" in the footer and submits the feedback form:
 
 ---
 
+## Model benchmark
+
+Tyler can estimate or run the Cognitive Bridge 2.0 model benchmark without changing the app. The pipeline lives in `scripts/benchmark/`. It interviews each enabled model with the same five scenarios, in the same order, and asks one pinned judge to score **behavior in those answers** with the Mirror `JSON_SCORES` rubric. It does not ask a model to fill out a personality questionnaire about itself.
+
+```bash
+# No key and no network. Prints an upper-bound USD estimate.
+npm run benchmark:dry-run
+
+# Live run. The key is read only from the environment.
+export OPENROUTER_API_KEY="your-openrouter-key"
+npm run benchmark
+```
+
+Cached scores are written to `scripts/benchmark/output/scores.json` (gitignored). Every call's token counts and USD cost are appended to `scripts/benchmark/output/ledger.jsonl`. If a previous score file was produced by a different judge version, the CLI stops and tells you to rerun with `npm run benchmark -- --rescore-all`.
+
+Cached extroversion is marked `low` confidence because the hypothesis uses that trait through the complementary strategy. When matching a person, high extroversion stays low confidence and low extroversion (the congruent row) is normal.
+
+**What this does not validate.** The match tiers are Charlie's design hypothesis, not a result that has been shown to improve conversations. Mirror scores are not a clinical personality instrument, and a model's interview answers are not a validated Big Five profile. Scenario 1 and the waived-deadline probe are copied from the product; scenarios 2–4 are a frozen neutral battery because the live Mirror invents the middle questions per person. Dry-run input tokens are a 4-characters-per-token estimate of the real prompts, and output tokens assume the configured maximum, so the printed cost is an upper bound. Prices are the 2026-10-05 snapshot in `scripts/benchmark/config.json`. A tight `spread_warning` only means the saved model means sit close together. Neuroticism below 30 is not scored and is left out of tiering. Do not treat the tiers as a 1-to-N ranking or as evidence that the hypothesis is true.
+
 ## License
 
 This project is licensed under the Apache-2.0 License.
