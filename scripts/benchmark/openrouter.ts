@@ -102,6 +102,9 @@ export function createOpenRouterClient(options: {
       const usageEstimated = !Number.isFinite(promptTokens) || !Number.isFinite(completionTokens);
       return {
         content,
+        // OpenRouter's `model` is often only the requested id (for example
+        // "google/gemini-2.5-flash-lite"), not a dated build. Callers store a
+        // recorded_at timestamp beside this string.
         modelVersion: typeof body.model === 'string' && body.model.trim() ? body.model : request.model,
         promptTokens: usageEstimated ? estimateMessagesTokens(request.messages) : (promptTokens as number),
         completionTokens: usageEstimated ? request.maxTokens : (completionTokens as number),

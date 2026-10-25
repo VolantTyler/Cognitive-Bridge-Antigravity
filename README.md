@@ -106,11 +106,23 @@ export OPENROUTER_API_KEY="your-openrouter-key"
 npm run benchmark
 ```
 
-Cached scores are written to `scripts/benchmark/output/scores.json` (gitignored). Every call's token counts and USD cost are appended to `scripts/benchmark/output/ledger.jsonl`. If a previous score file was produced by a different judge version, the CLI stops and tells you to rerun with `npm run benchmark -- --rescore-all`.
+Cached scores are written to `scripts/benchmark/output/scores.json` (gitignored, schema version 2). Every call's token counts and USD cost are appended to `scripts/benchmark/output/ledger.jsonl`. If a previous score file was produced by a different judge version string, the CLI stops and tells you to rerun with `npm run benchmark -- --rescore-all`.
 
-Cached extroversion is marked `low` confidence because the hypothesis uses that trait through the complementary strategy. When matching a person, high extroversion stays low confidence and low extroversion (the congruent row) is normal.
+The judge version stored on the score file is the OpenRouter response body's `model` field. OpenRouter often returns only the requested model id there (for example `google/gemini-2.5-flash-lite`), not a dated build. The pipeline records a UTC `judge.recorded_at` next to `judge.version`, and a UTC `recorded_at` on every run next to `judge_version`. A new timestamp with the same `model` string does not trip the mix guard. Use `--rescore-all` when the underlying model may have changed while the id stayed the same.
 
-**What this does not validate.** The match tiers are Charlie's design hypothesis, not a result that has been shown to improve conversations. Mirror scores are not a clinical personality instrument, and a model's interview answers are not a validated Big Five profile. Scenario 1 and the waived-deadline probe are copied from the product; scenarios 2–4 are a frozen neutral battery because the live Mirror invents the middle questions per person. Dry-run input tokens are a 4-characters-per-token estimate of the real prompts, and output tokens assume the configured maximum, so the printed cost is an upper bound. Prices are the 2026-10-05 snapshot in `scripts/benchmark/config.json`. A tight `spread_warning` only means the saved model means sit close together. Neuroticism below 30 is not scored and is left out of tiering. Do not treat the tiers as a 1-to-N ranking or as evidence that the hypothesis is true.
+Cached extroversion is marked `low` confidence because the hypothesis uses that trait through the complementary strategy. When matching a person, high extroversion stays low confidence and low extroversion (the congruent row) is normal. Each trait also has its own `wide_range` flag (high minus low at least the configured threshold, default 40). The model-level `wide_range` flag is true when any trait flag is true.
+
+`matchModels` always uses the in-code `STRATEGY_TABLE`. If the score file stores a table, it must equal that table or matching throws. Active traits follow `getActiveDirectives`: strictly above 70 or strictly below 30. Each model's `driving_traits` lists only the traits that set that model's tier. A strong tier is set by the active traits whose whole low–high range sits on the target side of 50. A decent tier is set by the active traits whose mean is on the target side while the range reaches or crosses 50 (a bound of exactly 50 counts). A poor tier is set by the active traits whose mean is on the wrong side of 50. A model missing a usable score for any active trait that counts toward the tier gets `tier: "not_scored"` and a `missing_traits` list.
+
+When `spread_warning` is true, scored models also get `relative_rank` (1 is closest). Distance is Euclidean from each eligible trait mean to the target profile (high = 100, low = 0). Ties break by model id. The match result includes `ranking_note`: "Ranking is relative because models cluster". Tiers stay on the result. Models that are `not_scored` are left unranked. When the models do not cluster, there is no rank and no ranking note.
+
+**Edge cases**
+
+- A user score of exactly 30 or exactly 70 is not active. If no trait is strictly active, the result is `no strong recommendation` and no model is tiered.
+- A model mean of exactly 50 counts as poor for that trait.
+- If the only active trait is low neuroticism, that row is not scored and is left out of tiering, so the result is `no strong recommendation`.
+
+**What this does not validate.** The match tiers are Charlie's design hypothesis, not a result that has been shown to improve conversations. Mirror scores are not a clinical personality instrument, and a model's interview answers are not a validated Big Five profile. Scenario 1 and the waived-deadline probe are copied from the product; scenarios 2–4 are a frozen neutral battery because the live Mirror invents the middle questions per person. Dry-run input tokens are a 4-characters-per-token estimate of the real prompts, and output tokens assume the configured maximum, so the printed cost is an upper bound. Prices are the 2026-10-05 snapshot in `scripts/benchmark/config.json`. A tight `spread_warning` only means the saved model means sit close together. Relative rank, when present, orders that cluster. It is not evidence that the hypothesis is true, and it is not a substitute for the fit tiers.
 
 ## License
 

@@ -45,10 +45,13 @@ describe('score file schema', () => {
       traitConfidence: config.traitConfidence,
     });
     validateScoreFile(JSON.parse(JSON.stringify(scoreFile)));
-    expect(scoreFile.schema_version).toBe(1);
+    expect(scoreFile.schema_version).toBe(2);
     expect(scoreFile.label).toBe(HYPOTHESIS_LABEL);
     expect(scoreFile.spread_warning).toBe(true);
     expect(scoreFile.judge.version).toBe('google/gemini-2.5-flash-lite-2026-10-05');
+    expect(scoreFile.judge.recorded_at).toBe('2026-10-25T03:04:00.000Z');
+    expect(scoreFile.models[0].runs[0].recorded_at).toBe('2026-10-25T03:00:00.000Z');
+    expect(scoreFile.models[0].traits.openness.wide_range).toBe(false);
     expect(scoreFile.models[0].version).toBe('openai/gpt-5-nano-2026-10-05');
     expect(scoreFile.models[0].runs[0].model_version).toBe('openai/gpt-5-nano-2026-10-05');
     expect(scoreFile.models[0].cost_usd).toBe(1.25);
@@ -69,7 +72,7 @@ describe('score file schema', () => {
     const broken = JSON.parse(JSON.stringify(scoreFile)) as { spread_warning?: boolean };
     delete broken.spread_warning;
     expect(() => validateScoreFile(broken)).toThrow(ScoreFileSchemaError);
-    expect(() => validateScoreFile({ ...scoreFile, schema_version: 2 })).toThrow(/schema_version/);
+    expect(() => validateScoreFile({ ...scoreFile, schema_version: 1 })).toThrow(/schema_version/);
   });
 
   it('turns a wide openness gap into spread_warning false', () => {
@@ -87,5 +90,32 @@ describe('score file schema', () => {
     });
     expect(scoreFile.spread_warning).toBe(false);
     expect(scoreFile.trait_spread.openness).toBe(80);
+  });
+
+  it('derives the model wide_range flag from per-trait flags', () => {
+    const config = loadConfig();
+    const scoreFile = buildScoreFile({
+      models: [{
+        id: 'openai/gpt-5-nano',
+        costUsd: 0,
+        timestamp: '2026-10-25T03:00:00.000Z',
+        repeats: [
+          { repeat: 1, modelVersion: 'openai/gpt-5-nano', judgeVersion: 'judge-v', recordedAt: '2026-10-25T03:00:00.000Z', scores: neutralScores({ openness: 10 }) },
+          { repeat: 2, modelVersion: 'openai/gpt-5-nano', judgeVersion: 'judge-v', recordedAt: '2026-10-25T03:01:00.000Z', scores: neutralScores({ openness: 80 }) },
+        ],
+      }],
+      judge: { modelId: config.judge.modelId, version: 'judge-v', temperature: 0, recordedAt: '2026-10-25T03:04:00.000Z' },
+      interviewTemperature: 0.8,
+      repeats: 2,
+      generatedAt: '2026-10-25T03:04:00.000Z',
+      priceDate: config.priceDate,
+      wideRangeThreshold: 40,
+      spreadThreshold: 10,
+      traitConfidence: config.traitConfidence,
+    });
+    expect(scoreFile.models[0].traits.openness.wide_range).toBe(true);
+    expect(scoreFile.models[0].traits.conscientiousness.wide_range).toBe(false);
+    expect(scoreFile.models[0].wide_range).toBe(true);
+    expect(scoreFile.models[0].runs[1].recorded_at).toBe('2026-10-25T03:01:00.000Z');
   });
 });

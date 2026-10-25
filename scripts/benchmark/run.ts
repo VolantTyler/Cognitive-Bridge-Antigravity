@@ -213,7 +213,12 @@ export async function runBenchmark(options: RunOptions): Promise<ReturnType<type
     if (error instanceof HardStopError && completed.length > 0 && judgeVersion) {
       const partial = buildScoreFile({
         models: completed,
-        judge: { modelId: config.judge.modelId, version: judgeVersion, temperature: config.judge.temperature },
+        judge: {
+          modelId: config.judge.modelId,
+          version: judgeVersion,
+          temperature: config.judge.temperature,
+          recordedAt: now().toISOString(),
+        },
         interviewTemperature: config.interview.temperature,
         repeats: config.interview.repeats,
         generatedAt: now().toISOString(),
@@ -234,7 +239,12 @@ export async function runBenchmark(options: RunOptions): Promise<ReturnType<type
   }
   const scoreFile = buildScoreFile({
     models: completed,
-    judge: { modelId: config.judge.modelId, version: judgeVersion, temperature: config.judge.temperature },
+    judge: {
+      modelId: config.judge.modelId,
+      version: judgeVersion,
+      temperature: config.judge.temperature,
+      recordedAt: now().toISOString(),
+    },
     interviewTemperature: config.interview.temperature,
     repeats: config.interview.repeats,
     generatedAt: now().toISOString(),
@@ -317,6 +327,7 @@ async function runOneModel(options: {
         repeat,
         modelVersion,
         judgeVersion: billedJudge.response.modelVersion,
+        recordedAt: options.now().toISOString(),
         scores,
       });
     } catch (error) {

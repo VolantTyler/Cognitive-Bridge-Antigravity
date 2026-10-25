@@ -18,44 +18,49 @@ export function mean(values: number[]): number {
   return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
+export function traitWideRange(low: number | null, high: number | null, threshold: number): boolean {
+  return low !== null && high !== null && high - low >= threshold;
+}
+
 export function aggregateTrait(
   values: number[],
   publishedConfidence: Confidence,
+  wideRangeThreshold: number,
 ): TraitStats {
   if (values.length === 0) {
-    return { mean: null, low: null, high: null, runs: 0, confidence: 'not_scored' };
+    return { mean: null, low: null, high: null, runs: 0, confidence: 'not_scored', wide_range: false };
   }
+  const low = Math.min(...values);
+  const high = Math.max(...values);
   return {
     mean: mean(values),
-    low: Math.min(...values),
-    high: Math.max(...values),
+    low,
+    high,
     runs: values.length,
     confidence: publishedConfidence,
+    wide_range: traitWideRange(low, high, wideRangeThreshold),
   };
 }
 
 export function aggregateTraits(
   runs: OceanScores[],
   published: Record<OceanTrait, Confidence>,
+  wideRangeThreshold: number,
 ): Record<OceanTrait, TraitStats> {
   const traits = {} as Record<OceanTrait, TraitStats>;
   for (const trait of OCEAN_TRAITS) {
     traits[trait] = aggregateTrait(
       runs.map((scores) => scores[trait]),
       published[trait],
+      wideRangeThreshold,
     );
   }
   return traits;
 }
 
-export function hasWideRange(
-  traits: Record<OceanTrait, TraitStats>,
-  threshold: number,
-): boolean {
-  return OCEAN_TRAITS.some((trait) => {
-    const stats = traits[trait];
-    return stats.low !== null && stats.high !== null && stats.high - stats.low >= threshold;
-  });
+/** Model-level flag, derived from the per-trait wide_range flags. */
+export function hasWideRange(traits: Record<OceanTrait, TraitStats>): boolean {
+  return OCEAN_TRAITS.some((trait) => traits[trait].wide_range);
 }
 
 export function traitSpreads(

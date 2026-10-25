@@ -5,7 +5,7 @@
 
 import type { OceanScores } from '../../src/types';
 
-export const SCORE_FILE_SCHEMA_VERSION = 1;
+export const SCORE_FILE_SCHEMA_VERSION = 2;
 
 export const HYPOTHESIS_LABEL = 'design hypothesis based on research';
 
@@ -25,7 +25,7 @@ export type TargetDirection = 'high' | 'low';
 
 export type AlignmentStrategy = 'congruent' | 'complementary' | 'compensatory';
 
-export type Tier = 'strong' | 'decent' | 'poor';
+export type Tier = 'strong' | 'decent' | 'poor' | 'not_scored';
 
 export interface ModelConfig {
   id: string;
@@ -114,12 +114,17 @@ export interface TraitStats {
   high: number | null;
   runs: number;
   confidence: Confidence;
+  /** True when this trait's high-low range meets the wide-range threshold. */
+  wide_range: boolean;
 }
 
 export interface ScoreRun {
   repeat: number;
   model_version: string;
+  /** `model` string from the judge response. Often the requested id, not a dated build. */
   judge_version: string;
+  /** UTC time of this scoring call, stored beside the judge version string. */
+  recorded_at: string;
   scores: OceanScores;
 }
 
@@ -156,7 +161,10 @@ export interface ScoreFile {
   partial: boolean;
   judge: {
     model_id: string;
+    /** Value of the OpenRouter response `model` field. */
     version: string;
+    /** UTC time of this benchmark run. The version string may not change across runs. */
+    recorded_at: string;
     temperature: number;
   };
   strategy_table: StrategyRow[];
@@ -196,8 +204,13 @@ export interface MatchTraitResult {
 
 export interface MatchModelResult {
   model_id: string;
-  tier?: Tier;
+  tier: Tier;
+  /** Traits that set this model's tier, not every active trait. */
   driving_traits: OceanTrait[];
+  /** Active traits with no usable model score. Non-empty only when tier is not_scored. */
+  missing_traits: OceanTrait[];
+  /** 1 is closest to the target profile. Set only when spread_warning is true. */
+  relative_rank?: number;
   traits: Partial<Record<OceanTrait, MatchTraitResult>>;
 }
 
@@ -206,6 +219,9 @@ export interface MatchResult {
   recommendation: 'tiers' | 'no strong recommendation';
   targets: AppliedTarget[];
   strategy_table: StrategyRow[];
+  /** Active traits that are eligible for tiering. Per-model driving_traits is the subset that set that tier. */
   driving_traits: OceanTrait[];
+  /** Set when spread_warning is true and at least one model was ranked. */
+  ranking_note: string | null;
   models: MatchModelResult[];
 }

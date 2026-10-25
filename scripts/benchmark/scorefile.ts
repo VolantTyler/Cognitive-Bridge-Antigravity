@@ -29,6 +29,7 @@ export interface CompletedModelRun {
     repeat: number;
     modelVersion: string;
     judgeVersion: string;
+    recordedAt?: string;
     scores: OceanScores;
   }>;
   costUsd: number;
@@ -72,7 +73,7 @@ function summarizeVersion(runs: ScoreRun[]): string {
 
 export function buildScoreFile(input: {
   models: CompletedModelRun[];
-  judge: { modelId: string; version: string; temperature: number };
+  judge: { modelId: string; version: string; temperature: number; recordedAt?: string };
   interviewTemperature: number;
   repeats: number;
   generatedAt: string;
@@ -89,18 +90,20 @@ export function buildScoreFile(input: {
       repeat: repeat.repeat,
       model_version: repeat.modelVersion,
       judge_version: repeat.judgeVersion,
+      recorded_at: repeat.recordedAt ?? model.timestamp,
       scores: repeat.scores,
     }));
     const traits = aggregateTraits(
       runs.map((run) => run.scores),
       input.traitConfidence,
+      input.wideRangeThreshold,
     );
     return {
       id: model.id,
       version: summarizeVersion(runs) || model.id,
       timestamp: model.timestamp,
       cost_usd: model.costUsd,
-      wide_range: hasWideRange(traits, input.wideRangeThreshold),
+      wide_range: hasWideRange(traits),
       traits,
       runs,
     };
@@ -121,6 +124,7 @@ export function buildScoreFile(input: {
     judge: {
       model_id: input.judge.modelId,
       version: input.judge.version,
+      recorded_at: input.judge.recordedAt ?? input.generatedAt,
       temperature: input.judge.temperature,
     },
     strategy_table: strategyTable,
@@ -167,6 +171,9 @@ export function validateScoreFile(value: unknown): asserts value is ScoreFile {
   if (typeof value.judge.temperature !== 'number') {
     throw new ScoreFileSchemaError('judge.temperature is required');
   }
+  if (typeof value.judge.recorded_at !== 'string' || !value.judge.recorded_at) {
+    throw new ScoreFileSchemaError('judge.recorded_at is required alongside judge.version');
+  }
   if (!Array.isArray(value.models)) {
     throw new ScoreFileSchemaError('models must be an array');
   }
@@ -194,6 +201,9 @@ export function validateScoreFile(value: unknown): asserts value is ScoreFile {
       if (typeof stats.confidence !== 'string' || !CONFIDENCE_VALUES.includes(stats.confidence as Confidence)) {
         throw new ScoreFileSchemaError(`model ${model.id} trait ${trait} confidence is invalid`);
       }
+      if (typeof stats.wide_range !== 'boolean') {
+        throw new ScoreFileSchemaError(`model ${model.id} trait ${trait} wide_range must be a boolean`);
+      }
       const measured = stats.confidence !== 'not_scored' && stats.runs > 0;
       for (const key of ['mean', 'low', 'high'] as const) {
         const numeric = stats[key];
@@ -208,6 +218,9 @@ export function validateScoreFile(value: unknown): asserts value is ScoreFile {
     for (const run of model.runs) {
       if (!isRecord(run) || typeof run.model_version !== 'string' || typeof run.judge_version !== 'string') {
         throw new ScoreFileSchemaError(`model ${model.id} runs must record model_version and judge_version`);
+      }
+      if (typeof run.recorded_at !== 'string' || !run.recorded_at) {
+        throw new ScoreFileSchemaError(`model ${model.id} runs must record recorded_at beside judge_version`);
       }
       if (!isRecord(run.scores)) {
         throw new ScoreFileSchemaError(`model ${model.id} run is missing scores`);

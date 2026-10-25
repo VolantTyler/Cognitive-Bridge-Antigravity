@@ -99,5 +99,6 @@ describe('OpenRouter client', () => {
     const response = await client.complete(request);
     expect(response.usageEstimated).toBe(true);
     expect(response.completionTokens).toBe(100);
+    expect(response.modelVersion).toBe('openai/gpt-5-nano');
   });
 });

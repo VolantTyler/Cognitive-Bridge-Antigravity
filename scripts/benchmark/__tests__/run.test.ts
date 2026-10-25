@@ -59,6 +59,9 @@ describe('benchmark run', () => {
     expect(scoreFile.models[0].traits.openness).toMatchObject({ mean: 80, low: 80, high: 80, runs: 2 });
     expect(scoreFile.models[0].version).toBe('openai/gpt-5-nano-2026-10-05');
     expect(scoreFile.judge.version).toBe('google/gemini-2.5-flash-lite-2026-10-05');
+    expect(scoreFile.judge.recorded_at).toBe('2026-10-25T04:00:00.000Z');
+    expect(scoreFile.models[0].runs[0].recorded_at).toBe('2026-10-25T04:00:00.000Z');
+    expect(scoreFile.models[0].runs[0].judge_version).toBe(scoreFile.judge.version);
     expect(scoreFile.spread_warning).toBe(true);
 
     const ledger = readLedger(path.join(dir, 'ledger.jsonl'));

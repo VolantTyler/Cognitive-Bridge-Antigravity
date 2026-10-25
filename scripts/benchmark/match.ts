@@ -2,9 +2,11 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
  *
- * One swappable match: pass `table` or replace STRATEGY_TABLE.
- * Charlie's design hypothesis — not a validated ranking. Active traits follow
+ * One match function. Replace STRATEGY_TABLE in this file to swap the hypothesis.
+ * A score file whose stored table differs is rejected. Active traits follow
  * getActiveDirectives (strictly >70 or <30). Tiers are fit bands against 50.
+ * When the score file's spread_warning is true, models are also ranked by
+ * distance from the target profile.
  */
 
 import { getActiveDirectives } from '../../src/constants';
@@ -19,7 +21,6 @@ import {
   type ScoreFile,
   type StrategyRow,
   type TargetDirection,
-  type Tier,
 } from './types';
 
 export const STRATEGY_TABLE: StrategyRow[] = [
@@ -52,7 +53,7 @@ export function placement(
   high: number,
   mean: number,
   target: TargetDirection,
-): Tier {
+): 'strong' | 'decent' | 'poor' {
   const meanOnTarget = target === 'high' ? mean > 50 : mean < 50;
   const rangeOnTarget = target === 'high' ? low > 50 && high > 50 : low < 50 && high < 50;
   if (!meanOnTarget) return 'poor';
@@ -60,17 +61,68 @@ export function placement(
   return 'decent';
 }
 
-function combinePlacements(placements: Tier[]): Tier {
+function combinePlacements(placements: Array<'strong' | 'decent' | 'poor'>): 'strong' | 'decent' | 'poor' {
   if (placements.some((item) => item === 'poor')) return 'poor';
   if (placements.every((item) => item === 'strong')) return 'strong';
   return 'decent';
 }
 
-export function matchModels(
-  userScores: OceanScores,
-  scoreFile: ScoreFile,
-  table: StrategyRow[] = scoreFile.strategy_table?.length ? scoreFile.strategy_table : STRATEGY_TABLE,
-): MatchResult {
+export const RELATIVE_RANKING_NOTE = 'Ranking is relative because models cluster';
+
+/** High targets sit at 100 and low targets at 0, so a tight cluster can still be ordered. */
+export function targetProfilePoint(direction: TargetDirection): number {
+  return direction === 'high' ? 100 : 0;
+}
+
+export function distanceFromTarget(points: Array<{ mean: number; target: TargetDirection }>): number {
+  let sum = 0;
+  for (const point of points) {
+    const delta = point.mean - targetProfilePoint(point.target);
+    sum += delta * delta;
+  }
+  return Math.sqrt(sum);
+}
+
+function sameStrategyRow(stored: StrategyRow, expected: StrategyRow): boolean {
+  return stored.trait === expected.trait
+    && stored.threshold === expected.threshold
+    && stored.strategy === expected.strategy
+    && stored.target_direction === expected.target_direction
+    && stored.confidence === expected.confidence
+    && stored.exclude_from_tiering === expected.exclude_from_tiering;
+}
+
+export function assertStoredStrategyTable(stored: StrategyRow[] | undefined): void {
+  if (stored === undefined) return;
+  const matches = stored.length === STRATEGY_TABLE.length
+    && stored.every((row, index) => sameStrategyRow(row, STRATEGY_TABLE[index]));
+  if (!matches) {
+    throw new Error(
+      'Score file strategy_table does not match the in-code STRATEGY_TABLE. Refusing to match against a different hypothesis.',
+    );
+  }
+}
+
+interface ScoredTrait {
+  trait: OceanTrait;
+  placement: 'strong' | 'decent' | 'poor';
+  mean: number;
+  target: TargetDirection;
+}
+
+function traitsThatSetTier(tier: 'strong' | 'decent' | 'poor', scored: ScoredTrait[]): OceanTrait[] {
+  if (tier === 'strong') {
+    return scored.filter((item) => item.placement === 'strong').map((item) => item.trait);
+  }
+  if (tier === 'decent') {
+    return scored.filter((item) => item.placement === 'decent').map((item) => item.trait);
+  }
+  return scored.filter((item) => item.placement === 'poor').map((item) => item.trait);
+}
+
+export function matchModels(userScores: OceanScores, scoreFile: ScoreFile): MatchResult {
+  assertStoredStrategyTable(scoreFile.strategy_table);
+  const table = STRATEGY_TABLE;
   assertStrategyTable(table);
   const active = getActiveDirectives(userScores);
   const applied: AppliedTarget[] = active.map((directive) => {
@@ -82,38 +134,40 @@ export function matchModels(
     }
     return { ...row, user_score: userScores[directive.trait] };
   });
-  const driving = applied.filter((row) => row.confidence !== 'not_scored' && !row.exclude_from_tiering);
-  const drivingTraits = driving.map((row) => row.trait);
+  const eligible = applied.filter((row) => row.confidence !== 'not_scored' && !row.exclude_from_tiering);
+  const eligibleTraits = eligible.map((row) => row.trait);
 
-  if (drivingTraits.length === 0) {
+  if (eligibleTraits.length === 0) {
     return {
       label: HYPOTHESIS_LABEL,
       recommendation: 'no strong recommendation',
       targets: applied,
       strategy_table: table,
       driving_traits: [],
+      ranking_note: null,
       models: [],
     };
   }
 
+  const distances = new Map<string, number>();
   const models: MatchModelResult[] = scoreFile.models.map((model) => {
     const traits: MatchModelResult['traits'] = {};
-    const placements: Tier[] = [];
-    let missing = false;
+    const scored: ScoredTrait[] = [];
+    const missingTraits: OceanTrait[] = [];
     for (const row of applied) {
       const stats = model.traits[row.trait as OceanTrait];
-      const result: MatchTraitResult = {
+      const included = row.confidence !== 'not_scored' && !row.exclude_from_tiering;
+      traits[row.trait] = {
         strategy: row.strategy,
         target_direction: row.target_direction,
         confidence: row.confidence,
-        included_in_tier: row.confidence !== 'not_scored' && !row.exclude_from_tiering,
+        included_in_tier: included,
         user_score: row.user_score,
         model_mean: stats?.mean ?? null,
         model_low: stats?.low ?? null,
         model_high: stats?.high ?? null,
-      };
-      traits[row.trait] = result;
-      if (!result.included_in_tier) continue;
+      } satisfies MatchTraitResult;
+      if (!included) continue;
       if (
         stats == null ||
         stats.mean === null ||
@@ -122,20 +176,51 @@ export function matchModels(
         stats.confidence === 'not_scored' ||
         row.target_direction === null
       ) {
-        missing = true;
+        missingTraits.push(row.trait);
         continue;
       }
-      placements.push(placement(stats.low, stats.high, stats.mean, row.target_direction));
+      scored.push({
+        trait: row.trait,
+        placement: placement(stats.low, stats.high, stats.mean, row.target_direction),
+        mean: stats.mean,
+        target: row.target_direction,
+      });
     }
-    const modelResult: MatchModelResult = {
+    if (missingTraits.length > 0) {
+      return {
+        model_id: model.id,
+        tier: 'not_scored' as const,
+        driving_traits: [],
+        missing_traits: missingTraits,
+        traits,
+      };
+    }
+    const tier = combinePlacements(scored.map((item) => item.placement));
+    distances.set(
+      model.id,
+      distanceFromTarget(scored.map((item) => ({ mean: item.mean, target: item.target }))),
+    );
+    return {
       model_id: model.id,
-      driving_traits: drivingTraits,
+      tier,
+      driving_traits: traitsThatSetTier(tier, scored),
+      missing_traits: [],
       traits,
     };
-    if (!missing && placements.length === drivingTraits.length) {
-      modelResult.tier = combinePlacements(placements);
-    }
-    return modelResult;
+  });
+
+  const rankById = new Map<string, number>();
+  if (scoreFile.spread_warning) {
+    const ordered = [...distances.entries()].sort(
+      (a, b) => a[1] - b[1] || a[0].localeCompare(b[0]),
+    );
+    ordered.forEach(([modelId], index) => rankById.set(modelId, index + 1));
+  }
+
+  const rankedModels: MatchModelResult[] = models.map((model) => {
+    const relativeRank = rankById.get(model.model_id);
+    if (relativeRank === undefined) return model;
+    return { ...model, relative_rank: relativeRank };
   });
 
   return {
@@ -143,7 +228,8 @@ export function matchModels(
     recommendation: 'tiers',
     targets: applied,
     strategy_table: table,
-    driving_traits: drivingTraits,
-    models,
+    driving_traits: eligibleTraits,
+    ranking_note: rankById.size > 0 ? RELATIVE_RANKING_NOTE : null,
+    models: rankedModels,
   };
 }
