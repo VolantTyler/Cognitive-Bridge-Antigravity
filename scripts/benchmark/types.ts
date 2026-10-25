@@ -219,8 +219,11 @@ export interface MatchResult {
   recommendation: 'tiers' | 'no strong recommendation';
   targets: AppliedTarget[];
   strategy_table: StrategyRow[];
-  /** Active traits that are eligible for tiering. Per-model driving_traits is the subset that set that tier. */
-  driving_traits: OceanTrait[];
+  /**
+   * Every active trait that counts toward tiering.
+   * UI cards should read each model's driving_traits, which is only the subset that set that tier.
+   */
+  active_traits: OceanTrait[];
   /** Set when spread_warning is true and at least one model was ranked. */
   ranking_note: string | null;
   models: MatchModelResult[];

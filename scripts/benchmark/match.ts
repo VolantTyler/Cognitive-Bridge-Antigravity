@@ -143,7 +143,7 @@ export function matchModels(userScores: OceanScores, scoreFile: ScoreFile): Matc
       recommendation: 'no strong recommendation',
       targets: applied,
       strategy_table: table,
-      driving_traits: [],
+      active_traits: [],
       ranking_note: null,
       models: [],
     };
@@ -228,7 +228,7 @@ export function matchModels(userScores: OceanScores, scoreFile: ScoreFile): Matc
     recommendation: 'tiers',
     targets: applied,
     strategy_table: table,
-    driving_traits: eligibleTraits,
+    active_traits: eligibleTraits,
     ranking_note: rankById.size > 0 ? RELATIVE_RANKING_NOTE : null,
     models: rankedModels,
   };

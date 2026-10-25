@@ -129,7 +129,8 @@ describe('match tiers', () => {
       const result = matchModels(user, fileFor('openness', [80, 90]));
       expect(result.recommendation).toBe('no strong recommendation');
       expect(result.models).toEqual([]);
-      expect(result.driving_traits).toEqual([]);
+      expect(result.active_traits).toEqual([]);
+      expect(result).not.toHaveProperty('driving_traits');
     }
     expect(getActiveDirectives(neutralScores({ openness: 71 }))).toHaveLength(1);
     expect(getActiveDirectives(neutralScores({ openness: 29 }))).toHaveLength(1);
@@ -138,8 +139,10 @@ describe('match tiers', () => {
   it('excludes neuroticism-low from tiering even when another trait is active', () => {
     const user = neutralScores({ openness: 90, neuroticism: 10 });
     const result = matchModels(user, fileFor('openness', [80, 95]));
-    expect(result.driving_traits).toEqual(['openness']);
+    expect(result.active_traits).toEqual(['openness']);
+    expect(result).not.toHaveProperty('driving_traits');
     expect(result.models[0].tier).toBe('strong');
+    expect(result.models[0].driving_traits).toEqual(['openness']);
     expect(result.models[0].traits.neuroticism).toMatchObject({
       confidence: 'not_scored',
       included_in_tier: false,
@@ -154,6 +157,8 @@ describe('match tiers', () => {
       openness: [40, 80],
       agreeableness: [10, 20],
     }));
+    expect(decent.active_traits).toEqual(['openness', 'agreeableness']);
+    expect(decent).not.toHaveProperty('driving_traits');
     expect(decent.models[0].tier).toBe('decent');
     expect(decent.models[0].driving_traits).toEqual(['openness']);
     expect(decent.models[0].missing_traits).toEqual([]);
@@ -170,6 +175,7 @@ describe('match tiers', () => {
       openness: [80, 90],
       agreeableness: [70, 80],
     }));
+    expect(poor.active_traits).toEqual(['openness', 'agreeableness']);
     expect(poor.models[0].tier).toBe('poor');
     expect(poor.models[0].driving_traits).toEqual(['agreeableness']);
   });
@@ -199,6 +205,8 @@ describe('match tiers', () => {
     const result = matchModels(neutralScores({ neuroticism: 15 }), fileFor('neuroticism', [10, 90]));
     expect(result.recommendation).toBe('no strong recommendation');
     expect(result.models).toEqual([]);
+    expect(result.active_traits).toEqual([]);
+    expect(result).not.toHaveProperty('driving_traits');
     expect(result.targets[0]).toMatchObject({ trait: 'neuroticism', confidence: 'not_scored' });
   });
 
