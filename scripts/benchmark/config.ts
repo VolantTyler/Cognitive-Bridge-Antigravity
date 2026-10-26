@@ -9,11 +9,13 @@ import { fileURLToPath } from 'url';
 import { ConfigError } from './errors';
 import {
   OCEAN_TRAITS,
+  REASONING_EFFORTS,
   type BenchmarkConfig,
   type Confidence,
   type ModelConfig,
   type OceanTrait,
   type PricedModel,
+  type ReasoningEffort,
 } from './types';
 
 const BENCHMARK_DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -91,6 +93,14 @@ export function parseConfig(value: unknown): BenchmarkConfig {
   if (!Number.isInteger(maxOutputTokens) || maxOutputTokens <= 0) {
     throw new ConfigError('interview.maxOutputTokens must be a positive integer');
   }
+  const retryMaxOutputTokens = requireNumber(value.interview.retryMaxOutputTokens, 'interview.retryMaxOutputTokens');
+  if (!Number.isInteger(retryMaxOutputTokens) || retryMaxOutputTokens <= maxOutputTokens) {
+    throw new ConfigError('interview.retryMaxOutputTokens must be an integer greater than interview.maxOutputTokens');
+  }
+  const reasoningEffort = value.interview.reasoningEffort;
+  if (typeof reasoningEffort !== 'string' || !REASONING_EFFORTS.includes(reasoningEffort as ReasoningEffort)) {
+    throw new ConfigError(`interview.reasoningEffort must be one of ${REASONING_EFFORTS.join(', ')}`);
+  }
   const repeats = requireNumber(value.interview.repeats, 'interview.repeats');
   if (!Number.isInteger(repeats) || repeats <= 0) {
     throw new ConfigError('interview.repeats must be a positive integer');
@@ -107,6 +117,11 @@ export function parseConfig(value: unknown): BenchmarkConfig {
   const judgeMaxOutputTokens = requireNumber(value.judge.maxOutputTokens, 'judge.maxOutputTokens');
   if (!Number.isInteger(judgeMaxOutputTokens) || judgeMaxOutputTokens <= 0) {
     throw new ConfigError('judge.maxOutputTokens must be a positive integer');
+  }
+  if (judgeMaxOutputTokens !== maxOutputTokens) {
+    throw new ConfigError(
+      'judge.maxOutputTokens must equal interview.maxOutputTokens so every model and the judge share one output cap',
+    );
   }
   const judgeVersionRaw = value.judge.version;
   if (judgeVersionRaw !== null && typeof judgeVersionRaw !== 'string') {
@@ -169,6 +184,8 @@ export function parseConfig(value: unknown): BenchmarkConfig {
       systemPrompt: systemPrompt === null || systemPrompt.trim() === '' ? null : systemPrompt,
       temperature,
       maxOutputTokens,
+      retryMaxOutputTokens,
+      reasoningEffort: reasoningEffort as ReasoningEffort,
       repeats,
     },
     judge: {

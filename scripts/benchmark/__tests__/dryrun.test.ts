@@ -22,7 +22,7 @@ describe('dry-run estimate', () => {
       const config = testConfig({
         repeats: 2,
         maxOutputTokens: 10,
-        judgeMaxOutputTokens: 7,
+        judgeMaxOutputTokens: 10,
         models: [
           { id: 'openai/gpt-5-nano', enabled: true, inputPerMillionUsd: 2, outputPerMillionUsd: 4 },
           { id: 'google/gemini-2.5-flash-lite', enabled: true, inputPerMillionUsd: 0.1, outputPerMillionUsd: 0.4 },
@@ -39,7 +39,7 @@ describe('dry-run estimate', () => {
         outputPerMillionUsd: 4,
       });
       const judgeInput = 2 * estimateJudgeInputTokens(scenarios, 10);
-      const judgeCost = costUsd(judgeInput, 2 * 7, {
+      const judgeCost = costUsd(judgeInput, 2 * 10, {
         id: 'google/gemini-2.5-flash-lite',
         inputPerMillionUsd: 0.1,
         outputPerMillionUsd: 0.4,

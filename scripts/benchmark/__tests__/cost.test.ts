@@ -24,6 +24,7 @@ const price = { id: 'example/model', inputPerMillionUsd: 2, outputPerMillionUsd:
 function state(partial: Partial<SpendState> = {}): SpendState {
   return {
     spentUsd: 0,
+    spentActualUsd: 0,
     runWarned: false,
     monthWarned: false,
     monthBaseUsd: 0,
@@ -100,6 +101,19 @@ describe('cost ledger and limits', () => {
     const entries = readLedger(ledgerPath);
     expect(entries).toHaveLength(2);
     expect(spendForMonth(entries, '2026-10')).toBeCloseTo(12.5);
+    appendLedger(ledgerPath, {
+      ts: '2026-10-03T00:00:00.000Z',
+      run_id: 'failed',
+      model_id: 'openai/gpt-5-nano',
+      kind: 'interview',
+      scenario_id: 'demo-bug',
+      repeat: 1,
+      prompt_tokens: 10,
+      completion_tokens: 1024,
+      cost_usd: 80,
+      estimated: true,
+    });
+    expect(spendForMonth(readLedger(ledgerPath), '2026-10')).toBeCloseTo(12.5);
     expect(fs.readFileSync(ledgerPath, 'utf8')).not.toContain('sk-');
   });
 });

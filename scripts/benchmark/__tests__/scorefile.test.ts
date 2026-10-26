@@ -45,7 +45,12 @@ describe('score file schema', () => {
       traitConfidence: config.traitConfidence,
     });
     validateScoreFile(JSON.parse(JSON.stringify(scoreFile)));
-    expect(scoreFile.schema_version).toBe(2);
+    expect(scoreFile.schema_version).toBe(3);
+    expect(scoreFile.output_budget).toMatchObject({
+      max_output_tokens: 8192,
+      retry_max_output_tokens: 16384,
+      reasoning_effort: 'minimal',
+    });
     expect(scoreFile.label).toBe(HYPOTHESIS_LABEL);
     expect(scoreFile.spread_warning).toBe(true);
     expect(scoreFile.judge.version).toBe('google/gemini-2.5-flash-lite-2026-10-05');

@@ -18,6 +18,10 @@ describe('shipped benchmark config', () => {
     expect(config.interview.systemPrompt).toBeNull();
     expect(config.interview.temperature).toBe(0.8);
     expect(config.interview.repeats).toBe(5);
+    expect(config.interview.maxOutputTokens).toBe(8192);
+    expect(config.interview.retryMaxOutputTokens).toBe(16384);
+    expect(config.interview.reasoningEffort).toBe('minimal');
+    expect(config.judge.maxOutputTokens).toBe(config.interview.maxOutputTokens);
     expect(config.judge.modelId).toBe('google/gemini-2.5-flash-lite');
     expect(config.judge.temperature).toBe(0);
     expect(config.limits).toEqual({ warnPerRunUsd: 10, hardStopPerRunUsd: 15, warnPerMonthUsd: 40 });

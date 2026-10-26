@@ -19,6 +19,7 @@ describe('aggregation', () => {
       runs: 5,
       confidence: 'normal',
       wide_range: true,
+      fewer_runs: false,
     });
   });
 
@@ -59,7 +60,10 @@ describe('aggregation', () => {
       runs: 0,
       confidence: 'not_scored',
       wide_range: false,
+      fewer_runs: false,
     });
+    expect(aggregateTrait([], 'normal', 40, 5).fewer_runs).toBe(true);
+    expect(aggregateTrait([80], 'normal', 40, 5)).toMatchObject({ runs: 1, mean: 80, fewer_runs: true });
   });
 
   it('sets spread_warning only when every trait clusters under the threshold', () => {
@@ -75,7 +79,7 @@ function traitBlock(lowMean: number, highMean: number): Record<(typeof OCEAN_TRA
   const traits = {} as Record<(typeof OCEAN_TRAITS)[number], TraitStats>;
   for (const trait of OCEAN_TRAITS) {
     const mean = trait === 'openness' ? highMean : lowMean;
-    traits[trait] = { mean, low: mean, high: mean, runs: 1, confidence: 'normal', wide_range: false };
+    traits[trait] = { mean, low: mean, high: mean, runs: 1, confidence: 'normal', wide_range: false, fewer_runs: false };
   }
   return traits;
 }

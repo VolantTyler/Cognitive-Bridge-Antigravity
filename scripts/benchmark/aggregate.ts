@@ -26,9 +26,19 @@ export function aggregateTrait(
   values: number[],
   publishedConfidence: Confidence,
   wideRangeThreshold: number,
+  expectedRuns: number = values.length,
 ): TraitStats {
+  const fewerRuns = values.length < expectedRuns;
   if (values.length === 0) {
-    return { mean: null, low: null, high: null, runs: 0, confidence: 'not_scored', wide_range: false };
+    return {
+      mean: null,
+      low: null,
+      high: null,
+      runs: 0,
+      confidence: 'not_scored',
+      wide_range: false,
+      fewer_runs: fewerRuns,
+    };
   }
   const low = Math.min(...values);
   const high = Math.max(...values);
@@ -39,6 +49,7 @@ export function aggregateTrait(
     runs: values.length,
     confidence: publishedConfidence,
     wide_range: traitWideRange(low, high, wideRangeThreshold),
+    fewer_runs: fewerRuns,
   };
 }
 
@@ -46,6 +57,7 @@ export function aggregateTraits(
   runs: OceanScores[],
   published: Record<OceanTrait, Confidence>,
   wideRangeThreshold: number,
+  expectedRuns: number = runs.length,
 ): Record<OceanTrait, TraitStats> {
   const traits = {} as Record<OceanTrait, TraitStats>;
   for (const trait of OCEAN_TRAITS) {
@@ -53,9 +65,15 @@ export function aggregateTraits(
       runs.map((scores) => scores[trait]),
       published[trait],
       wideRangeThreshold,
+      expectedRuns,
     );
   }
   return traits;
+}
+
+/** More than half of the configured repeats failed, so the model should not be tiered. */
+export function failedMostRuns(failedRuns: number, configuredRepeats: number): boolean {
+  return failedRuns > configuredRepeats / 2;
 }
 
 /** Model-level flag, derived from the per-trait wide_range flags. */

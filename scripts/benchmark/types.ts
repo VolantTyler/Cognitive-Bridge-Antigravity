@@ -5,7 +5,12 @@
 
 import type { OceanScores } from '../../src/types';
 
-export const SCORE_FILE_SCHEMA_VERSION = 2;
+export const SCORE_FILE_SCHEMA_VERSION = 3;
+
+/** OpenRouter `reasoning.effort` values. The benchmark sends one value to every model. */
+export const REASONING_EFFORTS = ['none', 'minimal', 'low', 'medium', 'high'] as const;
+
+export type ReasoningEffort = (typeof REASONING_EFFORTS)[number];
 
 export const HYPOTHESIS_LABEL = 'design hypothesis based on research';
 
@@ -43,7 +48,12 @@ export interface BenchmarkConfig {
     /** Null means no system message is sent to candidate models. */
     systemPrompt: string | null;
     temperature: number;
+    /** Shared completion cap for every interview model. Reasoning tokens count against it. */
     maxOutputTokens: number;
+    /** One retry cap, identical for every model, used only after finish_reason length. */
+    retryMaxOutputTokens: number;
+    /** Sent as OpenRouter `reasoning.effort` on every interview and judge call. */
+    reasoningEffort: ReasoningEffort;
     repeats: number;
   };
   judge: {
@@ -85,6 +95,8 @@ export interface ChatRequest {
   messages: ChatMessage[];
   temperature: number;
   maxTokens: number;
+  /** Uniform OpenRouter reasoning effort. Omitted only in tests that do not set it. */
+  reasoningEffort?: ReasoningEffort;
   scenarioId?: string;
   repeat?: number;
 }
@@ -116,6 +128,8 @@ export interface TraitStats {
   confidence: Confidence;
   /** True when this trait's high-low range meets the wide-range threshold. */
   wide_range: boolean;
+  /** True when successful runs are fewer than the configured repeat count. */
+  fewer_runs: boolean;
 }
 
 export interface ScoreRun {
@@ -125,7 +139,20 @@ export interface ScoreRun {
   judge_version: string;
   /** UTC time of this scoring call, stored beside the judge version string. */
   recorded_at: string;
+  /** Highest max_tokens actually sent for this repeat, including a length retry. */
+  max_output_tokens: number;
+  /** OpenRouter reasoning.effort sent with this repeat. */
+  reasoning_effort: ReasoningEffort;
   scores: OceanScores;
+}
+
+export interface ModelFailure {
+  repeat: number;
+  scenario_id: string | null;
+  kind: 'interview' | 'judge';
+  reason: string;
+  max_output_tokens: number;
+  reasoning_effort: ReasoningEffort;
 }
 
 export interface StrategyRow {
@@ -143,6 +170,13 @@ export interface ModelScore {
   timestamp: string;
   cost_usd: number;
   wide_range: boolean;
+  /** Successful scored repeats are below the configured repeat count. */
+  fewer_runs: boolean;
+  scored_runs: number;
+  failed_runs: number;
+  /** Set when failed repeats are more than half of the configured repeats. */
+  not_scored_reason: string | null;
+  failures: ModelFailure[];
   traits: Record<OceanTrait, TraitStats>;
   runs: ScoreRun[];
 }
@@ -159,6 +193,12 @@ export interface ScoreFile {
   interview_temperature: number;
   repeats: number;
   partial: boolean;
+  /** Caps and reasoning effort actually configured for this file. Same values for every model. */
+  output_budget: {
+    max_output_tokens: number;
+    retry_max_output_tokens: number;
+    reasoning_effort: ReasoningEffort;
+  };
   judge: {
     model_id: string;
     /** Value of the OpenRouter response `model` field. */
@@ -209,6 +249,8 @@ export interface MatchModelResult {
   driving_traits: OceanTrait[];
   /** Active traits with no usable model score. Non-empty only when tier is not_scored. */
   missing_traits: OceanTrait[];
+  /** Present when the model failed more than half its runs. */
+  not_scored_reason?: string;
   /** 1 is closest to the target profile. Set only when spread_warning is true. */
   relative_rank?: number;
   traits: Partial<Record<OceanTrait, MatchTraitResult>>;

@@ -10,8 +10,10 @@ npm run benchmark
 
 Outputs (gitignored):
 
-- `scripts/benchmark/output/scores.json` — schema version 2, one file the UI can render without rescoring
-- `scripts/benchmark/output/ledger.jsonl` — one row per call with token counts and USD cost
+- `scripts/benchmark/output/scores.json` — schema version 3, one file the UI can render without rescoring
+- `scripts/benchmark/output/ledger.jsonl` — one row per call with token counts and USD cost. Estimated rows (no usage came back) do not count toward the $40 monthly warning.
+
+Every model and the judge use the same `maxOutputTokens` (8192) and the same OpenRouter `reasoning.effort` (`minimal`). A length cutoff with empty `message.content` retries once at `retryMaxOutputTokens` (16384). The judge scores `message.content` only, never `message.reasoning`. One model's failed repeat does not stop the others. `runs` is the number of scored repeats, `fewer_runs` is true when that is short of the configured count, and a model that fails more than half its repeats is `not_scored` with `not_scored_reason`. Exit code 4 means every model failed. The dry run assumes each call uses the full cap, because reasoning tokens are billed as completion tokens.
 
 `matchModels` in `match.ts` is the only tier function. It always uses the in-code `STRATEGY_TABLE`. A stored `strategy_table` that differs, including an empty one, throws. Swap the hypothesis by editing `STRATEGY_TABLE` in that file.
 

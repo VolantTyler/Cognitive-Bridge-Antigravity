@@ -6,7 +6,7 @@
 import fs from 'fs';
 import path from 'path';
 import type { OceanScores } from '../../src/types';
-import { aggregateTraits, hasWideRange, spreadWarning, traitSpreads } from './aggregate';
+import { aggregateTraits, failedMostRuns, hasWideRange, spreadWarning, traitSpreads } from './aggregate';
 import { JudgeMixError, ScoreFileSchemaError } from './errors';
 import { STRATEGY_TABLE } from './match';
 import {
@@ -16,12 +16,22 @@ import {
   type Confidence,
   type ModelScore,
   type OceanTrait,
+  type ReasoningEffort,
   type ScoreFile,
   type ScoreRun,
   type StrategyRow,
 } from './types';
 
 const CONFIDENCE_VALUES: Confidence[] = ['normal', 'low', 'not_scored'];
+
+export interface AttemptFailure {
+  repeat: number;
+  scenarioId: string | null;
+  kind: 'interview' | 'judge';
+  reason: string;
+  maxOutputTokens: number;
+  reasoningEffort: ReasoningEffort;
+}
 
 export interface CompletedModelRun {
   id: string;
@@ -30,8 +40,12 @@ export interface CompletedModelRun {
     modelVersion: string;
     judgeVersion: string;
     recordedAt?: string;
+    maxOutputTokens?: number;
+    reasoningEffort?: ReasoningEffort;
     scores: OceanScores;
   }>;
+  failures?: AttemptFailure[];
+  configuredRepeats?: number;
   costUsd: number;
   timestamp: string;
 }
@@ -83,32 +97,66 @@ export function buildScoreFile(input: {
   traitConfidence: Record<OceanTrait, Confidence>;
   partial?: boolean;
   strategyTable?: StrategyRow[];
+  outputBudget?: { maxOutputTokens: number; retryMaxOutputTokens: number; reasoningEffort: ReasoningEffort };
 }): ScoreFile {
   const strategyTable = input.strategyTable ?? STRATEGY_TABLE;
+  const outputBudget = input.outputBudget ?? {
+    maxOutputTokens: 8192,
+    retryMaxOutputTokens: 16384,
+    reasoningEffort: 'minimal' as const,
+  };
   const models: ModelScore[] = input.models.map((model) => {
+    const failures = model.failures ?? [];
+    const configuredRepeats = model.configuredRepeats ?? input.repeats;
+    const failedRepeats = new Set(failures.map((failure) => failure.repeat));
     const runs: ScoreRun[] = model.repeats.map((repeat) => ({
       repeat: repeat.repeat,
       model_version: repeat.modelVersion,
       judge_version: repeat.judgeVersion,
       recorded_at: repeat.recordedAt ?? model.timestamp,
+      max_output_tokens: repeat.maxOutputTokens ?? outputBudget.maxOutputTokens,
+      reasoning_effort: repeat.reasoningEffort ?? outputBudget.reasoningEffort,
       scores: repeat.scores,
     }));
     const traits = aggregateTraits(
       runs.map((run) => run.scores),
       input.traitConfidence,
       input.wideRangeThreshold,
+      configuredRepeats,
     );
+    const failedRuns = failedRepeats.size;
+    const majorityFailed = failedMostRuns(failedRuns, configuredRepeats);
+    if (majorityFailed) {
+      for (const trait of OCEAN_TRAITS) {
+        traits[trait] = { ...traits[trait], confidence: 'not_scored' };
+      }
+    }
+    const reasonText = failures.map((failure) => failure.reason).filter((reason, index, all) => all.indexOf(reason) === index);
     return {
       id: model.id,
       version: summarizeVersion(runs) || model.id,
       timestamp: model.timestamp,
       cost_usd: model.costUsd,
       wide_range: hasWideRange(traits),
+      fewer_runs: runs.length < configuredRepeats,
+      scored_runs: runs.length,
+      failed_runs: failedRuns,
+      not_scored_reason: majorityFailed
+        ? `Failed ${failedRuns} of ${configuredRepeats} runs. ${reasonText.join(' ') || 'No successful scored repeat.'}`
+        : null,
+      failures: failures.map((failure) => ({
+        repeat: failure.repeat,
+        scenario_id: failure.scenarioId,
+        kind: failure.kind,
+        reason: failure.reason,
+        max_output_tokens: failure.maxOutputTokens,
+        reasoning_effort: failure.reasoningEffort,
+      })),
       traits,
       runs,
     };
   });
-  const spreads = traitSpreads(models.map((model) => model.traits));
+  const spreads = traitSpreads(models.filter((model) => model.not_scored_reason === null).map((model) => model.traits));
   return {
     schema_version: SCORE_FILE_SCHEMA_VERSION,
     label: HYPOTHESIS_LABEL,
@@ -121,6 +169,11 @@ export function buildScoreFile(input: {
     interview_temperature: input.interviewTemperature,
     repeats: input.repeats,
     partial: input.partial ?? false,
+    output_budget: {
+      max_output_tokens: outputBudget.maxOutputTokens,
+      retry_max_output_tokens: outputBudget.retryMaxOutputTokens,
+      reasoning_effort: outputBudget.reasoningEffort,
+    },
     judge: {
       model_id: input.judge.modelId,
       version: input.judge.version,
@@ -174,6 +227,15 @@ export function validateScoreFile(value: unknown): asserts value is ScoreFile {
   if (typeof value.judge.recorded_at !== 'string' || !value.judge.recorded_at) {
     throw new ScoreFileSchemaError('judge.recorded_at is required alongside judge.version');
   }
+  if (!isRecord(value.output_budget)) {
+    throw new ScoreFileSchemaError('output_budget is required');
+  }
+  if (typeof value.output_budget.max_output_tokens !== 'number' || typeof value.output_budget.retry_max_output_tokens !== 'number') {
+    throw new ScoreFileSchemaError('output_budget max_output_tokens and retry_max_output_tokens are required');
+  }
+  if (typeof value.output_budget.reasoning_effort !== 'string' || !value.output_budget.reasoning_effort) {
+    throw new ScoreFileSchemaError('output_budget.reasoning_effort is required');
+  }
   if (!Array.isArray(value.models)) {
     throw new ScoreFileSchemaError('models must be an array');
   }
@@ -183,6 +245,15 @@ export function validateScoreFile(value: unknown): asserts value is ScoreFile {
     }
     if (typeof model.timestamp !== 'string' || typeof model.cost_usd !== 'number' || typeof model.wide_range !== 'boolean') {
       throw new ScoreFileSchemaError(`model ${String(model.id)} needs timestamp, cost_usd, and wide_range`);
+    }
+    if (typeof model.fewer_runs !== 'boolean' || typeof model.scored_runs !== 'number' || typeof model.failed_runs !== 'number') {
+      throw new ScoreFileSchemaError(`model ${String(model.id)} needs fewer_runs, scored_runs, and failed_runs`);
+    }
+    if (model.not_scored_reason !== null && typeof model.not_scored_reason !== 'string') {
+      throw new ScoreFileSchemaError(`model ${String(model.id)} not_scored_reason must be a string or null`);
+    }
+    if (!Array.isArray(model.failures)) {
+      throw new ScoreFileSchemaError(`model ${String(model.id)} failures must be an array`);
     }
     if (!isRecord(model.traits)) {
       throw new ScoreFileSchemaError(`model ${model.id} is missing traits`);
@@ -204,6 +275,9 @@ export function validateScoreFile(value: unknown): asserts value is ScoreFile {
       if (typeof stats.wide_range !== 'boolean') {
         throw new ScoreFileSchemaError(`model ${model.id} trait ${trait} wide_range must be a boolean`);
       }
+      if (typeof stats.fewer_runs !== 'boolean') {
+        throw new ScoreFileSchemaError(`model ${model.id} trait ${trait} fewer_runs must be a boolean`);
+      }
       const measured = stats.confidence !== 'not_scored' && stats.runs > 0;
       for (const key of ['mean', 'low', 'high'] as const) {
         const numeric = stats[key];
@@ -221,6 +295,9 @@ export function validateScoreFile(value: unknown): asserts value is ScoreFile {
       }
       if (typeof run.recorded_at !== 'string' || !run.recorded_at) {
         throw new ScoreFileSchemaError(`model ${model.id} runs must record recorded_at beside judge_version`);
+      }
+      if (typeof run.max_output_tokens !== 'number' || typeof run.reasoning_effort !== 'string' || !run.reasoning_effort) {
+        throw new ScoreFileSchemaError(`model ${model.id} runs must record max_output_tokens and reasoning_effort`);
       }
       if (!isRecord(run.scores)) {
         throw new ScoreFileSchemaError(`model ${model.id} run is missing scores`);

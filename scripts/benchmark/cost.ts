@@ -9,10 +9,13 @@ import { HardStopError } from './errors';
 import type { LedgerEntry, PricedModel } from './types';
 
 export interface SpendState {
+  /** All recorded cost this run, including estimated rows. Used for the per-run warn and hard stop. */
   spentUsd: number;
+  /** Recorded cost this run whose usage came from the API. Estimated rows are excluded. */
+  spentActualUsd: number;
   runWarned: boolean;
   monthWarned: boolean;
-  /** Ledger total for the current UTC month before this run. */
+  /** Ledger total for the current UTC month before this run, excluding estimated rows. */
   monthBaseUsd: number;
   runId: string;
 }
@@ -37,9 +40,14 @@ export function monthKey(isoTimestamp: string): string {
   return isoTimestamp.slice(0, 7);
 }
 
+/** Estimated rows are upper bounds for calls whose usage never came back. They do not count toward the monthly warning. */
+export function countsTowardMonth(entry: LedgerEntry): boolean {
+  return entry.estimated !== true;
+}
+
 export function spendForMonth(entries: LedgerEntry[], month: string): number {
   return entries
-    .filter((entry) => monthKey(entry.ts) === month)
+    .filter((entry) => monthKey(entry.ts) === month && countsTowardMonth(entry))
     .reduce((sum, entry) => sum + entry.cost_usd, 0);
 }
 
@@ -62,7 +70,7 @@ export function assessCall(state: SpendState, nextCallUsd: number, limits: {
       `Run cost warning: this call would bring the run to about $${projectedRun.toFixed(6)}, at or above the $${limits.warnPerRunUsd.toFixed(2)} warning line.`,
     );
   }
-  const projectedMonth = state.monthBaseUsd + projectedRun;
+  const projectedMonth = state.monthBaseUsd + state.spentActualUsd + nextCallUsd;
   if (!state.monthWarned && projectedMonth >= limits.warnPerMonthUsd) {
     warnings.push(
       `Monthly cost warning: spend for this UTC month would reach about $${projectedMonth.toFixed(6)}, at or above the $${limits.warnPerMonthUsd.toFixed(2)} warning line.`,

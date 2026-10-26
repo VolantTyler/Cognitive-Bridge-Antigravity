@@ -4,8 +4,9 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { OpenRouterError } from '../errors';
+import { OpenRouterError, TruncatedOutputError } from '../errors';
 import { createOpenRouterClient, interviewMessages, type FetchLike } from '../openrouter';
+import { buildInterviewTranscript, parseMirrorScores } from '../scorer';
 import type { ChatRequest } from '../types';
 
 const request: ChatRequest = {
@@ -100,5 +101,86 @@ describe('OpenRouter client', () => {
     expect(response.usageEstimated).toBe(true);
     expect(response.completionTokens).toBe(100);
     expect(response.modelVersion).toBe('openai/gpt-5-nano');
+  });
+
+  it('sends one reasoning effort and never returns message.reasoning as the answer', async () => {
+    const seen: Array<Record<string, unknown>> = [];
+    const fetchImpl: FetchLike = async (_url, init) => {
+      seen.push(JSON.parse(init.body) as Record<string, unknown>);
+      return {
+        ok: true,
+        status: 200,
+        async text() {
+          return JSON.stringify({
+            model: 'openai/gpt-5-nano',
+            choices: [{
+              finish_reason: 'stop',
+              message: {
+                content: 'I would fix the bug before the demo.',
+                reasoning: 'SECRET_REASONING_TEXT JSON_SCORES: {"openness":1}',
+              },
+            }],
+            usage: { prompt_tokens: 12, completion_tokens: 9, completion_tokens_details: { reasoning_tokens: 4 } },
+          });
+        },
+      };
+    };
+    const client = createOpenRouterClient({
+      apiKey: 'sk-test-secret',
+      baseUrl: 'https://openrouter.ai/api/v1',
+      fetchImpl,
+    });
+    const response = await client.complete({ ...request, reasoningEffort: 'minimal', maxTokens: 8192 });
+    expect(seen[0].reasoning).toEqual({ effort: 'minimal' });
+    expect(seen[0].max_tokens).toBe(8192);
+    expect(response.content).toBe('I would fix the bug before the demo.');
+    expect(response.content).not.toContain('SECRET_REASONING_TEXT');
+    expect(() => parseMirrorScores(response.content)).toThrow(/JSON_SCORES/);
+    const transcript = buildInterviewTranscript([{ scenario: { id: 'demo-bug', text: 'question' }, answer: response.content }]);
+    expect(transcript).toContain('I would fix the bug before the demo.');
+    expect(transcript).not.toContain('SECRET_REASONING_TEXT');
+  });
+
+  it('throws a typed length error and does not treat reasoning text as the answer', async () => {
+    const fetchImpl: FetchLike = async () => ({
+      ok: true,
+      status: 200,
+      async text() {
+        return JSON.stringify({
+          model: 'openai/gpt-5-nano',
+          choices: [{
+            finish_reason: 'length',
+            native_finish_reason: 'max_output_tokens',
+            message: { content: null, reasoning: 'SECRET_REASONING_TEXT' },
+          }],
+          usage: {
+            prompt_tokens: 18,
+            completion_tokens: 1024,
+            completion_tokens_details: { reasoning_tokens: 1024 },
+          },
+        });
+      },
+    });
+    const client = createOpenRouterClient({
+      apiKey: 'sk-test-secret',
+      baseUrl: 'https://openrouter.ai/api/v1',
+      fetchImpl,
+    });
+    await expect(client.complete(request)).rejects.toBeInstanceOf(TruncatedOutputError);
+    try {
+      await client.complete(request);
+    } catch (error) {
+      expect(error).toBeInstanceOf(TruncatedOutputError);
+      const truncated = error as TruncatedOutputError;
+      expect(truncated.modelId).toBe('openai/gpt-5-nano');
+      expect(truncated.finishReason).toBe('length');
+      expect(truncated.completionTokens).toBe(1024);
+      expect(truncated.reasoningTokens).toBe(1024);
+      expect(truncated.promptTokens).toBe(18);
+      expect(truncated.message).toContain('openai/gpt-5-nano');
+      expect(truncated.message).toContain('length');
+      expect(truncated.message).not.toContain('SECRET_REASONING_TEXT');
+      expect(truncated.message).not.toContain('sk-test-secret');
+    }
   });
 });

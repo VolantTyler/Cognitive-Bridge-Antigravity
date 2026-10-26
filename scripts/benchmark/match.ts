@@ -186,6 +186,16 @@ export function matchModels(userScores: OceanScores, scoreFile: ScoreFile): Matc
         target: row.target_direction,
       });
     }
+    if (model.not_scored_reason) {
+      return {
+        model_id: model.id,
+        tier: 'not_scored' as const,
+        driving_traits: [],
+        missing_traits: eligibleTraits,
+        not_scored_reason: model.not_scored_reason,
+        traits,
+      };
+    }
     if (missingTraits.length > 0) {
       return {
         model_id: model.id,

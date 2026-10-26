@@ -5,7 +5,7 @@
 
 import { loadConfig, DEFAULT_CONFIG_PATH } from './config';
 import { estimateDryRun, formatDryRun } from './dryrun';
-import { ConfigError, HardStopError, JudgeMixError } from './errors';
+import { AllModelsFailedError, ConfigError, HardStopError, JudgeMixError } from './errors';
 import { redactSecret, createOpenRouterClient } from './openrouter';
 import { runBenchmark } from './run';
 
@@ -79,6 +79,7 @@ export async function main(argv: string[], io?: Partial<MainIo>): Promise<number
     report(message);
     if (error instanceof JudgeMixError) return 2;
     if (error instanceof HardStopError) return 3;
+    if (error instanceof AllModelsFailedError) return 4;
     if (error instanceof ConfigError) return 1;
     return 1;
   }

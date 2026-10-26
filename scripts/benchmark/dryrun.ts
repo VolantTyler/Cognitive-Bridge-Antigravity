@@ -34,6 +34,8 @@ export interface DryRunEstimate {
   scenarioIds: string[];
   interviewMaxOutputTokens: number;
   judgeMaxOutputTokens: number;
+  retryMaxOutputTokens: number;
+  reasoningEffort: string;
   systemPrompt: null | string;
   models: ModelDryRun[];
   skipped: Array<{ id: string; reason: string }>;
@@ -88,6 +90,8 @@ export function estimateDryRun(
     scenarioIds: scenarios.map((scenario) => scenario.id),
     interviewMaxOutputTokens: config.interview.maxOutputTokens,
     judgeMaxOutputTokens: config.judge.maxOutputTokens,
+    retryMaxOutputTokens: config.interview.retryMaxOutputTokens,
+    reasoningEffort: config.interview.reasoningEffort,
     systemPrompt: config.interview.systemPrompt,
     models,
     skipped: skippedModels(config),
@@ -144,7 +148,8 @@ export function formatDryRun(estimate: DryRunEstimate): string {
     `Scenarios (${estimate.scenarioCount}, fixed order): ${estimate.scenarioIds.join(', ')}`,
     `Repeats per model: ${estimate.repeats}`,
     `Judge: ${estimate.judgeModelId} at temperature ${estimate.judgeTemperature}`,
-    `Max output tokens: interview ${estimate.interviewMaxOutputTokens}, judge ${estimate.judgeMaxOutputTokens}`,
+    `Max output tokens: ${estimate.interviewMaxOutputTokens} for every model and the judge (retry once at ${estimate.retryMaxOutputTokens} after a length cutoff; retry is not included here)`,
+    `Reasoning effort: ${estimate.reasoningEffort} (OpenRouter reasoning.effort on every call; models that ignore it are left as-is)`,
     '',
     'Per model (interview calls = scenarios × repeats; judge calls = one Mirror scoring per repeat):',
   ];
@@ -168,7 +173,7 @@ export function formatDryRun(estimate: DryRunEstimate): string {
     '',
     `Total estimated USD: ${formatUsd(estimate.totalCostUsd)}`,
     `Warn at ${formatUsd(estimate.warnPerRunUsd)} per run; hard stop at ${formatUsd(estimate.hardStopPerRunUsd)} per run; warn at ${formatUsd(estimate.warnPerMonthUsd)} per month.`,
-    'Input tokens are counted from the real scenario prompts and the Mirror judge rubric. Output tokens use the configured maximum, so this is an upper bound. Judge cost is included in every model subtotal and uses the judge model price.',
+    'Input tokens are counted from the real scenario prompts and the Mirror judge rubric. Output tokens use the full configured maximum, because reasoning tokens are billed as completion tokens and can fill the cap. This is an upper bound and does not add the one length-cutoff retry. Judge cost is included in every model subtotal and uses the judge model price.',
   );
   return lines.join('\n');
 }

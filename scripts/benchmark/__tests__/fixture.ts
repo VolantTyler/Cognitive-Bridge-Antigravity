@@ -36,6 +36,8 @@ export function testConfig(patch?: {
   temperature?: number;
   systemPrompt?: string | null;
   maxOutputTokens?: number;
+  retryMaxOutputTokens?: number;
+  reasoningEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high';
   judgeMaxOutputTokens?: number;
   judgeVersion?: string | null;
   judgeModelId?: string;
@@ -60,12 +62,14 @@ export function testConfig(patch?: {
       systemPrompt: patch?.systemPrompt === undefined ? null : patch.systemPrompt,
       temperature: patch?.temperature ?? 0.8,
       maxOutputTokens: patch?.maxOutputTokens ?? 32,
+      retryMaxOutputTokens: patch?.retryMaxOutputTokens ?? ((patch?.maxOutputTokens ?? 32) * 2),
+      reasoningEffort: patch?.reasoningEffort ?? 'minimal',
       repeats: patch?.repeats ?? 1,
     },
     judge: {
       modelId: patch?.judgeModelId ?? 'google/gemini-2.5-flash-lite',
       temperature: 0,
-      maxOutputTokens: patch?.judgeMaxOutputTokens ?? 32,
+      maxOutputTokens: patch?.judgeMaxOutputTokens ?? patch?.maxOutputTokens ?? 32,
       version: patch?.judgeVersion ?? null,
     },
     limits: {
