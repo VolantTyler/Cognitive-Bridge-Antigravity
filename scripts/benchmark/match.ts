@@ -23,17 +23,21 @@ import {
   type TargetDirection,
 } from './types';
 
+export const EXTROVERSION_EXCLUSION_REASON = 'Excluded from tiering: benchmarked models scored extroversion between 55 and 61, and the table needs a model below 50. Means are still reported.';
+
+const counted = { exclude_from_tiering: false, exclusion_reason: null } as const;
+
 export const STRATEGY_TABLE: StrategyRow[] = [
-  { trait: 'openness', threshold: 'high', strategy: 'congruent', target_direction: 'high', confidence: 'normal', exclude_from_tiering: false },
-  { trait: 'openness', threshold: 'low', strategy: 'congruent', target_direction: 'low', confidence: 'normal', exclude_from_tiering: false },
-  { trait: 'conscientiousness', threshold: 'high', strategy: 'congruent', target_direction: 'high', confidence: 'normal', exclude_from_tiering: false },
-  { trait: 'conscientiousness', threshold: 'low', strategy: 'compensatory', target_direction: 'high', confidence: 'normal', exclude_from_tiering: false },
-  { trait: 'extroversion', threshold: 'high', strategy: 'complementary', target_direction: 'low', confidence: 'low', exclude_from_tiering: false },
-  { trait: 'extroversion', threshold: 'low', strategy: 'congruent', target_direction: 'low', confidence: 'normal', exclude_from_tiering: false },
-  { trait: 'agreeableness', threshold: 'high', strategy: 'congruent', target_direction: 'high', confidence: 'normal', exclude_from_tiering: false },
-  { trait: 'agreeableness', threshold: 'low', strategy: 'congruent', target_direction: 'low', confidence: 'normal', exclude_from_tiering: false },
-  { trait: 'neuroticism', threshold: 'high', strategy: 'compensatory', target_direction: 'low', confidence: 'normal', exclude_from_tiering: false },
-  { trait: 'neuroticism', threshold: 'low', strategy: 'complementary', target_direction: null, confidence: 'not_scored', exclude_from_tiering: true },
+  { trait: 'openness', threshold: 'high', strategy: 'congruent', target_direction: 'high', confidence: 'normal', ...counted },
+  { trait: 'openness', threshold: 'low', strategy: 'congruent', target_direction: 'low', confidence: 'normal', ...counted },
+  { trait: 'conscientiousness', threshold: 'high', strategy: 'congruent', target_direction: 'high', confidence: 'normal', ...counted },
+  { trait: 'conscientiousness', threshold: 'low', strategy: 'compensatory', target_direction: 'high', confidence: 'normal', ...counted },
+  { trait: 'extroversion', threshold: 'high', strategy: 'complementary', target_direction: 'low', confidence: 'low', exclude_from_tiering: true, exclusion_reason: EXTROVERSION_EXCLUSION_REASON },
+  { trait: 'extroversion', threshold: 'low', strategy: 'congruent', target_direction: 'low', confidence: 'normal', exclude_from_tiering: true, exclusion_reason: EXTROVERSION_EXCLUSION_REASON },
+  { trait: 'agreeableness', threshold: 'high', strategy: 'congruent', target_direction: 'high', confidence: 'normal', ...counted },
+  { trait: 'agreeableness', threshold: 'low', strategy: 'congruent', target_direction: 'low', confidence: 'normal', ...counted },
+  { trait: 'neuroticism', threshold: 'high', strategy: 'compensatory', target_direction: 'low', confidence: 'normal', ...counted },
+  { trait: 'neuroticism', threshold: 'low', strategy: 'complementary', target_direction: null, confidence: 'not_scored', exclude_from_tiering: true, exclusion_reason: null },
 ];
 
 export function assertStrategyTable(table: StrategyRow[]): void {
@@ -89,7 +93,8 @@ function sameStrategyRow(stored: StrategyRow, expected: StrategyRow): boolean {
     && stored.strategy === expected.strategy
     && stored.target_direction === expected.target_direction
     && stored.confidence === expected.confidence
-    && stored.exclude_from_tiering === expected.exclude_from_tiering;
+    && stored.exclude_from_tiering === expected.exclude_from_tiering
+    && stored.exclusion_reason === expected.exclusion_reason;
 }
 
 export function assertStoredStrategyTable(stored: StrategyRow[] | undefined): void {
@@ -98,7 +103,7 @@ export function assertStoredStrategyTable(stored: StrategyRow[] | undefined): vo
     && stored.every((row, index) => sameStrategyRow(row, STRATEGY_TABLE[index]));
   if (!matches) {
     throw new Error(
-      'Score file strategy_table does not match the in-code STRATEGY_TABLE. Refusing to match against a different hypothesis.',
+      'Score file strategy_table does not match the in-code STRATEGY_TABLE. Refusing to match against a different hypothesis. Delete the existing scores.json and re-run the benchmark. This run does not merge an older score file.',
     );
   }
 }
@@ -136,6 +141,7 @@ export function matchModels(userScores: OceanScores, scoreFile: ScoreFile): Matc
   });
   const eligible = applied.filter((row) => row.confidence !== 'not_scored' && !row.exclude_from_tiering);
   const eligibleTraits = eligible.map((row) => row.trait);
+  const activeTraits = applied.filter((row) => row.confidence !== 'not_scored').map((row) => row.trait);
 
   if (eligibleTraits.length === 0) {
     return {
@@ -143,7 +149,7 @@ export function matchModels(userScores: OceanScores, scoreFile: ScoreFile): Matc
       recommendation: 'no strong recommendation',
       targets: applied,
       strategy_table: table,
-      active_traits: [],
+      active_traits: activeTraits,
       ranking_note: null,
       models: [],
     };
@@ -162,6 +168,7 @@ export function matchModels(userScores: OceanScores, scoreFile: ScoreFile): Matc
         target_direction: row.target_direction,
         confidence: row.confidence,
         included_in_tier: included,
+        exclusion_reason: included ? null : row.exclusion_reason,
         user_score: row.user_score,
         model_mean: stats?.mean ?? null,
         model_low: stats?.low ?? null,
@@ -238,7 +245,7 @@ export function matchModels(userScores: OceanScores, scoreFile: ScoreFile): Matc
     recommendation: 'tiers',
     targets: applied,
     strategy_table: table,
-    active_traits: eligibleTraits,
+    active_traits: activeTraits,
     ranking_note: rankById.size > 0 ? RELATIVE_RANKING_NOTE : null,
     models: rankedModels,
   };

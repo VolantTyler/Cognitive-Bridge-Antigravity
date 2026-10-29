@@ -45,7 +45,7 @@ describe('score file schema', () => {
       traitConfidence: config.traitConfidence,
     });
     validateScoreFile(JSON.parse(JSON.stringify(scoreFile)));
-    expect(scoreFile.schema_version).toBe(3);
+    expect(scoreFile.schema_version).toBe(4);
     expect(scoreFile.output_budget).toMatchObject({
       max_output_tokens: 8192,
       retry_max_output_tokens: 16384,
@@ -77,7 +77,8 @@ describe('score file schema', () => {
     const broken = JSON.parse(JSON.stringify(scoreFile)) as { spread_warning?: boolean };
     delete broken.spread_warning;
     expect(() => validateScoreFile(broken)).toThrow(ScoreFileSchemaError);
-    expect(() => validateScoreFile({ ...scoreFile, schema_version: 1 })).toThrow(/schema_version/);
+    expect(() => validateScoreFile({ ...scoreFile, schema_version: 3 })).toThrow(/Delete the existing scores.json/);
+    expect(scoreFile.strategy_table.filter((row) => row.trait === 'extroversion').every((row) => row.exclude_from_tiering && row.exclusion_reason)).toBe(true);
   });
 
   it('turns a wide openness gap into spread_warning false', () => {

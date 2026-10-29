@@ -86,7 +86,7 @@ describe('dry-run estimate', () => {
     const shipped = estimateDryRun(loadConfig());
     expect(shipped.models).toHaveLength(4);
     expect(shipped.scenarioCount).toBe(5);
-    expect(shipped.repeats).toBe(5);
+    expect(shipped.repeats).toBe(10);
     expect(shipped.temperature).toBe(0.8);
     expect(shipped.systemPrompt).toBeNull();
     expect(output).toContain(`Total estimated USD: $${shipped.totalCostUsd.toFixed(6)}`);

@@ -5,7 +5,7 @@
 
 import type { OceanScores } from '../../src/types';
 
-export const SCORE_FILE_SCHEMA_VERSION = 3;
+export const SCORE_FILE_SCHEMA_VERSION = 4;
 
 /** OpenRouter `reasoning.effort` values. The benchmark sends one value to every model. */
 export const REASONING_EFFORTS = ['none', 'minimal', 'low', 'medium', 'high'] as const;
@@ -162,6 +162,8 @@ export interface StrategyRow {
   target_direction: TargetDirection | null;
   confidence: Confidence;
   exclude_from_tiering: boolean;
+  /** Why this row is left out of tiering. Null when the row still counts. */
+  exclusion_reason: string | null;
 }
 
 export interface ModelScore {
@@ -236,6 +238,8 @@ export interface MatchTraitResult {
   target_direction: TargetDirection | null;
   confidence: Confidence;
   included_in_tier: boolean;
+  /** Set when this active trait is reported but does not count toward the tier. */
+  exclusion_reason: string | null;
   user_score: number;
   model_mean: number | null;
   model_low: number | null;
@@ -262,8 +266,9 @@ export interface MatchResult {
   targets: AppliedTarget[];
   strategy_table: StrategyRow[];
   /**
-   * Every active trait that counts toward tiering.
-   * UI cards should read each model's driving_traits, which is only the subset that set that tier.
+   * Active traits that are still reported, including extroversion when it is excluded from tiering.
+   * Neuroticism-low stays off this list because that row is not scored.
+   * UI cards should read each model's driving_traits for the tier, and exclusion_reason for an excluded trait.
    */
   active_traits: OceanTrait[];
   /** Set when spread_warning is true and at least one model was ranked. */

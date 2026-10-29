@@ -204,7 +204,9 @@ export function validateScoreFile(value: unknown): asserts value is ScoreFile {
     throw new ScoreFileSchemaError('Score file must be a JSON object');
   }
   if (value.schema_version !== SCORE_FILE_SCHEMA_VERSION) {
-    throw new ScoreFileSchemaError(`schema_version must be ${SCORE_FILE_SCHEMA_VERSION}`);
+    throw new ScoreFileSchemaError(
+      `schema_version must be ${SCORE_FILE_SCHEMA_VERSION} (found ${String(value.schema_version)}). Delete the existing scores.json and re-run the benchmark. This run does not merge an older score file.`,
+    );
   }
   if (value.label !== HYPOTHESIS_LABEL) {
     throw new ScoreFileSchemaError('label must be the design-hypothesis label');
@@ -214,6 +216,16 @@ export function validateScoreFile(value: unknown): asserts value is ScoreFile {
   }
   if (!Array.isArray(value.strategy_table) || value.strategy_table.length === 0) {
     throw new ScoreFileSchemaError('strategy_table is required');
+  }
+  for (const row of value.strategy_table) {
+    if (!isRecord(row) || typeof row.exclude_from_tiering !== 'boolean') {
+      throw new ScoreFileSchemaError('each strategy_table row needs exclude_from_tiering');
+    }
+    if (row.exclusion_reason !== null && typeof row.exclusion_reason !== 'string') {
+      throw new ScoreFileSchemaError(
+        'each strategy_table row needs exclusion_reason (string or null). Delete the existing scores.json and re-run the benchmark.',
+      );
+    }
   }
   if (!isRecord(value.confidence_policy) || !isRecord(value.confidence_policy.published_trait_confidence)) {
     throw new ScoreFileSchemaError('confidence_policy.published_trait_confidence is required');

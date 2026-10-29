@@ -8,7 +8,7 @@
     "maxOutputTokens": 8192,
     "retryMaxOutputTokens": 16384,
     "reasoningEffort": "minimal",
-    "repeats": 5
+    "repeats": 10
   },
   "judge": {
     "modelId": "google/gemini-2.5-flash-lite",

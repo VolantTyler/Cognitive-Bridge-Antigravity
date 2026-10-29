@@ -17,7 +17,7 @@ describe('shipped benchmark config', () => {
     expect(config.baseUrl).toBe('https://openrouter.ai/api/v1');
     expect(config.interview.systemPrompt).toBeNull();
     expect(config.interview.temperature).toBe(0.8);
-    expect(config.interview.repeats).toBe(5);
+    expect(config.interview.repeats).toBe(10);
     expect(config.interview.maxOutputTokens).toBe(8192);
     expect(config.interview.retryMaxOutputTokens).toBe(16384);
     expect(config.interview.reasoningEffort).toBe('minimal');

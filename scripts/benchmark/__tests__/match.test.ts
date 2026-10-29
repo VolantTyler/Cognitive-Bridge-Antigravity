@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { STEERING_LIBRARY, getActiveDirectives } from '../../../src/constants';
 import type { OceanScores } from '../../../src/types';
 import { buildScoreFile, type CompletedModelRun } from '../scorefile';
-import { RELATIVE_RANKING_NOTE, STRATEGY_TABLE, matchModels, placement } from '../match';
+import { EXTROVERSION_EXCLUSION_REASON, RELATIVE_RANKING_NOTE, STRATEGY_TABLE, matchModels, placement } from '../match';
 import { HYPOTHESIS_LABEL, type OceanTrait, type StrategyRow } from '../types';
 import { neutralScores, scoresFor } from './fixture';
 
@@ -55,6 +55,15 @@ describe('strategy table', () => {
       strategy: 'complementary',
       target_direction: 'low',
       confidence: 'low',
+      exclude_from_tiering: true,
+      exclusion_reason: EXTROVERSION_EXCLUSION_REASON,
+    });
+    expect(STRATEGY_TABLE.find((row) => row.trait === 'extroversion' && row.threshold === 'low')).toMatchObject({
+      strategy: 'congruent',
+      target_direction: 'low',
+      confidence: 'normal',
+      exclude_from_tiering: true,
+      exclusion_reason: EXTROVERSION_EXCLUSION_REASON,
     });
     expect(STRATEGY_TABLE.find((row) => row.trait === 'neuroticism' && row.threshold === 'low')).toMatchObject({
       strategy: 'complementary',
@@ -78,8 +87,8 @@ describe('match tiers', () => {
     { trait: 'openness', user: 15, target: 'low', strategy: 'congruent', confidence: 'normal' },
     { trait: 'conscientiousness', user: 85, target: 'high', strategy: 'congruent', confidence: 'normal' },
     { trait: 'conscientiousness', user: 15, target: 'high', strategy: 'compensatory', confidence: 'normal' },
-    { trait: 'extroversion', user: 85, target: 'low', strategy: 'complementary', confidence: 'low' },
-    { trait: 'extroversion', user: 15, target: 'low', strategy: 'congruent', confidence: 'normal' },
+    { trait: 'extroversion', user: 85, target: 'low', strategy: 'complementary', confidence: 'low', excluded: true },
+    { trait: 'extroversion', user: 15, target: 'low', strategy: 'congruent', confidence: 'normal', excluded: true },
     { trait: 'agreeableness', user: 85, target: 'high', strategy: 'congruent', confidence: 'normal' },
     { trait: 'agreeableness', user: 15, target: 'low', strategy: 'congruent', confidence: 'normal' },
     { trait: 'neuroticism', user: 85, target: 'low', strategy: 'compensatory', confidence: 'normal' },
@@ -94,7 +103,19 @@ describe('match tiers', () => {
         expect(result.recommendation).toBe('no strong recommendation');
         expect(result.models).toEqual([]);
         expect(result.label).toBe(HYPOTHESIS_LABEL);
-        expect(result.targets[0]).toMatchObject({ confidence: 'not_scored', target_direction: null });
+        if (row.confidence === 'not_scored') {
+          expect(result.active_traits).toEqual([]);
+          expect(result.targets[0]).toMatchObject({ confidence: 'not_scored', target_direction: null, exclude_from_tiering: true });
+        } else {
+          expect(result.active_traits).toEqual([row.trait]);
+          expect(result.targets[0]).toMatchObject({
+            confidence: row.confidence,
+            target_direction: row.target,
+            exclude_from_tiering: true,
+            exclusion_reason: EXTROVERSION_EXCLUSION_REASON,
+          });
+          expect(result.targets[0].exclusion_reason).toEqual(expect.any(String));
+        }
         continue;
       }
       const onTarget = row.target === 'high' ? [70, 90] : [10, 30];
@@ -201,6 +222,54 @@ describe('match tiers', () => {
     expect(result.models[0].traits.openness?.model_mean).toBe(50);
   });
 
+  it('returns no strong recommendation when the only active trait is extroversion', () => {
+    const file = fileFor('extroversion', [55, 61]);
+    expect(file.models[0].traits.extroversion).toMatchObject({ mean: 58, low: 55, high: 61 });
+    const high = matchModels(neutralScores({ extroversion: 88 }), file);
+    expect(high.recommendation).toBe('no strong recommendation');
+    expect(high.models).toEqual([]);
+    expect(high.active_traits).toEqual(['extroversion']);
+    expect(high.targets[0]).toMatchObject({
+      trait: 'extroversion',
+      threshold: 'high',
+      confidence: 'low',
+      target_direction: 'low',
+      exclude_from_tiering: true,
+      exclusion_reason: EXTROVERSION_EXCLUSION_REASON,
+    });
+    const low = matchModels(neutralScores({ extroversion: 12 }), file);
+    expect(low.recommendation).toBe('no strong recommendation');
+    expect(low.models).toEqual([]);
+    expect(low.active_traits).toEqual(['extroversion']);
+    expect(low.targets[0]).toMatchObject({
+      threshold: 'low',
+      confidence: 'normal',
+      exclude_from_tiering: true,
+    });
+  });
+
+  it('keeps extroversion visible but out of the tier when another trait is active', () => {
+    const user = neutralScores({ openness: 90, extroversion: 88 });
+    const result = matchModels(user, buildMixed({
+      openness: [80, 90],
+      extroversion: [55, 61],
+    }));
+    expect(result.recommendation).toBe('tiers');
+    expect(result.active_traits).toEqual(['openness', 'extroversion']);
+    expect(result.models[0].tier).toBe('strong');
+    expect(result.models[0].driving_traits).toEqual(['openness']);
+    expect(result.models[0].traits.extroversion).toMatchObject({
+      included_in_tier: false,
+      confidence: 'low',
+      target_direction: 'low',
+      model_mean: 58,
+      model_low: 55,
+      model_high: 61,
+      exclusion_reason: EXTROVERSION_EXCLUSION_REASON,
+    });
+    expect(result.models[0].traits.openness?.included_in_tier).toBe(true);
+  });
+
   it('returns no strong recommendation when the only active trait is low neuroticism', () => {
     const result = matchModels(neutralScores({ neuroticism: 15 }), fileFor('neuroticism', [10, 90]));
     expect(result.recommendation).toBe('no strong recommendation');
@@ -290,7 +359,7 @@ describe('match tiers', () => {
         ? { ...row, target_direction: 'low' as const }
         : row
     ));
-    expect(() => matchModels(neutralScores({ openness: 90 }), file)).toThrow(/STRATEGY_TABLE/);
+    expect(() => matchModels(neutralScores({ openness: 90 }), file)).toThrow(/Delete the existing scores.json/);
     file.strategy_table = [];
     expect(() => matchModels(neutralScores({ openness: 90 }), file)).toThrow(/STRATEGY_TABLE/);
     file.strategy_table = STRATEGY_TABLE.map((row) => ({ ...row }));
