@@ -6,6 +6,16 @@
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { Message } from "../types";
 import { db, auth } from "./firebase";
+import {
+  DEFAULT_GEMINI_MODEL,
+  LIVE_GEMINI_MODELS,
+  buildModelChain,
+  classifyModelError,
+  terminalModelMessage,
+  type ModelFailureKind,
+} from "../../functions/src/modelRouter";
+
+export { DEFAULT_GEMINI_MODEL, LIVE_GEMINI_MODELS, buildModelChain };
 
 function getProxyUrl(): string {
   const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || "cognitive-bridge-ai";
@@ -20,10 +30,9 @@ function getProxyUrl(): string {
   return "/api/chat";
 }
 
-// Constants for retry logic
-const MAX_ATTEMPTS_PER_MODEL = 2;
-const RETRY_DELAY_MS = 1000;
-const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+// Capacity (503) and retired ids (404) switch models immediately.
+// Retrying the same id repeats the failure and burns the demo.
+const ATTEMPT_TIMEOUT_MS = 80000;
 
 export interface ModelInfo {
   name: string;
@@ -67,22 +76,8 @@ export async function refreshActiveModelsList(apiKey?: string) {
 export function getDynamicModelFallbacks(requestedModel: string): string[] {
   const fullName = requestedModel.startsWith('models/') ? requestedModel : `models/${requestedModel}`;
   
-  const staticProFallbacks = [
-    'gemini-3.1-pro-preview',
-    'gemini-3-pro-preview',
-    'gemini-2.5-pro',
-    'gemini-1.5-pro',
-    'gemini-2.5-flash',
-    'gemini-1.5-flash'
-  ];
-  
-  const staticFlashFallbacks = [
-    'gemini-3.5-flash',
-    'gemini-3.1-flash-lite',
-    'gemini-3-flash-preview',
-    'gemini-2.5-flash',
-    'gemini-1.5-flash'
-  ];
+  const staticProFallbacks = [...LIVE_GEMINI_MODELS];
+  const staticFlashFallbacks = [...LIVE_GEMINI_MODELS];
 
   const getStaticFallback = (list: string[]) => {
     const fullList = list.map(m => m.startsWith('models/') ? m : `models/${m}`);
@@ -412,53 +407,123 @@ async function* chatWithOllamaStream(
   }
 }
 
+class ProxyRequestError extends Error {
+  kind: ModelFailureKind;
+  exhausted: boolean;
+
+  constructor(message: string, kind: ModelFailureKind, exhausted = false) {
+    super(message);
+    this.name = "ProxyRequestError";
+    this.kind = kind;
+    this.exhausted = exhausted;
+  }
+}
+
+function shouldSwitchModel(error: unknown): boolean {
+  if (error instanceof ProxyRequestError && error.exhausted) return false;
+  const kind = error instanceof ProxyRequestError ? error.kind : classifyModelError(error);
+  // Timeouts and dropped connections move on too. A hung model must not
+  // block the rest of the chain until the UI gives up.
+  return kind === "capacity" || kind === "unavailable" || isTransportBlip(error);
+}
+
+function isTransportBlip(error: unknown): boolean {
+  const msg = String((error as Error)?.message || error).toLowerCase();
+  return (
+    msg.includes("502") ||
+    msg.includes("504") ||
+    msg.includes("econnreset") ||
+    msg.includes("network") ||
+    msg.includes("failed to fetch") ||
+    msg.includes("timed out") ||
+    msg.includes("timeout")
+  );
+}
+
+async function readProxyError(response: Response): Promise<ProxyRequestError> {
+  const errorText = await response.text();
+  let payload: { error?: string; fallbacksExhausted?: boolean; code?: number } | null = null;
+  try {
+    payload = JSON.parse(errorText);
+  } catch {
+    payload = null;
+  }
+  const message = payload?.error || errorText || `HTTP ${response.status}`;
+  const wrapped = `HTTP error! status: ${response.status}, message: ${message}`;
+  const kind = classifyModelError({ status: payload?.code || response.status, message: wrapped });
+  return new ProxyRequestError(wrapped, kind, Boolean(payload?.fallbacksExhausted));
+}
+
+async function postChat(
+  messages: Message[],
+  systemInstruction: string | undefined,
+  modelName: string,
+  stream: boolean
+): Promise<Response> {
+  return fetch(getProxyUrl(), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      messages,
+      systemInstruction,
+      modelName,
+      stream
+    }),
+    signal: typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function"
+      ? AbortSignal.timeout(ATTEMPT_TIMEOUT_MS)
+      : undefined
+  });
+}
+
 export async function chatWithGemini(
   messages: Message[],
   systemInstruction?: string,
-  modelName: string = "gemini-2.5-flash",
-  feature?: string
+  modelName: string = DEFAULT_GEMINI_MODEL,
+  _feature?: string
 ): Promise<string> {
   const ollamaConfig = getOllamaConfig();
   if (ollamaConfig.enabled) {
     return chatWithOllama(messages, systemInstruction, ollamaConfig);
   }
 
-  try {
-    const url = getProxyUrl();
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        messages,
-        systemInstruction,
-        modelName,
-        stream: false
-      })
-    });
+  const models = getDynamicModelFallbacks(modelName);
+  let lastError: unknown;
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+  for (let index = 0; index < models.length; index++) {
+    const model = models[index];
+    try {
+      const response = await postChat(messages, systemInstruction, model, false);
+      if (!response.ok) {
+        throw await readProxyError(response);
+      }
+      const data = await response.json();
+      if (data.error) {
+        const kind = classifyModelError(data.error);
+        throw new ProxyRequestError(String(data.error), kind, Boolean(data.fallbacksExhausted));
+      }
+      return data.text || "";
+    } catch (error) {
+      lastError = error;
+      const nextModel = models[index + 1];
+      if (nextModel && shouldSwitchModel(error)) {
+        console.warn(`Gemini model ${model} failed. Switching to ${nextModel}.`);
+        continue;
+      }
+      break;
     }
-
-    const data = await response.json();
-    if (data.error) {
-      throw new Error(data.error);
-    }
-    return data.text || "";
-  } catch (error) {
-    console.error("Gemini API Error (via Proxy):", error);
-    return "I encountered an error connecting to the intelligence bridge.";
   }
+
+  console.error("Gemini API Error (via Proxy):", lastError);
+  return "I encountered an error connecting to the intelligence bridge.";
 }
 
 export async function* chatWithGeminiStream(
   messages: Message[],
   systemInstruction?: string,
-  modelName: string = "gemini-2.5-flash",
-  feature?: string,
+  modelName: string = DEFAULT_GEMINI_MODEL,
+  _feature?: string,
   onFallback?: (failedModel: string, nextModel: string) => void
 ): AsyncGenerator<string, void, unknown> {
   const ollamaConfig = getOllamaConfig();
@@ -467,73 +532,87 @@ export async function* chatWithGeminiStream(
     return;
   }
 
-  try {
-    const url = getProxyUrl();
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        messages,
-        systemInstruction,
-        modelName,
-        stream: true
-      })
-    });
+  const models = getDynamicModelFallbacks(modelName);
+  let lastError: unknown;
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
-    }
-
-    if (!response.body) {
-      throw new Error("Response body is not readable.");
-    }
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder("utf-8");
-    let buffer = "";
-
+  for (let index = 0; index < models.length; index++) {
+    const model = models[index];
+    let yielded = false;
     try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
+      const response = await postChat(messages, systemInstruction, model, true);
+      if (!response.ok) {
+        throw await readProxyError(response);
+      }
+      if (!response.body) {
+        throw new ProxyRequestError("Response body is not readable.", "other");
+      }
 
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder("utf-8");
+      let buffer = "";
 
-        for (const line of lines) {
-          const cleanLine = line.trim();
-          if (!cleanLine.startsWith("data: ")) continue;
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
 
-          const dataStr = cleanLine.substring(6).trim();
-          if (dataStr === "[DONE]") {
-            return;
-          }
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
 
-          let parsed: any;
-          try {
-            parsed = JSON.parse(dataStr);
-          } catch (e) {
-            console.error("Failed to parse stream chunk:", e, "Chunk string:", dataStr);
-            continue;
-          }
+          for (const line of lines) {
+            const cleanLine = line.trim();
+            if (!cleanLine.startsWith("data: ")) continue;
 
-          if (parsed.error) {
-            throw new Error(parsed.error);
-          }
-          if (parsed.text) {
-            yield parsed.text;
+            const dataStr = cleanLine.substring(6).trim();
+            if (dataStr === "[DONE]") {
+              return;
+            }
+
+            let parsed: any;
+            try {
+              parsed = JSON.parse(dataStr);
+            } catch (parseError) {
+              console.error("Failed to parse stream chunk:", parseError, "Chunk string:", dataStr);
+              continue;
+            }
+
+            if (parsed.fallback?.from && parsed.fallback?.to && onFallback) {
+              onFallback(parsed.fallback.from, parsed.fallback.to);
+            }
+            if (parsed.error) {
+              const kind = classifyModelError(parsed.error);
+              throw new ProxyRequestError(String(parsed.error), kind, Boolean(parsed.fallbacksExhausted));
+            }
+            if (parsed.text) {
+              yielded = true;
+              yield parsed.text;
+            }
           }
         }
+      } finally {
+        reader.releaseLock();
       }
-    } finally {
-      reader.releaseLock();
+      return;
+    } catch (error) {
+      lastError = error;
+      if (yielded) {
+        console.error("Gemini Streaming Error (via Proxy):", error);
+        return;
+      }
+      const nextModel = models[index + 1];
+      if (nextModel && shouldSwitchModel(error)) {
+        console.warn(`Gemini model ${model} failed. Switching to ${nextModel}.`);
+        onFallback?.(model, nextModel);
+        continue;
+      }
+      break;
     }
-  } catch (finalError) {
-    console.error("Gemini Streaming Error (via Proxy):", finalError);
-    yield "Error connecting to the stream.";
   }
+
+  console.error("Gemini Streaming Error (via Proxy):", lastError);
+  const kind = lastError instanceof ProxyRequestError
+    ? lastError.kind
+    : classifyModelError(lastError);
+  yield terminalModelMessage(kind);
 }

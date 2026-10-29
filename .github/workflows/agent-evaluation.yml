@@ -85,9 +85,10 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           PYTHONUNBUFFERED: "1"
-          # Optional overrides for 503 capacity fallbacks:
+          # Optional overrides when the default chain is at capacity.
+          # Do not use gemini-2.5-pro or gemini-1.5-flash: both 404 for this key.
           # GEMINI_EVAL_MODEL: gemini-3.8-flash
-          # GEMINI_EVAL_FALLBACK_MODELS: gemini-2.5-flash,gemini-2.5-pro,gemini-1.5-flash
+          # GEMINI_EVAL_FALLBACK_MODELS: gemini-2.5-flash,gemini-2.5-flash-lite,gemini-3.5-flash,gemini-3.1-pro-preview
         run: |
           source venv/bin/activate
           python scripts/agent_eval.py

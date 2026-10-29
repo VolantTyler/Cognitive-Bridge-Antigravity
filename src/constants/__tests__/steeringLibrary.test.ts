@@ -1,10 +1,14 @@
 import { describe, it, expect } from 'vitest';
+import { APP_VERSION_LABEL } from '../../appVersion';
 import {
   STEERING_LIBRARY,
   getActiveDirectives,
   generateAlignmentPrompt,
   generateInverseAlignmentPrompt,
+  generatePortableMetadata,
   MIRROR_SYSTEM_PROMPT,
+  ALIGNMENT_STRATEGY_INFO,
+  COGNITIVE_BRIDGE_APP_URL,
 } from '../../constants';
 import { OceanScores } from '../../types';
 
@@ -115,6 +119,30 @@ describe('STEERING_LIBRARY (doc 02 matrix)', () => {
     expect(prompt).toContain('MIS-ALIGNMENT DIRECTIVES');
     expect(prompt).toContain('NEVER use language like "balances"');
     expect(prompt).toContain('what an aligned response would do differently');
+  });
+});
+
+describe('portable exports', () => {
+  const scores: OceanScores = {
+    openness: 85,
+    conscientiousness: 15,
+    extroversion: 50,
+    agreeableness: 90,
+    neuroticism: 20,
+  };
+
+  it('includes strategy definitions and the app link, without a research section', () => {
+    const markdown = generatePortableMetadata(scores);
+
+    expect(markdown).toContain(`ALIGNMENT.md (${APP_VERSION_LABEL})`);
+    expect(markdown).toContain(`Cognitive Bridge ${APP_VERSION_LABEL}`);
+    expect(markdown).toContain('## Strategy definitions');
+    expect(markdown).toContain(ALIGNMENT_STRATEGY_INFO.congruent.tooltip);
+    expect(markdown).toContain(ALIGNMENT_STRATEGY_INFO.compensatory.tooltip);
+    expect(markdown).toContain(ALIGNMENT_STRATEGY_INFO.complementary.tooltip);
+    expect(markdown).toContain(COGNITIVE_BRIDGE_APP_URL);
+    expect(markdown).not.toContain('## Research references');
+    expect(markdown).not.toContain('bibliographic citations');
   });
 });
 

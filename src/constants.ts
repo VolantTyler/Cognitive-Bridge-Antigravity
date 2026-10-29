@@ -3,7 +3,22 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { APP_VERSION_LABEL } from './appVersion';
 import { AlignmentStrategy, OceanScores, SteeringDirective } from './types';
+
+/** Hosted app. Included in portable exports so an agent can return to the source. */
+export const COGNITIVE_BRIDGE_APP_URL = 'https://cognitive-bridge-ai.web.app';
+
+/**
+ * Alignment mechanisms named in the product copy.
+ * README, footer/about, and this file do not store article URLs or bibliographic citations.
+ */
+export const RESEARCH_FRAMING = {
+  aligned: 'Complementarity + congruence (research matrix)',
+  unaligned: 'Similarity-attraction / amplify extremes',
+  theory:
+    'Prefer need-complementarity / compensatory counterbalance where marked complementary or compensatory; prefer similarity-attraction (congruence) where marked congruent. Never claim clinical validation.',
+} as const;
 
 /** UI copy for alignment strategy badges (matches ALIGNMENT THEORY in generateAlignmentPrompt). */
 export const ALIGNMENT_STRATEGY_INFO: Record<
@@ -207,7 +222,7 @@ USER PROFILE SUMMARY:
 - Agreeableness: ${scores.agreeableness}/100
 - Neuroticism: ${scores.neuroticism}/100
 
-ALIGNMENT THEORY (Cognitive Bridge): Prefer need-complementarity / compensatory counterbalance where marked complementary or compensatory; prefer similarity-attraction (congruence) where marked congruent. Never claim clinical validation.
+ALIGNMENT THEORY (Cognitive Bridge): ${RESEARCH_FRAMING.theory}
 
 ALIGNMENT DIRECTIVES:
 ${directives.length > 0 ? directives.map(formatDirective).join('\n') : '- Maintain a balanced, helpful, and professional tone.'}
@@ -222,13 +237,28 @@ Do not nest tags. Keep the wrap on complete, natural sentences.
 `;
 }
 
+function formatStrategyDefinitions(): string {
+  const order: AlignmentStrategy[] = ['congruent', 'compensatory', 'complementary'];
+  return order
+    .map((key) => {
+      const info = ALIGNMENT_STRATEGY_INFO[key];
+      return `* **${info.label}:** ${info.tooltip}`;
+    })
+    .join('\n');
+}
+
+function formatAppLink(): string {
+  return `## App
+[Cognitive Bridge](${COGNITIVE_BRIDGE_APP_URL})`;
+}
+
 export function generatePortableMetadata(scores: OceanScores): string {
   const directives = getActiveDirectives(scores);
 
   return `---
-# 📑 ALIGNMENT.md (v1.5)
+# 📑 ALIGNMENT.md (${APP_VERSION_LABEL})
 **Context:** User Cognitive Alignment Shard
-**Source:** Cognitive Bridge v1.5
+**Source:** Cognitive Bridge ${APP_VERSION_LABEL}
 
 ## User Profile: OCEAN Scores
 * **Openness:** ${scores.openness}/100
@@ -239,6 +269,11 @@ export function generatePortableMetadata(scores: OceanScores): string {
 
 ## Steering Directives
 ${directives.length > 0 ? directives.map((d) => `> [${d.strategy}] ${d.text}`).join('\n') : '> Default professional balance enabled.'}
+
+## Strategy definitions
+${formatStrategyDefinitions()}
+
+${formatAppLink()}
 
 ---
 **Instruction for AI Model:**

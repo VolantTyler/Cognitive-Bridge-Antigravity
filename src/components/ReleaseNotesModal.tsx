@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Calendar, Sparkles, ChevronRight } from 'lucide-react';
+import { APP_VERSION_LABEL } from '../appVersion';
 import { RELEASE_NOTES } from './ReleaseNotesData';
 
 interface ReleaseNotesModalProps {
@@ -55,6 +56,9 @@ export default function ReleaseNotesModal({ isOpen, onClose }: ReleaseNotesModal
                 <h3 className="text-lg font-bold tracking-tight text-text-primary uppercase">
                   Release Notes
                 </h3>
+                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded uppercase tracking-wider bg-orange-500/10 text-status-brand border border-orange-500/20">
+                  {APP_VERSION_LABEL}
+                </span>
               </div>
               <button
                 onClick={onClose}

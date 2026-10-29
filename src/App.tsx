@@ -5,8 +5,9 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Brain, Dna, ArrowRight, Zap, Target, ShieldCheck, Github, User as UserIcon, Settings, Cpu } from 'lucide-react';
+import { Brain, User as UserIcon, Cpu } from 'lucide-react';
 import { ModuleId, OceanScores, Message, ComparisonMessage } from './types';
+import { APP_VERSION_LABEL } from './appVersion';
 import { INITIAL_OCEAN, INITIAL_MIRROR_MESSAGE } from './constants';
 import Mirror from './components/Mirror';
 import Tailor from './components/Tailor';
@@ -201,7 +202,7 @@ export default function App() {
             alt="Cognitive Bridge"
             className="w-8 h-8 rounded shadow-lg shadow-orange-500/10"
           />
-          <span className="font-bold tracking-tight text-sm sm:text-lg">COGNITIVE BRIDGE <span className="hidden sm:inline-block text-[10px] font-mono text-status-brand ml-1 border border-orange-500/30 px-1 rounded uppercase">v1.5</span></span>
+          <span className="font-bold tracking-tight text-sm sm:text-lg">COGNITIVE BRIDGE <span className="hidden sm:inline-block text-[10px] font-mono text-status-brand ml-1 border border-orange-500/30 px-1 rounded uppercase">{APP_VERSION_LABEL}</span></span>
         </div>
 
         <div className="flex items-center gap-4">
@@ -385,28 +386,6 @@ export default function App() {
         ))}
       </div>
 
-      {/* Hero / Information Bar (Only on Mirror) */}
-      {activeModule === 'mirror' && (
-        <div className="bg-bg-tertiary border-b border-border-primary py-3 px-6 overflow-hidden transition-colors duration-300">
-          <div className="max-w-7xl mx-auto flex items-center justify-between">
-            <div className="flex items-center gap-6">
-              <div className="flex items-center gap-2">
-                <Zap className="w-3 h-3 text-status-brand" />
-                <span className="text-[10px] uppercase font-bold text-text-muted-dark">Recursive Reasoning</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Target className="w-3 h-3 text-accent-blue" />
-                <span className="text-[10px] uppercase font-bold text-text-muted-dark">Bias Suppression</span>
-              </div>
-              <div className="flex items-center gap-2 text-status-success">
-                <ShieldCheck className="w-3 h-3" />
-                <span className="text-[10px] uppercase font-bold">Stable R&D Build</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-6 md:p-10 flex flex-col min-h-0 overflow-hidden">
         <AnimatePresence mode="wait">
@@ -441,10 +420,6 @@ export default function App() {
               exit={{ opacity: 0, scale: 0.98 }}
               className="flex-1 flex flex-col"
             >
-              <div className="mb-8 flex items-end justify-between uppercase tracking-widest text-[10px] font-bold text-status-brand">
-                <span>Phase 2: Synthesis Complete</span>
-                <span className="text-text-muted-dark">Bridge Active</span>
-              </div>
               <div className="flex-1">
                 <Tailor
                   scores={scores}
@@ -465,10 +440,6 @@ export default function App() {
               exit={{ opacity: 0, y: 20 }}
               className="flex-1 flex flex-col"
             >
-              <div className="mb-6">
-                <h2 className="text-3xl font-bold tracking-tight">Interfacing with Aligned Intelligence</h2>
-                <p className="text-text-muted mt-1">Directives mapped. Prompt fatigue eliminated. Communicate with your matched model.</p>
-              </div>
               <div className="flex-1 min-h-0">
                 <Playground
                   scores={scores}
@@ -515,11 +486,11 @@ export default function App() {
             className="hover:text-text-primary transition-colors cursor-pointer border-0 bg-transparent uppercase tracking-[0.3em] font-bold text-[9px] text-text-muted-darker"
             title="View Release Notes"
           >
-            Cognitive Bridge v1.5
+            Cognitive Bridge {APP_VERSION_LABEL}
           </button>
         </div>
         <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 md:gap-4 text-center">
-          <span className="text-text-muted">Model: {ollamaConfig.enabled ? `Ollama (${ollamaConfig.model})` : 'Gemini 3.1 Pro // Flash'}</span>
+          <span className="text-text-muted">Model: {ollamaConfig.enabled ? `Ollama (${ollamaConfig.model})` : 'Gemini 2.5 Flash (live fallbacks)'}</span>
           <span className="text-border-primary">/</span>
           <span>Procedural Skills Engine</span>
         </div>

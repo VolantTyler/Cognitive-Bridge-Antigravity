@@ -31,8 +31,7 @@ export default function Tailor({ scores, onNext }: TailorProps) {
   const showBleedChip = scores.agreeableness > 70 && scores.conscientiousness > 70;
 
   const handleCopy = () => {
-    const text = generatePortableMetadata(scores);
-    navigator.clipboard.writeText(text);
+    navigator.clipboard.writeText(generatePortableMetadata(scores));
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -41,29 +40,43 @@ export default function Tailor({ scores, onNext }: TailorProps) {
     <div className="h-full flex flex-col gap-6 overflow-hidden">
       <OceanCards scores={scores} />
 
-      {showBleedChip && (
-        <div className="px-4 py-2 bg-amber-500/10 border border-amber-500/30 rounded-lg text-[11px] text-status-warning font-medium">
-          Possible A↔C bleed — prefer Compassion vs Industriousness reading from interview
+      <div className="flex-1 flex flex-col bg-bg-secondary text-text-primary font-sans border border-border-primary rounded-xl overflow-hidden shadow-2xl relative transition-colors duration-300 min-h-0">
+        <div className="p-4 bg-bg-surface/95 backdrop-blur-sm border-b border-border-primary flex items-center justify-between transition-colors duration-300">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-button-brand flex items-center justify-center shadow-lg shadow-orange-500/20">
+              <Brain className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h2 className="font-medium tracking-tight text-text-primary">The Tailor</h2>
+              <p className="text-xs text-text-muted uppercase tracking-widest">Personality Analysis</p>
+            </div>
+          </div>
         </div>
-      )}
 
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-0">
+        <div className="flex-1 flex flex-col gap-6 p-6 min-h-0 overflow-hidden">
+          {showBleedChip && (
+            <div className="px-4 py-2 bg-amber-500/10 border border-amber-500/30 rounded-lg text-[11px] text-status-warning font-medium shrink-0">
+              Possible A↔C bleed — prefer Compassion vs Industriousness reading from interview
+            </div>
+          )}
+
+          <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-0">
         <div className="flex flex-col gap-4 overflow-hidden">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Brain className="w-5 h-5 text-status-brand" />
               <h3 className="text-lg font-medium">Alignment Directives</h3>
             </div>
-            <button 
+            <button
               onClick={handleCopy}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all text-[10px] uppercase font-bold tracking-widest ${
-                copied 
-                  ? 'bg-green-500/20 border-green-500/50 text-status-success' 
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all text-[10px] font-bold tracking-widest ${
+                copied
+                  ? 'bg-green-500/20 border-green-500/50 text-status-success'
                   : 'bg-bg-surface border border-border-secondary text-text-muted hover:text-text-primary hover:border-text-muted'
               }`}
             >
               {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-              {copied ? 'Copied to Clipboard' : 'Export Portable Context'}
+              {copied ? 'Copied to Clipboard' : 'Export Personality Profile'}
             </button>
           </div>
           
@@ -144,7 +157,9 @@ export default function Tailor({ scores, onNext }: TailorProps) {
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </button>
           </div>
+          </div>
         </div>
+      </div>
       </div>
     </div>
   );

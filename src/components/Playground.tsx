@@ -7,15 +7,27 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Send, Sparkles, User, Shield, Info, Loader2, AlertTriangle, Zap, Split, Brain, Trash2, ChevronDown, ChevronUp, RotateCcw } from 'lucide-react';
 import { OceanScores, Message, ComparisonMessage } from '../types';
-import { generateAlignmentPrompt, generateInverseAlignmentPrompt } from '../constants';
-import { chatWithGeminiStream } from '../services/gemini';
+import { generateAlignmentPrompt, generateInverseAlignmentPrompt, RESEARCH_FRAMING } from '../constants';
+import { chatWithGeminiStream, DEFAULT_GEMINI_MODEL } from '../services/gemini';
 import { AlignmentJudgment } from '../jev/questions';
 import { judgeAlignment } from '../services/jev';
 import OceanCards from './OceanCards';
 import JevAlignmentCheck from './JevAlignmentCheck';
 import { isStreamErrorText } from './playgroundUtils';
 
-const GENERATION_TIMEOUT_MS = 25000;
+const GENERATION_TIMEOUT_MS = 90000;
+
+const EXAMPLE_QUESTIONS = [
+  {
+    label: 'Vacation decision',
+    prompt:
+      'My friends and I want to go on vacation together. Two of us want to go to the mountains, and one of us wants to go to the beach. How do we decide where to go?',
+  },
+  {
+    label: 'Should I get a pet?',
+    prompt: 'Do you think I should get a pet? What kind?',
+  },
+] as const;
 
 interface PlaygroundProps {
   scores: OceanScores;
@@ -53,6 +65,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 export default function Playground({ scores, messages, setMessages, setScores, onSaveSession }: PlaygroundProps) {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [generationStatus, setGenerationStatus] = useState('Generating Aligned and Unaligned responses...');
   const [activeAnalysis, setActiveAnalysis] = useState<ActiveAnalysis | null>(null);
   const [alignmentCheck, setAlignmentCheck] = useState<AlignmentJudgment | null>(null);
   const [alignmentStatus, setAlignmentStatus] = useState<'idle' | 'loading' | 'ready'>('idle');
@@ -176,6 +189,7 @@ export default function Playground({ scores, messages, setMessages, setScores, o
     });
     setAlignmentCheck(null);
     setAlignmentStatus('idle');
+    setGenerationStatus('Generating Aligned and Unaligned responses...');
     setIsLoading(true);
 
     const conversationHistory: Message[] = messages
@@ -194,8 +208,9 @@ export default function Playground({ scores, messages, setMessages, setScores, o
         const stream = chatWithGeminiStream(
           [...conversationHistory, currentInput],
           alignedPrompt,
-          'gemini-2.5-pro',
-          'playground-aligned'
+          DEFAULT_GEMINI_MODEL,
+          'playground-aligned',
+          (_failed, next) => setGenerationStatus(`Switching to ${next} after a model capacity error...`)
         );
         for await (const chunk of stream) {
           alignedText += chunk;
@@ -206,8 +221,9 @@ export default function Playground({ scores, messages, setMessages, setScores, o
         const stream = chatWithGeminiStream(
           [...conversationHistory, currentInput],
           unalignedPrompt,
-          'gemini-2.5-pro',
-          'playground-unaligned'
+          DEFAULT_GEMINI_MODEL,
+          'playground-unaligned',
+          (_failed, next) => setGenerationStatus(`Switching to ${next} after a model capacity error...`)
         );
         for await (const chunk of stream) {
           unalignedText += chunk;
@@ -271,10 +287,10 @@ export default function Playground({ scores, messages, setMessages, setScores, o
     }
   }, [messages, scores, updateMessage, selectFirstHighlight, onSaveSession, setMessages]);
 
-  const handleSend = async () => {
-    if (!input.trim() || isLoading) return;
+  const submitPrompt = async (rawPrompt: string) => {
+    const userPrompt = rawPrompt.trim();
+    if (!userPrompt || isLoading) return;
 
-    const userPrompt = input.trim();
     const newMessage: ComparisonMessage = {
       user: userPrompt,
       aligned: '',
@@ -288,6 +304,10 @@ export default function Playground({ scores, messages, setMessages, setScores, o
     setInput('');
 
     await runGeneration(newIndex, userPrompt);
+  };
+
+  const handleSend = async () => {
+    await submitPrompt(input);
   };
 
   const handleRetry = async (messageIndex: number) => {
@@ -419,32 +439,15 @@ export default function Playground({ scores, messages, setMessages, setScores, o
         </AnimatePresence>
 
         <div className="flex-1 flex flex-col bg-bg-secondary border border-border-primary rounded-xl overflow-hidden shadow-2xl relative min-w-0 transition-colors duration-300">
-          <div className="grid grid-cols-2 bg-bg-surface border-b border-border-primary transition-colors duration-300">
-            <div className="p-4 flex items-center justify-between border-r border-border-primary">
-              <div className="flex flex-col gap-0.5">
-                <div className="flex items-center gap-3">
-                  <Shield className="w-4 h-4 text-status-success" />
-                  <span className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-status-success">Aligned</span>
-                  {alignmentStatus === 'ready' && alignmentCheck?.alignedWeak && (
-                    <span className="text-[9px] font-bold uppercase tracking-wider text-status-danger">Weak alignment</span>
-                  )}
-                </div>
-                <span className="text-[9px] text-text-muted italic pl-7">Complementarity + congruence (research matrix)</span>
+          <div className="p-4 bg-bg-surface/95 backdrop-blur-sm border-b border-border-primary flex items-center justify-between transition-colors duration-300">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-button-brand flex items-center justify-center shadow-lg shadow-orange-500/20">
+                <Sparkles className="w-5 h-5 text-white" />
               </div>
-              <Zap className="w-3 h-3 text-text-primary animate-pulse hidden sm:block" />
-            </div>
-            <div className="p-4 flex items-center justify-between">
-              <div className="flex flex-col gap-0.5">
-                <div className="flex items-center gap-3">
-                  <AlertTriangle className="w-4 h-4 text-status-danger" />
-                  <span className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-status-danger">Unaligned</span>
-                  {alignmentStatus === 'ready' && alignmentCheck?.unalignedWeak && (
-                    <span className="text-[9px] font-bold uppercase tracking-wider text-status-danger">Weak alignment</span>
-                  )}
-                </div>
-                <span className="text-[9px] text-text-muted italic pl-7">Similarity-attraction / amplify extremes</span>
+              <div>
+                <h2 className="font-medium tracking-tight text-text-primary">The Bridge</h2>
+                <p className="text-xs text-text-muted uppercase tracking-widest">Intelligence Aligned to You</p>
               </div>
-              <Split className="w-3 h-3 text-status-danger hidden sm:block" />
             </div>
           </div>
 
@@ -472,6 +475,56 @@ export default function Playground({ scores, messages, setMessages, setScores, o
                 <Send className="w-4 h-4 text-white" />
               </button>
             </div>
+            <div className="mt-3">
+              <div className="text-[10px] uppercase font-bold tracking-widest text-text-secondary mb-2">
+                Example questions
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {EXAMPLE_QUESTIONS.map((example) => (
+                  <button
+                    key={example.label}
+                    type="button"
+                    onClick={() => submitPrompt(example.prompt)}
+                    disabled={isLoading}
+                    title={example.prompt}
+                    className="p-3 rounded-xl border border-border-card bg-bg-secondary/60 hover:bg-bg-tertiary hover:border-accent-orange text-left transition-all disabled:opacity-50 group cursor-pointer"
+                  >
+                    <div className="text-[10px] font-bold text-accent-orange uppercase tracking-wide group-hover:text-accent-orange-hover transition-colors">
+                      {example.label}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 bg-bg-surface border-b border-border-primary transition-colors duration-300">
+            <div className="p-4 flex items-center justify-between border-r border-border-primary">
+              <div className="flex flex-col gap-0.5">
+                <div className="flex items-center gap-3">
+                  <Shield className="w-4 h-4 text-status-success" />
+                  <span className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-status-success">Aligned</span>
+                  {alignmentStatus === 'ready' && alignmentCheck?.alignedWeak && (
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-status-danger">Weak alignment</span>
+                  )}
+                </div>
+                <span className="text-[9px] text-text-muted italic pl-7">{RESEARCH_FRAMING.aligned}</span>
+              </div>
+              <Zap className="w-3 h-3 text-text-primary animate-pulse hidden sm:block" />
+            </div>
+            <div className="p-4 flex items-center justify-between">
+              <div className="flex flex-col gap-0.5">
+                <div className="flex items-center gap-3">
+                  <AlertTriangle className="w-4 h-4 text-status-danger" />
+                  <span className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-status-danger">Unaligned</span>
+                  {alignmentStatus === 'ready' && alignmentCheck?.unalignedWeak && (
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-status-danger">Weak alignment</span>
+                  )}
+                </div>
+                <span className="text-[9px] text-text-muted italic pl-7">{RESEARCH_FRAMING.unaligned}</span>
+              </div>
+              <Split className="w-3 h-3 text-status-danger hidden sm:block" />
+            </div>
           </div>
 
           <div
@@ -481,7 +534,7 @@ export default function Playground({ scores, messages, setMessages, setScores, o
             {isLoading && (
               <div className="p-3 flex justify-center gap-2 bg-bg-secondary border-b border-border-primary transition-colors duration-300 shrink-0">
                 <Loader2 className="w-3.5 h-3.5 animate-spin text-accent-blue" />
-                <span className="text-[10px] uppercase font-bold tracking-widest text-text-secondary">Generating Aligned and Unaligned responses...</span>
+                <span className="text-[10px] uppercase font-bold tracking-widest text-text-secondary">{generationStatus}</span>
               </div>
             )}
 
@@ -511,11 +564,11 @@ export default function Playground({ scores, messages, setMessages, setScores, o
                 <div key={origIdx} className="flex flex-col">
                   {isExpanded ? (
                     <>
-                      <div className="bg-bg-tertiary p-4 flex justify-between items-center border-b border-border-primary transition-colors duration-300">
-                        <div className="flex-1 flex justify-center">
-                          <div className="flex items-center gap-3 bg-bg-playground-user-bubble px-4 py-2 rounded-full border border-border-playground-user-bubble max-w-[90%] overflow-hidden">
-                            <User className="w-3 h-3 text-icon-playground-user-bubble shrink-0" />
-                            <span className="text-xs font-medium text-text-playground-user-bubble italic truncate">{m.user}</span>
+                      <div className="bg-bg-tertiary p-4 flex justify-between items-start gap-3 border-b border-border-primary transition-colors duration-300">
+                        <div className="flex-1 flex justify-center min-w-0">
+                          <div className="flex items-start gap-3 bg-bg-playground-user-bubble px-4 py-2 rounded-2xl border border-border-playground-user-bubble w-full max-w-full min-w-0">
+                            <User className="w-3 h-3 text-icon-playground-user-bubble shrink-0 mt-0.5" />
+                            <span className="text-xs font-medium text-text-playground-user-bubble italic break-words whitespace-pre-wrap min-w-0">{m.user}</span>
                           </div>
                         </div>
                         <div className="flex items-center gap-1 shrink-0">
@@ -573,15 +626,15 @@ export default function Playground({ scores, messages, setMessages, setScores, o
                       )}
                     </>
                   ) : (
-                    <div className="bg-bg-tertiary/60 hover:bg-bg-tertiary p-3 flex justify-between items-center transition-colors duration-200">
+                    <div className="bg-bg-tertiary/60 hover:bg-bg-tertiary p-3 flex justify-between items-start gap-3 transition-colors duration-200">
                       <div
                         onClick={() => setExpandedIndices(prev => ({ ...prev, [origIdx]: true }))}
-                        className="flex-1 flex items-center gap-3 cursor-pointer select-none overflow-hidden mr-4"
+                        className="flex-1 flex items-start gap-3 cursor-pointer select-none min-w-0"
                       >
-                        <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-blue-600/10 text-accent-blue border border-blue-500/20 shrink-0">
+                        <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-blue-600/10 text-accent-blue border border-blue-500/20 shrink-0 mt-0.5">
                           Prompt
                         </span>
-                        <span className="text-xs text-text-secondary truncate font-medium max-w-[80%]">
+                        <span className="text-xs text-text-secondary break-words whitespace-pre-wrap font-medium min-w-0">
                           {m.user}
                         </span>
                         {m.error && (
