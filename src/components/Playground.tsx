@@ -9,7 +9,10 @@ import { Send, Sparkles, User, Shield, Info, Loader2, AlertTriangle, Zap, Split,
 import { OceanScores, Message, ComparisonMessage } from '../types';
 import { generateAlignmentPrompt, generateInverseAlignmentPrompt, RESEARCH_FRAMING } from '../constants';
 import { chatWithGeminiStream, DEFAULT_GEMINI_MODEL } from '../services/gemini';
+import { AlignmentJudgment } from '../jev/questions';
+import { judgeAlignment } from '../services/jev';
 import OceanCards from './OceanCards';
+import JevAlignmentCheck from './JevAlignmentCheck';
 import { isStreamErrorText } from './playgroundUtils';
 
 const GENERATION_TIMEOUT_MS = 90000;
@@ -64,6 +67,8 @@ export default function Playground({ scores, messages, setMessages, setScores, o
   const [isLoading, setIsLoading] = useState(false);
   const [generationStatus, setGenerationStatus] = useState('Generating Aligned and Unaligned responses...');
   const [activeAnalysis, setActiveAnalysis] = useState<ActiveAnalysis | null>(null);
+  const [alignmentCheck, setAlignmentCheck] = useState<AlignmentJudgment | null>(null);
+  const [alignmentStatus, setAlignmentStatus] = useState<'idle' | 'loading' | 'ready'>('idle');
   const [expandedIndices, setExpandedIndices] = useState<Record<number, boolean>>({});
   const initializedRef = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -182,6 +187,8 @@ export default function Playground({ scores, messages, setMessages, setScores, o
       aligned: '',
       unaligned: '',
     });
+    setAlignmentCheck(null);
+    setAlignmentStatus('idle');
     setGenerationStatus('Generating Aligned and Unaligned responses...');
     setIsLoading(true);
 
@@ -255,6 +262,20 @@ export default function Playground({ scores, messages, setMessages, setScores, o
         return updated;
       });
       selectFirstHighlight(finalAligned, finalUnaligned);
+      setAlignmentStatus('loading');
+      const judgment = await judgeAlignment({
+        scores: activeScores,
+        userQuery: userPrompt,
+        alignedReply: finalAligned,
+        unalignedReply: finalUnaligned,
+      });
+      if (isStaleAttempt()) return;
+      if (judgment) {
+        setAlignmentCheck(judgment);
+        setAlignmentStatus('ready');
+      } else {
+        setAlignmentStatus('idle');
+      }
     } catch (err) {
       if (isStaleAttempt()) return;
       console.error('Bridge generation failed:', err);
@@ -401,6 +422,11 @@ export default function Playground({ scores, messages, setMessages, setScores, o
                 <p className="text-sm leading-relaxed text-text-primary">
                   {activeAnalysis.explanation}
                 </p>
+                {alignmentStatus === 'ready' && alignmentCheck && (
+                  <div className="mt-4 pt-4 border-t border-border-primary">
+                    <JevAlignmentCheck judgment={alignmentCheck} focus={activeAnalysis.type} />
+                  </div>
+                )}
                 <button
                   onClick={() => setActiveAnalysis(null)}
                   className="mt-6 w-full py-3 bg-bg-surface hover:bg-bg-tertiary border border-border-primary text-text-primary rounded-xl text-xs font-bold uppercase transition-colors cursor-pointer"
@@ -478,6 +504,9 @@ export default function Playground({ scores, messages, setMessages, setScores, o
                 <div className="flex items-center gap-3">
                   <Shield className="w-4 h-4 text-status-success" />
                   <span className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-status-success">Aligned</span>
+                  {alignmentStatus === 'ready' && alignmentCheck?.alignedWeak && (
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-status-danger">Weak alignment</span>
+                  )}
                 </div>
                 <span className="text-[9px] text-text-muted italic pl-7">{RESEARCH_FRAMING.aligned}</span>
               </div>
@@ -488,6 +517,9 @@ export default function Playground({ scores, messages, setMessages, setScores, o
                 <div className="flex items-center gap-3">
                   <AlertTriangle className="w-4 h-4 text-status-danger" />
                   <span className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-status-danger">Unaligned</span>
+                  {alignmentStatus === 'ready' && alignmentCheck?.unalignedWeak && (
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-status-danger">Weak alignment</span>
+                  )}
                 </div>
                 <span className="text-[9px] text-text-muted italic pl-7">{RESEARCH_FRAMING.unaligned}</span>
               </div>
@@ -680,6 +712,10 @@ export default function Playground({ scores, messages, setMessages, setScores, o
                       </p>
                     </div>
 
+                    {alignmentStatus === 'ready' && alignmentCheck && (
+                      <JevAlignmentCheck judgment={alignmentCheck} />
+                    )}
+
                     <button
                       onClick={() => setActiveAnalysis(null)}
                       className="text-[10px] uppercase font-bold text-text-muted hover:text-text-primary transition-colors cursor-pointer"
@@ -698,6 +734,14 @@ export default function Playground({ scores, messages, setMessages, setScores, o
                     <p className="text-xs text-text-secondary leading-relaxed">
                       Select a <span className="font-semibold text-text-primary">highlighted</span> span in the Aligned or Unaligned column to view its psychometric derivation and alignment logic.
                     </p>
+                    {alignmentStatus === 'loading' && (
+                      <p className="text-xs text-text-secondary italic mt-4">Checking alignment…</p>
+                    )}
+                    {alignmentStatus === 'ready' && alignmentCheck && (
+                      <div className="mt-6 w-full text-left">
+                        <JevAlignmentCheck judgment={alignmentCheck} />
+                      </div>
+                    )}
                   </motion.div>
                 )}
               </AnimatePresence>
