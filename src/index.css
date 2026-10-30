@@ -69,6 +69,16 @@
   --bg-agreeableness-shaded: rgba(20, 83, 45, 0.4);
   --bg-neuroticism: rgba(127, 29, 29, 0.2);
   --bg-neuroticism-shaded: rgba(127, 29, 29, 0.4);
+
+  /* Model-match range bars. Marks stay 3:1 without relying on hue. */
+  --match-zone: #163526;
+  --match-zone-edge: #9ee0b8;
+  --match-band: #d5e1f5;
+  --match-tick: #f7f9fc;
+  --match-ink: #f4f1ea;
+  --match-axis: #c8c2b4;
+  --match-focus: #fdba74;
+  --match-hatch: #f7f9fc;
 }
 
 :root.light {
@@ -138,6 +148,15 @@
   --bg-agreeableness-shaded: rgba(22, 163, 74, 0.16);
   --bg-neuroticism: rgba(220, 38, 38, 0.08);
   --bg-neuroticism-shaded: rgba(220, 38, 38, 0.16);
+
+  --match-zone: #d3eadb;
+  --match-zone-edge: #14532d;
+  --match-band: #3e5588;
+  --match-tick: #1b3358;
+  --match-ink: #1f1b14;
+  --match-axis: #4a4336;
+  --match-focus: #9a3412;
+  --match-hatch: #1b3358;
 }
 
 @theme {
@@ -222,6 +241,20 @@
   }
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
     @apply bg-border-secondary;
+  }
+}
+
+/* Model-match: focus stays visible, and this section does not animate. */
+.model-match :focus-visible {
+  outline: 2px solid var(--match-focus);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .model-match,
+  .model-match * {
+    animation: none !important;
+    transition: none !important;
   }
 }
 

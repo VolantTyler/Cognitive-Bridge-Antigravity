@@ -11,6 +11,10 @@ import { generateAlignmentPrompt, generateInverseAlignmentPrompt, RESEARCH_FRAMI
 import { chatWithGeminiStream, DEFAULT_GEMINI_MODEL } from '../services/gemini';
 import OceanCards from './OceanCards';
 import { isStreamErrorText } from './playgroundUtils';
+import ModelMatchSection from '../modelMatch/ModelMatchSection';
+import LeaderboardPage from '../modelMatch/LeaderboardPage';
+import { useModelMatch } from '../modelMatch/useModelMatch';
+import type { ModelMatchState } from '../modelMatch/loadRuns';
 
 const GENERATION_TIMEOUT_MS = 90000;
 
@@ -32,6 +36,11 @@ interface PlaygroundProps {
   setMessages: React.Dispatch<React.SetStateAction<ComparisonMessage[]>>;
   setScores: React.Dispatch<React.SetStateAction<OceanScores | null>>;
   onSaveSession?: (updatedMessages: ComparisonMessage[], updatedScores?: OceanScores) => void;
+  /**
+   * Tests and the screenshot preview pass a ready view.
+   * The app omits this and reads the committed run index.
+   */
+  modelMatch?: { state: ModelMatchState; retry: () => void };
 }
 
 type ActiveAnalysis = { text: string; explanation: string; type: 'aligned' | 'unaligned' };
@@ -59,7 +68,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   });
 }
 
-export default function Playground({ scores, messages, setMessages, setScores, onSaveSession }: PlaygroundProps) {
+export default function Playground({ scores, messages, setMessages, setScores, onSaveSession, modelMatch }: PlaygroundProps) {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [generationStatus, setGenerationStatus] = useState('Generating Aligned and Unaligned responses...');
@@ -73,6 +82,10 @@ export default function Playground({ scores, messages, setMessages, setScores, o
   const mobileAnalysisModalRef = useRef<HTMLDivElement>(null);
   const pendingHighlightScrollRef = useRef<HTMLElement | null>(null);
   const generationAttemptsRef = useRef<Map<number, number>>(new Map());
+  const loadedMatch = useModelMatch(scores);
+  const match = modelMatch ?? loadedMatch;
+  const [leaderboardModel, setLeaderboardModel] = useState<string | undefined | null>(null);
+  const leaderboardOpen = leaderboardModel !== null;
 
   const activateAnalysis = useCallback((analysis: ActiveAnalysis, sourceEl?: HTMLElement | null) => {
     pendingHighlightScrollRef.current = sourceEl ?? null;
@@ -362,10 +375,26 @@ export default function Playground({ scores, messages, setMessages, setScores, o
   );
 
   return (
-    <div className="h-full flex flex-col gap-6 overflow-hidden">
+    <div className="h-full flex flex-col gap-6 overflow-y-auto overflow-x-hidden min-h-0">
       <OceanCards scores={scores} />
 
-      <div className="flex-1 flex gap-6 relative min-h-0">
+      {leaderboardOpen ? (
+        <LeaderboardPage
+          state={match.state}
+          onRetry={match.retry}
+          focusModelId={leaderboardModel ?? undefined}
+          onBack={() => setLeaderboardModel(null)}
+        />
+      ) : (
+      <ModelMatchSection
+        state={match.state}
+        onRetry={match.retry}
+        onOpenLeaderboard={(modelId) => setLeaderboardModel(modelId)}
+      />
+      )}
+
+      {!leaderboardOpen && (
+      <div className="flex gap-6 relative min-h-[560px] h-[70vh] shrink-0">
         <AnimatePresence>
           {activeAnalysis && (
             <motion.div
@@ -723,6 +752,7 @@ export default function Playground({ scores, messages, setMessages, setScores, o
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }

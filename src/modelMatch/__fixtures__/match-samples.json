@@ -1,0 +1,982 @@
+{
+  "A": {
+    "profile": {
+      "openness": 85,
+      "conscientiousness": 85,
+      "extroversion": 50,
+      "agreeableness": 70,
+      "neuroticism": 40
+    },
+    "result": {
+      "label": "design hypothesis based on research",
+      "recommendation": "tiers",
+      "targets": [
+        {
+          "trait": "openness",
+          "threshold": "high",
+          "strategy": "congruent",
+          "target_direction": "high",
+          "confidence": "normal",
+          "exclude_from_tiering": false,
+          "exclusion_reason": null,
+          "user_score": 85
+        },
+        {
+          "trait": "conscientiousness",
+          "threshold": "high",
+          "strategy": "congruent",
+          "target_direction": "high",
+          "confidence": "normal",
+          "exclude_from_tiering": false,
+          "exclusion_reason": null,
+          "user_score": 85
+        }
+      ],
+      "strategy_table": [
+        {
+          "trait": "openness",
+          "threshold": "high",
+          "strategy": "congruent",
+          "target_direction": "high",
+          "confidence": "normal",
+          "exclude_from_tiering": false,
+          "exclusion_reason": null
+        },
+        {
+          "trait": "openness",
+          "threshold": "low",
+          "strategy": "congruent",
+          "target_direction": "low",
+          "confidence": "normal",
+          "exclude_from_tiering": false,
+          "exclusion_reason": null
+        },
+        {
+          "trait": "conscientiousness",
+          "threshold": "high",
+          "strategy": "congruent",
+          "target_direction": "high",
+          "confidence": "normal",
+          "exclude_from_tiering": false,
+          "exclusion_reason": null
+        },
+        {
+          "trait": "conscientiousness",
+          "threshold": "low",
+          "strategy": "compensatory",
+          "target_direction": "high",
+          "confidence": "normal",
+          "exclude_from_tiering": false,
+          "exclusion_reason": null
+        },
+        {
+          "trait": "extroversion",
+          "threshold": "high",
+          "strategy": "complementary",
+          "target_direction": "low",
+          "confidence": "low",
+          "exclude_from_tiering": true,
+          "exclusion_reason": "Excluded from tiering: benchmarked models scored extroversion between 55 and 61, and the table needs a model below 50. Means are still reported."
+        },
+        {
+          "trait": "extroversion",
+          "threshold": "low",
+          "strategy": "congruent",
+          "target_direction": "low",
+          "confidence": "normal",
+          "exclude_from_tiering": true,
+          "exclusion_reason": "Excluded from tiering: benchmarked models scored extroversion between 55 and 61, and the table needs a model below 50. Means are still reported."
+        },
+        {
+          "trait": "agreeableness",
+          "threshold": "high",
+          "strategy": "congruent",
+          "target_direction": "high",
+          "confidence": "normal",
+          "exclude_from_tiering": false,
+          "exclusion_reason": null
+        },
+        {
+          "trait": "agreeableness",
+          "threshold": "low",
+          "strategy": "congruent",
+          "target_direction": "low",
+          "confidence": "normal",
+          "exclude_from_tiering": false,
+          "exclusion_reason": null
+        },
+        {
+          "trait": "neuroticism",
+          "threshold": "high",
+          "strategy": "compensatory",
+          "target_direction": "low",
+          "confidence": "normal",
+          "exclude_from_tiering": false,
+          "exclusion_reason": null
+        },
+        {
+          "trait": "neuroticism",
+          "threshold": "low",
+          "strategy": "complementary",
+          "target_direction": null,
+          "confidence": "not_scored",
+          "exclude_from_tiering": true,
+          "exclusion_reason": null
+        }
+      ],
+      "active_traits": [
+        "openness",
+        "conscientiousness"
+      ],
+      "ranking_note": null,
+      "models": [
+        {
+          "model_id": "openai/gpt-5-nano",
+          "tier": "decent",
+          "driving_traits": [
+            "openness"
+          ],
+          "missing_traits": [],
+          "traits": {
+            "openness": {
+              "strategy": "congruent",
+              "target_direction": "high",
+              "confidence": "normal",
+              "included_in_tier": true,
+              "exclusion_reason": null,
+              "user_score": 85,
+              "model_mean": 79,
+              "model_low": 40,
+              "model_high": 85
+            },
+            "conscientiousness": {
+              "strategy": "congruent",
+              "target_direction": "high",
+              "confidence": "normal",
+              "included_in_tier": true,
+              "exclusion_reason": null,
+              "user_score": 85,
+              "model_mean": 88.5,
+              "model_low": 75,
+              "model_high": 95
+            }
+          }
+        },
+        {
+          "model_id": "google/gemini-2.5-flash-lite",
+          "tier": "not_scored",
+          "driving_traits": [],
+          "missing_traits": [
+            "openness",
+            "conscientiousness"
+          ],
+          "not_scored_reason": "Failed 6 of 10 runs. OpenRouter request failed (429): Provider returned error",
+          "traits": {
+            "openness": {
+              "strategy": "congruent",
+              "target_direction": "high",
+              "confidence": "normal",
+              "included_in_tier": true,
+              "exclusion_reason": null,
+              "user_score": 85,
+              "model_mean": 86.25,
+              "model_low": 85,
+              "model_high": 90
+            },
+            "conscientiousness": {
+              "strategy": "congruent",
+              "target_direction": "high",
+              "confidence": "normal",
+              "included_in_tier": true,
+              "exclusion_reason": null,
+              "user_score": 85,
+              "model_mean": 81.25,
+              "model_low": 75,
+              "model_high": 90
+            }
+          }
+        },
+        {
+          "model_id": "anthropic/claude-haiku-4.5",
+          "tier": "strong",
+          "driving_traits": [
+            "openness",
+            "conscientiousness"
+          ],
+          "missing_traits": [],
+          "traits": {
+            "openness": {
+              "strategy": "congruent",
+              "target_direction": "high",
+              "confidence": "normal",
+              "included_in_tier": true,
+              "exclusion_reason": null,
+              "user_score": 85,
+              "model_mean": 84.44444444444444,
+              "model_low": 75,
+              "model_high": 90
+            },
+            "conscientiousness": {
+              "strategy": "congruent",
+              "target_direction": "high",
+              "confidence": "normal",
+              "included_in_tier": true,
+              "exclusion_reason": null,
+              "user_score": 85,
+              "model_mean": 73.88888888888889,
+              "model_low": 60,
+              "model_high": 85
+            }
+          }
+        },
+        {
+          "model_id": "x-ai/grok-4.3",
+          "tier": "strong",
+          "driving_traits": [
+            "openness",
+            "conscientiousness"
+          ],
+          "missing_traits": [],
+          "traits": {
+            "openness": {
+              "strategy": "congruent",
+              "target_direction": "high",
+              "confidence": "normal",
+              "included_in_tier": true,
+              "exclusion_reason": null,
+              "user_score": 85,
+              "model_mean": 79,
+              "model_low": 70,
+              "model_high": 85
+            },
+            "conscientiousness": {
+              "strategy": "congruent",
+              "target_direction": "high",
+              "confidence": "normal",
+              "included_in_tier": true,
+              "exclusion_reason": null,
+              "user_score": 85,
+              "model_mean": 77,
+              "model_low": 70,
+              "model_high": 80
+            }
+          }
+        }
+      ]
+    }
+  },
+  "B": {
+    "profile": {
+      "openness": 20,
+      "conscientiousness": 20,
+      "extroversion": 50,
+      "agreeableness": 50,
+      "neuroticism": 50
+    },
+    "result": {
+      "label": "design hypothesis based on research",
+      "recommendation": "tiers",
+      "targets": [
+        {
+          "trait": "openness",
+          "threshold": "low",
+          "strategy": "congruent",
+          "target_direction": "low",
+          "confidence": "normal",
+          "exclude_from_tiering": false,
+          "exclusion_reason": null,
+          "user_score": 20
+        },
+        {
+          "trait": "conscientiousness",
+          "threshold": "low",
+          "strategy": "compensatory",
+          "target_direction": "high",
+          "confidence": "normal",
+          "exclude_from_tiering": false,
+          "exclusion_reason": null,
+          "user_score": 20
+        }
+      ],
+      "strategy_table": [
+        {
+          "trait": "openness",
+          "threshold": "high",
+          "strategy": "congruent",
+          "target_direction": "high",
+          "confidence": "normal",
+          "exclude_from_tiering": false,
+          "exclusion_reason": null
+        },
+        {
+          "trait": "openness",
+          "threshold": "low",
+          "strategy": "congruent",
+          "target_direction": "low",
+          "confidence": "normal",
+          "exclude_from_tiering": false,
+          "exclusion_reason": null
+        },
+        {
+          "trait": "conscientiousness",
+          "threshold": "high",
+          "strategy": "congruent",
+          "target_direction": "high",
+          "confidence": "normal",
+          "exclude_from_tiering": false,
+          "exclusion_reason": null
+        },
+        {
+          "trait": "conscientiousness",
+          "threshold": "low",
+          "strategy": "compensatory",
+          "target_direction": "high",
+          "confidence": "normal",
+          "exclude_from_tiering": false,
+          "exclusion_reason": null
+        },
+        {
+          "trait": "extroversion",
+          "threshold": "high",
+          "strategy": "complementary",
+          "target_direction": "low",
+          "confidence": "low",
+          "exclude_from_tiering": true,
+          "exclusion_reason": "Excluded from tiering: benchmarked models scored extroversion between 55 and 61, and the table needs a model below 50. Means are still reported."
+        },
+        {
+          "trait": "extroversion",
+          "threshold": "low",
+          "strategy": "congruent",
+          "target_direction": "low",
+          "confidence": "normal",
+          "exclude_from_tiering": true,
+          "exclusion_reason": "Excluded from tiering: benchmarked models scored extroversion between 55 and 61, and the table needs a model below 50. Means are still reported."
+        },
+        {
+          "trait": "agreeableness",
+          "threshold": "high",
+          "strategy": "congruent",
+          "target_direction": "high",
+          "confidence": "normal",
+          "exclude_from_tiering": false,
+          "exclusion_reason": null
+        },
+        {
+          "trait": "agreeableness",
+          "threshold": "low",
+          "strategy": "congruent",
+          "target_direction": "low",
+          "confidence": "normal",
+          "exclude_from_tiering": false,
+          "exclusion_reason": null
+        },
+        {
+          "trait": "neuroticism",
+          "threshold": "high",
+          "strategy": "compensatory",
+          "target_direction": "low",
+          "confidence": "normal",
+          "exclude_from_tiering": false,
+          "exclusion_reason": null
+        },
+        {
+          "trait": "neuroticism",
+          "threshold": "low",
+          "strategy": "complementary",
+          "target_direction": null,
+          "confidence": "not_scored",
+          "exclude_from_tiering": true,
+          "exclusion_reason": null
+        }
+      ],
+      "active_traits": [
+        "openness",
+        "conscientiousness"
+      ],
+      "ranking_note": null,
+      "models": [
+        {
+          "model_id": "openai/gpt-5-nano",
+          "tier": "poor",
+          "driving_traits": [
+            "openness"
+          ],
+          "missing_traits": [],
+          "traits": {
+            "openness": {
+              "strategy": "congruent",
+              "target_direction": "low",
+              "confidence": "normal",
+              "included_in_tier": true,
+              "exclusion_reason": null,
+              "user_score": 20,
+              "model_mean": 79,
+              "model_low": 40,
+              "model_high": 85
+            },
+            "conscientiousness": {
+              "strategy": "compensatory",
+              "target_direction": "high",
+              "confidence": "normal",
+              "included_in_tier": true,
+              "exclusion_reason": null,
+              "user_score": 20,
+              "model_mean": 88.5,
+              "model_low": 75,
+              "model_high": 95
+            }
+          }
+        },
+        {
+          "model_id": "google/gemini-2.5-flash-lite",
+          "tier": "not_scored",
+          "driving_traits": [],
+          "missing_traits": [
+            "openness",
+            "conscientiousness"
+          ],
+          "not_scored_reason": "Failed 6 of 10 runs. OpenRouter request failed (429): Provider returned error",
+          "traits": {
+            "openness": {
+              "strategy": "congruent",
+              "target_direction": "low",
+              "confidence": "normal",
+              "included_in_tier": true,
+              "exclusion_reason": null,
+              "user_score": 20,
+              "model_mean": 86.25,
+              "model_low": 85,
+              "model_high": 90
+            },
+            "conscientiousness": {
+              "strategy": "compensatory",
+              "target_direction": "high",
+              "confidence": "normal",
+              "included_in_tier": true,
+              "exclusion_reason": null,
+              "user_score": 20,
+              "model_mean": 81.25,
+              "model_low": 75,
+              "model_high": 90
+            }
+          }
+        },
+        {
+          "model_id": "anthropic/claude-haiku-4.5",
+          "tier": "poor",
+          "driving_traits": [
+            "openness"
+          ],
+          "missing_traits": [],
+          "traits": {
+            "openness": {
+              "strategy": "congruent",
+              "target_direction": "low",
+              "confidence": "normal",
+              "included_in_tier": true,
+              "exclusion_reason": null,
+              "user_score": 20,
+              "model_mean": 84.44444444444444,
+              "model_low": 75,
+              "model_high": 90
+            },
+            "conscientiousness": {
+              "strategy": "compensatory",
+              "target_direction": "high",
+              "confidence": "normal",
+              "included_in_tier": true,
+              "exclusion_reason": null,
+              "user_score": 20,
+              "model_mean": 73.88888888888889,
+              "model_low": 60,
+              "model_high": 85
+            }
+          }
+        },
+        {
+          "model_id": "x-ai/grok-4.3",
+          "tier": "poor",
+          "driving_traits": [
+            "openness"
+          ],
+          "missing_traits": [],
+          "traits": {
+            "openness": {
+              "strategy": "congruent",
+              "target_direction": "low",
+              "confidence": "normal",
+              "included_in_tier": true,
+              "exclusion_reason": null,
+              "user_score": 20,
+              "model_mean": 79,
+              "model_low": 70,
+              "model_high": 85
+            },
+            "conscientiousness": {
+              "strategy": "compensatory",
+              "target_direction": "high",
+              "confidence": "normal",
+              "included_in_tier": true,
+              "exclusion_reason": null,
+              "user_score": 20,
+              "model_mean": 77,
+              "model_low": 70,
+              "model_high": 80
+            }
+          }
+        }
+      ]
+    }
+  },
+  "C": {
+    "profile": {
+      "openness": 50,
+      "conscientiousness": 50,
+      "extroversion": 90,
+      "agreeableness": 50,
+      "neuroticism": 50
+    },
+    "result": {
+      "label": "design hypothesis based on research",
+      "recommendation": "no strong recommendation",
+      "targets": [
+        {
+          "trait": "extroversion",
+          "threshold": "high",
+          "strategy": "complementary",
+          "target_direction": "low",
+          "confidence": "low",
+          "exclude_from_tiering": true,
+          "exclusion_reason": "Excluded from tiering: benchmarked models scored extroversion between 55 and 61, and the table needs a model below 50. Means are still reported.",
+          "user_score": 90
+        }
+      ],
+      "strategy_table": [
+        {
+          "trait": "openness",
+          "threshold": "high",
+          "strategy": "congruent",
+          "target_direction": "high",
+          "confidence": "normal",
+          "exclude_from_tiering": false,
+          "exclusion_reason": null
+        },
+        {
+          "trait": "openness",
+          "threshold": "low",
+          "strategy": "congruent",
+          "target_direction": "low",
+          "confidence": "normal",
+          "exclude_from_tiering": false,
+          "exclusion_reason": null
+        },
+        {
+          "trait": "conscientiousness",
+          "threshold": "high",
+          "strategy": "congruent",
+          "target_direction": "high",
+          "confidence": "normal",
+          "exclude_from_tiering": false,
+          "exclusion_reason": null
+        },
+        {
+          "trait": "conscientiousness",
+          "threshold": "low",
+          "strategy": "compensatory",
+          "target_direction": "high",
+          "confidence": "normal",
+          "exclude_from_tiering": false,
+          "exclusion_reason": null
+        },
+        {
+          "trait": "extroversion",
+          "threshold": "high",
+          "strategy": "complementary",
+          "target_direction": "low",
+          "confidence": "low",
+          "exclude_from_tiering": true,
+          "exclusion_reason": "Excluded from tiering: benchmarked models scored extroversion between 55 and 61, and the table needs a model below 50. Means are still reported."
+        },
+        {
+          "trait": "extroversion",
+          "threshold": "low",
+          "strategy": "congruent",
+          "target_direction": "low",
+          "confidence": "normal",
+          "exclude_from_tiering": true,
+          "exclusion_reason": "Excluded from tiering: benchmarked models scored extroversion between 55 and 61, and the table needs a model below 50. Means are still reported."
+        },
+        {
+          "trait": "agreeableness",
+          "threshold": "high",
+          "strategy": "congruent",
+          "target_direction": "high",
+          "confidence": "normal",
+          "exclude_from_tiering": false,
+          "exclusion_reason": null
+        },
+        {
+          "trait": "agreeableness",
+          "threshold": "low",
+          "strategy": "congruent",
+          "target_direction": "low",
+          "confidence": "normal",
+          "exclude_from_tiering": false,
+          "exclusion_reason": null
+        },
+        {
+          "trait": "neuroticism",
+          "threshold": "high",
+          "strategy": "compensatory",
+          "target_direction": "low",
+          "confidence": "normal",
+          "exclude_from_tiering": false,
+          "exclusion_reason": null
+        },
+        {
+          "trait": "neuroticism",
+          "threshold": "low",
+          "strategy": "complementary",
+          "target_direction": null,
+          "confidence": "not_scored",
+          "exclude_from_tiering": true,
+          "exclusion_reason": null
+        }
+      ],
+      "active_traits": [
+        "extroversion"
+      ],
+      "ranking_note": null,
+      "models": []
+    }
+  },
+  "D": {
+    "profile": {
+      "openness": 50,
+      "conscientiousness": 50,
+      "extroversion": 50,
+      "agreeableness": 50,
+      "neuroticism": 10
+    },
+    "result": {
+      "label": "design hypothesis based on research",
+      "recommendation": "no strong recommendation",
+      "targets": [
+        {
+          "trait": "neuroticism",
+          "threshold": "low",
+          "strategy": "complementary",
+          "target_direction": null,
+          "confidence": "not_scored",
+          "exclude_from_tiering": true,
+          "exclusion_reason": null,
+          "user_score": 10
+        }
+      ],
+      "strategy_table": [
+        {
+          "trait": "openness",
+          "threshold": "high",
+          "strategy": "congruent",
+          "target_direction": "high",
+          "confidence": "normal",
+          "exclude_from_tiering": false,
+          "exclusion_reason": null
+        },
+        {
+          "trait": "openness",
+          "threshold": "low",
+          "strategy": "congruent",
+          "target_direction": "low",
+          "confidence": "normal",
+          "exclude_from_tiering": false,
+          "exclusion_reason": null
+        },
+        {
+          "trait": "conscientiousness",
+          "threshold": "high",
+          "strategy": "congruent",
+          "target_direction": "high",
+          "confidence": "normal",
+          "exclude_from_tiering": false,
+          "exclusion_reason": null
+        },
+        {
+          "trait": "conscientiousness",
+          "threshold": "low",
+          "strategy": "compensatory",
+          "target_direction": "high",
+          "confidence": "normal",
+          "exclude_from_tiering": false,
+          "exclusion_reason": null
+        },
+        {
+          "trait": "extroversion",
+          "threshold": "high",
+          "strategy": "complementary",
+          "target_direction": "low",
+          "confidence": "low",
+          "exclude_from_tiering": true,
+          "exclusion_reason": "Excluded from tiering: benchmarked models scored extroversion between 55 and 61, and the table needs a model below 50. Means are still reported."
+        },
+        {
+          "trait": "extroversion",
+          "threshold": "low",
+          "strategy": "congruent",
+          "target_direction": "low",
+          "confidence": "normal",
+          "exclude_from_tiering": true,
+          "exclusion_reason": "Excluded from tiering: benchmarked models scored extroversion between 55 and 61, and the table needs a model below 50. Means are still reported."
+        },
+        {
+          "trait": "agreeableness",
+          "threshold": "high",
+          "strategy": "congruent",
+          "target_direction": "high",
+          "confidence": "normal",
+          "exclude_from_tiering": false,
+          "exclusion_reason": null
+        },
+        {
+          "trait": "agreeableness",
+          "threshold": "low",
+          "strategy": "congruent",
+          "target_direction": "low",
+          "confidence": "normal",
+          "exclude_from_tiering": false,
+          "exclusion_reason": null
+        },
+        {
+          "trait": "neuroticism",
+          "threshold": "high",
+          "strategy": "compensatory",
+          "target_direction": "low",
+          "confidence": "normal",
+          "exclude_from_tiering": false,
+          "exclusion_reason": null
+        },
+        {
+          "trait": "neuroticism",
+          "threshold": "low",
+          "strategy": "complementary",
+          "target_direction": null,
+          "confidence": "not_scored",
+          "exclude_from_tiering": true,
+          "exclusion_reason": null
+        }
+      ],
+      "active_traits": [],
+      "ranking_note": null,
+      "models": []
+    }
+  },
+  "E": {
+    "profile": {
+      "openness": 90,
+      "conscientiousness": 50,
+      "extroversion": 50,
+      "agreeableness": 50,
+      "neuroticism": 50
+    },
+    "result": {
+      "label": "design hypothesis based on research",
+      "recommendation": "tiers",
+      "targets": [
+        {
+          "trait": "openness",
+          "threshold": "high",
+          "strategy": "congruent",
+          "target_direction": "high",
+          "confidence": "normal",
+          "exclude_from_tiering": false,
+          "exclusion_reason": null,
+          "user_score": 90
+        }
+      ],
+      "strategy_table": [
+        {
+          "trait": "openness",
+          "threshold": "high",
+          "strategy": "congruent",
+          "target_direction": "high",
+          "confidence": "normal",
+          "exclude_from_tiering": false,
+          "exclusion_reason": null
+        },
+        {
+          "trait": "openness",
+          "threshold": "low",
+          "strategy": "congruent",
+          "target_direction": "low",
+          "confidence": "normal",
+          "exclude_from_tiering": false,
+          "exclusion_reason": null
+        },
+        {
+          "trait": "conscientiousness",
+          "threshold": "high",
+          "strategy": "congruent",
+          "target_direction": "high",
+          "confidence": "normal",
+          "exclude_from_tiering": false,
+          "exclusion_reason": null
+        },
+        {
+          "trait": "conscientiousness",
+          "threshold": "low",
+          "strategy": "compensatory",
+          "target_direction": "high",
+          "confidence": "normal",
+          "exclude_from_tiering": false,
+          "exclusion_reason": null
+        },
+        {
+          "trait": "extroversion",
+          "threshold": "high",
+          "strategy": "complementary",
+          "target_direction": "low",
+          "confidence": "low",
+          "exclude_from_tiering": true,
+          "exclusion_reason": "Excluded from tiering: benchmarked models scored extroversion between 55 and 61, and the table needs a model below 50. Means are still reported."
+        },
+        {
+          "trait": "extroversion",
+          "threshold": "low",
+          "strategy": "congruent",
+          "target_direction": "low",
+          "confidence": "normal",
+          "exclude_from_tiering": true,
+          "exclusion_reason": "Excluded from tiering: benchmarked models scored extroversion between 55 and 61, and the table needs a model below 50. Means are still reported."
+        },
+        {
+          "trait": "agreeableness",
+          "threshold": "high",
+          "strategy": "congruent",
+          "target_direction": "high",
+          "confidence": "normal",
+          "exclude_from_tiering": false,
+          "exclusion_reason": null
+        },
+        {
+          "trait": "agreeableness",
+          "threshold": "low",
+          "strategy": "congruent",
+          "target_direction": "low",
+          "confidence": "normal",
+          "exclude_from_tiering": false,
+          "exclusion_reason": null
+        },
+        {
+          "trait": "neuroticism",
+          "threshold": "high",
+          "strategy": "compensatory",
+          "target_direction": "low",
+          "confidence": "normal",
+          "exclude_from_tiering": false,
+          "exclusion_reason": null
+        },
+        {
+          "trait": "neuroticism",
+          "threshold": "low",
+          "strategy": "complementary",
+          "target_direction": null,
+          "confidence": "not_scored",
+          "exclude_from_tiering": true,
+          "exclusion_reason": null
+        }
+      ],
+      "active_traits": [
+        "openness"
+      ],
+      "ranking_note": null,
+      "models": [
+        {
+          "model_id": "openai/gpt-5-nano",
+          "tier": "decent",
+          "driving_traits": [
+            "openness"
+          ],
+          "missing_traits": [],
+          "traits": {
+            "openness": {
+              "strategy": "congruent",
+              "target_direction": "high",
+              "confidence": "normal",
+              "included_in_tier": true,
+              "exclusion_reason": null,
+              "user_score": 90,
+              "model_mean": 79,
+              "model_low": 40,
+              "model_high": 85
+            }
+          }
+        },
+        {
+          "model_id": "google/gemini-2.5-flash-lite",
+          "tier": "not_scored",
+          "driving_traits": [],
+          "missing_traits": [
+            "openness"
+          ],
+          "not_scored_reason": "Failed 6 of 10 runs. OpenRouter request failed (429): Provider returned error",
+          "traits": {
+            "openness": {
+              "strategy": "congruent",
+              "target_direction": "high",
+              "confidence": "normal",
+              "included_in_tier": true,
+              "exclusion_reason": null,
+              "user_score": 90,
+              "model_mean": 86.25,
+              "model_low": 85,
+              "model_high": 90
+            }
+          }
+        },
+        {
+          "model_id": "anthropic/claude-haiku-4.5",
+          "tier": "strong",
+          "driving_traits": [
+            "openness"
+          ],
+          "missing_traits": [],
+          "traits": {
+            "openness": {
+              "strategy": "congruent",
+              "target_direction": "high",
+              "confidence": "normal",
+              "included_in_tier": true,
+              "exclusion_reason": null,
+              "user_score": 90,
+              "model_mean": 84.44444444444444,
+              "model_low": 75,
+              "model_high": 90
+            }
+          }
+        },
+        {
+          "model_id": "x-ai/grok-4.3",
+          "tier": "strong",
+          "driving_traits": [
+            "openness"
+          ],
+          "missing_traits": [],
+          "traits": {
+            "openness": {
+              "strategy": "congruent",
+              "target_direction": "high",
+              "confidence": "normal",
+              "included_in_tier": true,
+              "exclusion_reason": null,
+              "user_score": 90,
+              "model_mean": 79,
+              "model_low": 70,
+              "model_high": 85
+            }
+          }
+        }
+      ]
+    }
+  }
+}
