@@ -3,8 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import path from 'path';
 import { describe, expect, it } from 'vitest';
-import { loadConfig, parseConfig } from '../config';
+import { DEFAULT_CONFIG_PATH, loadConfig, parseConfig } from '../config';
 import { costUsd } from '../cost';
 import { estimateDryRun, estimateJudgeInputTokens, formatDryRun } from '../dryrun';
 import { interviewMessages } from '../openrouter';
@@ -90,6 +91,43 @@ describe('dry-run estimate', () => {
     expect(shipped.temperature).toBe(0.8);
     expect(shipped.systemPrompt).toBeNull();
     expect(output).toContain(`Total estimated USD: $${shipped.totalCostUsd.toFixed(6)}`);
+  });
+
+  it('dry-runs a --config file and leaves the default config on the original four', async () => {
+    const frontierPath = path.join(path.dirname(DEFAULT_CONFIG_PATH), 'config.frontier.json');
+    const lines: string[] = [];
+    const code = await main(['--dry-run', '--config', frontierPath], {
+      env: {},
+      stdout: (message) => lines.push(message),
+      stderr: (message) => lines.push(message),
+    });
+    expect(code).toBe(0);
+    const output = lines.join('\n');
+    expect(output).toContain('No network calls were made.');
+    const frontier = estimateDryRun(loadConfig(frontierPath));
+    expect(frontier.models.map((model) => model.id)).toEqual([
+      'google/gemini-3.8-flash',
+      'x-ai/grok-4.7',
+      'anthropic/claude-opus-5.5',
+      'openai/gpt-6-luna',
+    ]);
+    expect(frontier.repeats).toBe(10);
+    expect(output).toContain('openai/gpt-6-luna');
+    expect(output).toContain(`Total estimated USD: $${frontier.totalCostUsd.toFixed(6)}`);
+    expect(output).not.toContain('openai/gpt-5-nano');
+    const missing = await main(['--config'], {
+      env: {},
+      stdout: () => {},
+      stderr: (message) => lines.push(message),
+    });
+    expect(missing).toBe(1);
+    expect(lines.join('\n')).toContain('--config requires a file path');
+    expect(estimateDryRun(loadConfig()).models.map((model) => model.id)).toEqual([
+      'openai/gpt-5-nano',
+      'google/gemini-2.5-flash-lite',
+      'anthropic/claude-haiku-4.5',
+      'x-ai/grok-4.3',
+    ]);
   });
 
   it('treats a blank system prompt as none', () => {

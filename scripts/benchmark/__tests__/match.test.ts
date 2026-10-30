@@ -58,6 +58,9 @@ describe('strategy table', () => {
       exclude_from_tiering: true,
       exclusion_reason: EXTROVERSION_EXCLUSION_REASON,
     });
+    expect(EXTROVERSION_EXCLUSION_REASON).toBe(
+      'Excluded from tiering: no benchmarked model scored extroversion below 50, and the table needs one. Means are still reported.',
+    );
     expect(STRATEGY_TABLE.find((row) => row.trait === 'extroversion' && row.threshold === 'low')).toMatchObject({
       strategy: 'congruent',
       target_direction: 'low',
@@ -359,6 +362,16 @@ describe('match tiers', () => {
         ? { ...row, target_direction: 'low' as const }
         : row
     ));
+    expect(() => matchModels(neutralScores({ openness: 90 }), file)).toThrow(/Delete the existing scores.json/);
+    file.strategy_table = STRATEGY_TABLE.map((row) => (
+      row.trait === 'extroversion'
+        ? {
+          ...row,
+          exclusion_reason: 'Excluded from tiering: benchmarked models scored extroversion between 55 and 61, and the table needs a model below 50. Means are still reported.',
+        }
+        : row
+    ));
+    expect(() => matchModels(neutralScores({ openness: 90 }), file)).toThrow(/exclusion_reason/);
     expect(() => matchModels(neutralScores({ openness: 90 }), file)).toThrow(/Delete the existing scores.json/);
     file.strategy_table = [];
     expect(() => matchModels(neutralScores({ openness: 90 }), file)).toThrow(/STRATEGY_TABLE/);

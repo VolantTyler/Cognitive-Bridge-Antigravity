@@ -5,8 +5,8 @@
 
 import { describe, expect, it } from 'vitest';
 import { ScoreFileSchemaError } from '../errors';
-import { buildScoreFile, validateScoreFile, type CompletedModelRun } from '../scorefile';
-import { HYPOTHESIS_LABEL, OCEAN_TRAITS } from '../types';
+import { buildScoreFile, providersSeen, validateScoreFile, type CompletedModelRun } from '../scorefile';
+import { HYPOTHESIS_LABEL, OCEAN_TRAITS, SCORE_FILE_SCHEMA_VERSION, UNLABELED_RUN_LABEL } from '../types';
 import { loadConfig } from '../config';
 import { neutralScores } from './fixture';
 
@@ -45,7 +45,8 @@ describe('score file schema', () => {
       traitConfidence: config.traitConfidence,
     });
     validateScoreFile(JSON.parse(JSON.stringify(scoreFile)));
-    expect(scoreFile.schema_version).toBe(4);
+    expect(scoreFile.schema_version).toBe(SCORE_FILE_SCHEMA_VERSION);
+    expect(scoreFile.run_label).toBe('default');
     expect(scoreFile.output_budget).toMatchObject({
       max_output_tokens: 8192,
       retry_max_output_tokens: 16384,
@@ -59,6 +60,14 @@ describe('score file schema', () => {
     expect(scoreFile.models[0].traits.openness.wide_range).toBe(false);
     expect(scoreFile.models[0].version).toBe('openai/gpt-5-nano-2026-10-05');
     expect(scoreFile.models[0].runs[0].model_version).toBe('openai/gpt-5-nano-2026-10-05');
+    expect(scoreFile.models[0].runs[0].provider).toBeNull();
+    const withoutProvider = JSON.parse(JSON.stringify(scoreFile)) as {
+      models: Array<{ id: string; runs: Array<Record<string, unknown>> }>;
+    };
+    delete withoutProvider.models[0].runs[0].provider;
+    expect(() => validateScoreFile(withoutProvider)).not.toThrow();
+    withoutProvider.models[0].runs[0].provider = 4;
+    expect(() => validateScoreFile(withoutProvider)).toThrow(/provider must be a non-empty string or null/);
     expect(scoreFile.models[0].cost_usd).toBe(1.25);
     expect(scoreFile.models[0].timestamp).toBe('2026-10-25T03:00:00.000Z');
     for (const trait of OCEAN_TRAITS) {
@@ -72,6 +81,16 @@ describe('score file schema', () => {
       expect(typeof stats.high).toBe('number');
     }
     expect(scoreFile.models[0].traits.extroversion.confidence).toBe('low');
+    expect(scoreFile.models[0].providers_seen).toEqual([]);
+    const unlabeled = JSON.parse(JSON.stringify(scoreFile)) as { run_label?: string; models: Array<{ providers_seen?: unknown }> };
+    delete unlabeled.run_label;
+    delete unlabeled.models[0].providers_seen;
+    expect(() => validateScoreFile(unlabeled)).not.toThrow();
+    expect(unlabeled.run_label).toBe(UNLABELED_RUN_LABEL);
+    expect(unlabeled.models[0].providers_seen).toBeUndefined();
+    expect(() => validateScoreFile({ ...scoreFile, run_label: '  ' })).toThrow(/run_label/);
+    unlabeled.models[0].providers_seen = [{ provider: '', count: 1 }];
+    expect(() => validateScoreFile(unlabeled)).toThrow(/providers_seen/);
     expect(scoreFile.strategy_table.length).toBeGreaterThan(0);
 
     const broken = JSON.parse(JSON.stringify(scoreFile)) as { spread_warning?: boolean };
@@ -123,5 +142,44 @@ describe('score file schema', () => {
     expect(scoreFile.models[0].traits.conscientiousness.wide_range).toBe(false);
     expect(scoreFile.models[0].wide_range).toBe(true);
     expect(scoreFile.models[0].runs[1].recorded_at).toBe('2026-10-25T03:01:00.000Z');
+  });
+
+  it('counts distinct interview providers across scored repeats', () => {
+    expect(providersSeen([
+      { provider: 'Alpha' },
+      { provider: 'Alpha, Beta' },
+      { provider: null },
+      { provider: 'Beta' },
+    ])).toEqual([
+      { provider: 'Alpha', count: 2 },
+      { provider: 'Beta', count: 2 },
+    ]);
+    const config = loadConfig();
+    const scoreFile = buildScoreFile({
+      models: [{
+        id: 'qwen/qwen3-235b-a22b-2507',
+        costUsd: 0,
+        timestamp: '2026-10-25T03:00:00.000Z',
+        repeats: [
+          { repeat: 1, modelVersion: 'qwen', judgeVersion: 'judge-v', provider: 'Alpha', scores: neutralScores({ openness: 10 }) },
+          { repeat: 2, modelVersion: 'qwen', judgeVersion: 'judge-v', provider: 'Alpha, Beta', scores: neutralScores({ openness: 12 }) },
+        ],
+      }],
+      judge: { modelId: config.judge.modelId, version: 'judge-v', temperature: 0 },
+      interviewTemperature: 0.8,
+      repeats: 2,
+      generatedAt: '2026-10-25T03:04:00.000Z',
+      priceDate: config.priceDate,
+      wideRangeThreshold: 40,
+      spreadThreshold: 10,
+      traitConfidence: config.traitConfidence,
+      runLabel: 'open-set',
+    });
+    expect(scoreFile.schema_version).toBe(SCORE_FILE_SCHEMA_VERSION);
+    expect(scoreFile.run_label).toBe('open-set');
+    expect(scoreFile.models[0].providers_seen).toEqual([
+      { provider: 'Alpha', count: 2 },
+      { provider: 'Beta', count: 1 },
+    ]);
   });
 });

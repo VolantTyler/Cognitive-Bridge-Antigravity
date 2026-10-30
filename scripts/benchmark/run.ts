@@ -34,7 +34,7 @@ import {
 } from './scorefile';
 import { buildInterviewTranscript, judgeMessages, parseMirrorScores } from './scorer';
 import { estimateMessagesTokens } from './tokens';
-import type { BenchmarkConfig, ChatClient, ChatRequest, ChatResponse, PricedModel, Scenario } from './types';
+import { PROVIDER_LIST_SEPARATOR, type BenchmarkConfig, type ChatClient, type ChatRequest, type ChatResponse, type PricedModel, type ProviderRoute, type Scenario } from './types';
 
 export interface RunOptions {
   config: BenchmarkConfig;
@@ -47,6 +47,10 @@ export interface RunOptions {
   scoreFilePath?: string;
   ledgerPath?: string;
   existingScoreFile?: ReturnType<typeof readScoreFile>;
+  /** Test hook for the judge-model gap. Defaults to a real timer. */
+  sleep?: (ms: number) => Promise<void>;
+  /** Milliseconds clock for that gap. Defaults to Date.now. Independent of `now`. */
+  clock?: () => number;
 }
 
 interface BilledCall {
@@ -244,6 +248,14 @@ export async function runBenchmark(options: RunOptions): Promise<ReturnType<type
   }
 
   const judgePrice = priceOf(config, config.judge.modelId);
+  const pace = createModelPacer({
+    judgeModelId: config.judge.modelId,
+    minIntervalMs: config.judgeMinIntervalMs,
+    sleep: options.sleep ?? ((ms) => new Promise((resolve) => {
+      setTimeout(resolve, ms);
+    })),
+    clock: options.clock ?? Date.now,
+  });
   const completed: CompletedModelRun[] = [];
 
   try {
@@ -263,6 +275,7 @@ export async function runBenchmark(options: RunOptions): Promise<ReturnType<type
           versionsAgree(judgeVersion, version);
           judgeVersion = version;
         },
+        pace,
       }));
     }
   } catch (error) {
@@ -284,6 +297,7 @@ export async function runBenchmark(options: RunOptions): Promise<ReturnType<type
         traitConfidence: config.traitConfidence,
         partial: true,
         outputBudget: outputBudgetOf(config),
+        runLabel: config.runLabel,
       });
       writeScoreFile(scoreFilePath, partial);
       logger('warn', `Wrote partial score file for ${completed.length} finished model(s) before the hard stop.`);
@@ -311,6 +325,7 @@ export async function runBenchmark(options: RunOptions): Promise<ReturnType<type
     traitConfidence: config.traitConfidence,
     partial: false,
     outputBudget: outputBudgetOf(config),
+    runLabel: config.runLabel,
   });
   writeScoreFile(scoreFilePath, scoreFile);
   logger('info', `Wrote ${scoreFilePath}`);
@@ -321,6 +336,46 @@ export async function runBenchmark(options: RunOptions): Promise<ReturnType<type
   }
   if (summary) logger('warn', summary);
   return scoreFile;
+}
+
+function joinProviders(values: string[]): string | null {
+  const unique: string[] = [];
+  for (const value of values) {
+    if (!unique.includes(value)) unique.push(value);
+  }
+  return unique.length === 0 ? null : unique.join(PROVIDER_LIST_SEPARATOR);
+}
+
+/**
+ * One gap for every call to the judge model id, interview or judge.
+ * Other model ids are not paced. The map is keyed by model id so those
+ * two call kinds share one clock.
+ */
+export function createModelPacer(options: {
+  judgeModelId: string;
+  minIntervalMs: number;
+  sleep: (ms: number) => Promise<void>;
+  clock: () => number;
+}): (modelId: string) => Promise<void> {
+  const lastSentAt = new Map<string, number>();
+  return async (modelId: string) => {
+    if (modelId !== options.judgeModelId || options.minIntervalMs <= 0) return;
+    const last = lastSentAt.get(modelId);
+    let sendAt = options.clock();
+    if (last !== undefined) {
+      const earliest = last + options.minIntervalMs;
+      const wait = earliest - sendAt;
+      if (wait > 0) {
+        await options.sleep(wait);
+        sendAt = Math.max(options.clock(), earliest);
+      }
+    }
+    lastSentAt.set(modelId, sendAt);
+  };
+}
+
+function interviewProviderRoute(config: BenchmarkConfig, modelId: string): ProviderRoute | undefined {
+  return config.models.find((model) => model.id === modelId)?.provider;
 }
 
 function outputBudgetOf(config: BenchmarkConfig) {
@@ -359,6 +414,7 @@ async function runOneModel(options: {
   judgePrice: PricedModel;
   getJudgeVersion: () => string | null;
   setJudgeVersion: (version: string) => void;
+  pace: (modelId: string) => Promise<void>;
 }): Promise<CompletedModelRun> {
   const repeats: CompletedModelRun['repeats'] = [];
   const failures: CompletedModelRun['failures'] = [];
@@ -369,10 +425,12 @@ async function runOneModel(options: {
   for (let repeat = 1; repeat <= options.config.interview.repeats; repeat += 1) {
     const answers: Array<{ scenario: Scenario; answer: string }> = [];
     let modelVersion = options.model.id;
+    const interviewProviders: string[] = [];
     let maxUsed = options.config.interview.maxOutputTokens;
     let repeatFailed = false;
 
     for (const scenario of options.scenarios) {
+      await options.pace(options.model.id);
       const billed = await billCallWithRetry({
         state: options.state,
         config: options.config,
@@ -391,6 +449,7 @@ async function runOneModel(options: {
           reasoningEffort: effort,
           scenarioId: scenario.id,
           repeat,
+          provider: interviewProviderRoute(options.config, options.model.id),
         },
       });
       cost += billed.costUsd;
@@ -410,12 +469,14 @@ async function runOneModel(options: {
         break;
       }
       modelVersion = billed.response.modelVersion;
+      if (billed.response.provider) interviewProviders.push(billed.response.provider);
       answers.push({ scenario, answer: billed.response.content });
       options.logger('info', `interview ${options.model.id} repeat ${repeat} ${scenario.id} ${billed.response.modelVersion}`);
     }
     if (repeatFailed) continue;
 
     const transcript = buildInterviewTranscript(answers);
+    await options.pace(options.config.judge.modelId);
     const billedJudge = await billCallWithRetry({
       state: options.state,
       config: options.config,
@@ -460,6 +521,7 @@ async function runOneModel(options: {
         recordedAt: options.now().toISOString(),
         maxOutputTokens: maxUsed,
         reasoningEffort: effort,
+        provider: joinProviders(interviewProviders),
         scores,
       });
     } catch (error) {

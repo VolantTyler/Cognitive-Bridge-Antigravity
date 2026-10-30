@@ -44,6 +44,9 @@ export function testConfig(patch?: {
   hardStopPerRunUsd?: number;
   warnPerRunUsd?: number;
   warnPerMonthUsd?: number;
+  maxEnabledModels?: number;
+  judgeMinIntervalMs?: number;
+  runLabel?: string;
   wideRangeThreshold?: number;
   spreadThreshold?: number;
   traitConfidence?: BenchmarkConfig['traitConfidence'];
@@ -77,6 +80,9 @@ export function testConfig(patch?: {
       hardStopPerRunUsd: patch?.hardStopPerRunUsd ?? 15,
       warnPerMonthUsd: patch?.warnPerMonthUsd ?? 40,
     },
+    maxEnabledModels: patch?.maxEnabledModels ?? 12,
+    judgeMinIntervalMs: patch?.judgeMinIntervalMs ?? 0,
+    run_label: patch?.runLabel,
     wideRangeThreshold: patch?.wideRangeThreshold ?? 40,
     spreadThreshold: patch?.spreadThreshold ?? 10,
     traitConfidence,
@@ -117,6 +123,7 @@ export function recordingClient(options?: {
           promptTokens,
           completionTokens,
           usageEstimated: false,
+          provider: null,
         };
       }
       return {
@@ -125,6 +132,7 @@ export function recordingClient(options?: {
         promptTokens,
         completionTokens,
         usageEstimated: false,
+        provider: null,
       };
     },
   };

@@ -8,8 +8,8 @@ import path from 'path';
 import { describe, expect, it } from 'vitest';
 import { readLedger } from '../cost';
 import { AllModelsFailedError, HardStopError, JudgeMixError } from '../errors';
-import { createOpenRouterClient, type FetchLike } from '../openrouter';
-import { matchModels } from '../match';
+import { OPENROUTER_MAX_ATTEMPTS, createOpenRouterClient, type FetchLike } from '../openrouter';
+import { EXTROVERSION_EXCLUSION_REASON, matchModels } from '../match';
 import type { ChatClient, ChatRequest } from '../types';
 import { readScoreFile } from '../scorefile';
 import { runBenchmark } from '../run';
@@ -114,6 +114,7 @@ describe('benchmark run', () => {
           promptTokens: 0,
           completionTokens: 10,
           usageEstimated: false,
+          provider: null,
         };
       },
     };
@@ -189,6 +190,7 @@ describe('benchmark run', () => {
           promptTokens: 1,
           completionTokens: 1,
           usageEstimated: false,
+          provider: null,
         };
       },
     };
@@ -473,6 +475,7 @@ describe('benchmark run', () => {
           promptTokens: 3,
           completionTokens: 4,
           usageEstimated: false,
+          provider: null,
         };
       },
     };
@@ -513,6 +516,7 @@ describe('benchmark run', () => {
           promptTokens: 2,
           completionTokens: 3,
           usageEstimated: false,
+          provider: null,
         };
       },
     };
@@ -567,6 +571,401 @@ describe('benchmark run', () => {
     const saved = readScoreFile(scorePath);
     expect(saved?.models.map((model) => model.scored_runs)).toEqual([0, 0]);
     expect(saved?.models.every((model) => model.not_scored_reason)).toBe(true);
+  });
+
+  it('writes run_label and pins provider routing on interview calls only', async () => {
+    const dir = tempDir();
+    const bodies: Array<Record<string, unknown>> = [];
+    const fetchImpl: FetchLike = async (_url, init) => {
+      const body = JSON.parse(init.body) as Record<string, unknown> & { messages: Array<{ role: string }> };
+      bodies.push(body);
+      const interview = body.messages.every((message) => message.role !== 'system');
+      return jsonResponse({
+        model: 'openai/gpt-5-nano',
+        provider: 'ProviderName',
+        choices: [{
+          message: { content: interview ? 'answer' : scoreText(neutralScores({ openness: 20 })) },
+        }],
+        usage: { prompt_tokens: 2, completion_tokens: 2 },
+      });
+    };
+    const scoreFile = await runBenchmark({
+      config: testConfig({
+        runLabel: 'october-open',
+        repeats: 1,
+        judgeModelId: 'openai/gpt-5-nano',
+        models: [{
+          id: 'openai/gpt-5-nano',
+          enabled: true,
+          inputPerMillionUsd: 0,
+          outputPerMillionUsd: 0,
+          provider: { order: ['ProviderName'], allow_fallbacks: false },
+        }],
+      }),
+      client: createOpenRouterClient({
+        apiKey: 'sk-test-secret',
+        baseUrl: 'https://openrouter.ai/api/v1',
+        fetchImpl,
+      }),
+      scenarios: [{ id: 'one', text: 'scenario' }],
+      now: fixedNow,
+      scoreFilePath: path.join(dir, 'scores.json'),
+      ledgerPath: path.join(dir, 'ledger.jsonl'),
+      existingScoreFile: null,
+    });
+    const interview = bodies.find((body) => (body.messages as Array<{ role: string }>).every((message) => message.role !== 'system'));
+    const judge = bodies.find((body) => (body.messages as Array<{ role: string }>).some((message) => message.role === 'system'));
+    expect(interview?.provider).toEqual({ order: ['ProviderName'], allow_fallbacks: false });
+    expect(judge?.provider).toBeUndefined();
+    expect(scoreFile.run_label).toBe('october-open');
+    expect(scoreFile.schema_version).toBe(4);
+    expect(scoreFile.models[0].providers_seen).toEqual([{ provider: 'ProviderName', count: 1 }]);
+    expect(scoreFile.models[0].runs[0].provider).toBe('ProviderName');
+  });
+
+  it('replaces scores.json with only this run’s enabled models', async () => {
+    const dir = tempDir();
+    const scorePath = path.join(dir, 'scores.json');
+    const ledgerPath = path.join(dir, 'ledger.jsonl');
+    const first = await runBenchmark({
+      config: testConfig({
+        models: [
+          { id: 'openai/gpt-5-nano', enabled: true, inputPerMillionUsd: 0, outputPerMillionUsd: 0 },
+          { id: 'google/gemini-2.5-flash-lite', enabled: true, inputPerMillionUsd: 0, outputPerMillionUsd: 0 },
+        ],
+      }),
+      client: recordingClient().client,
+      scenarios: [{ id: 'one', text: 'scenario' }],
+      now: fixedNow,
+      scoreFilePath: scorePath,
+      ledgerPath,
+    });
+    expect(first.models.map((model) => model.id)).toEqual([
+      'openai/gpt-5-nano',
+      'google/gemini-2.5-flash-lite',
+    ]);
+
+    const stored = JSON.parse(fs.readFileSync(scorePath, 'utf8')) as {
+      strategy_table: Array<{ trait: string; exclusion_reason: string | null }>;
+    };
+    const previousWording = 'Excluded from tiering: benchmarked models scored extroversion between 55 and 61, and the table needs a model below 50. Means are still reported.';
+    for (const row of stored.strategy_table) {
+      if (row.trait === 'extroversion') row.exclusion_reason = previousWording;
+    }
+    fs.writeFileSync(scorePath, JSON.stringify(stored));
+    const stale = readScoreFile(scorePath);
+    expect(stale).not.toBeNull();
+    expect(() => matchModels(neutralScores({ openness: 90 }), stale!)).toThrow(/exclusion_reason/);
+    expect(() => matchModels(neutralScores({ openness: 90 }), stale!)).toThrow(/Delete the existing scores.json/);
+
+    const replaced = await runBenchmark({
+      config: testConfig({
+        models: [
+          { id: 'openai/gpt-5-nano', enabled: false, inputPerMillionUsd: 0, outputPerMillionUsd: 0 },
+          { id: 'google/gemini-2.5-flash-lite', enabled: true, inputPerMillionUsd: 0, outputPerMillionUsd: 0 },
+          { id: 'qwen/qwen3-235b-a22b-2507', enabled: true, inputPerMillionUsd: 0.09, outputPerMillionUsd: 0.55 },
+        ],
+      }),
+      client: recordingClient({ scores: neutralScores({ openness: 11 }) }).client,
+      scenarios: [{ id: 'one', text: 'scenario' }],
+      now: fixedNow,
+      scoreFilePath: scorePath,
+      ledgerPath,
+    });
+    expect(replaced.models.map((model) => model.id)).toEqual([
+      'google/gemini-2.5-flash-lite',
+      'qwen/qwen3-235b-a22b-2507',
+    ]);
+    const saved = readScoreFile(scorePath);
+    expect(saved?.models.map((model) => model.id)).toEqual([
+      'google/gemini-2.5-flash-lite',
+      'qwen/qwen3-235b-a22b-2507',
+    ]);
+    expect(saved?.strategy_table.filter((row) => row.trait === 'extroversion').every((row) => row.exclusion_reason === EXTROVERSION_EXCLUSION_REASON)).toBe(true);
+    expect(JSON.stringify(saved)).not.toContain('between 55 and 61');
+  });
+
+  it('scores a repeat after an interview 429 and does not ledger the failed attempt', async () => {
+    const dir = tempDir();
+    let interviews = 0;
+    const fetchImpl: FetchLike = async (_url, init) => {
+      const body = JSON.parse(init.body) as { messages: Array<{ role: string }> };
+      const interview = body.messages.every((message) => message.role !== 'system');
+      if (interview) {
+        interviews += 1;
+        if (interviews === 1) {
+          return {
+            ok: false,
+            status: 429,
+            headers: { get: () => '0' },
+            async text() {
+              return JSON.stringify({ error: { message: 'Provider returned error' } });
+            },
+          };
+        }
+      }
+      return jsonResponse({
+        model: 'openai/gpt-5-nano',
+        provider: interview ? 'DeepInfra' : 'Google',
+        choices: [{
+          message: { content: interview ? 'answer' : scoreText(neutralScores({ openness: 70 })) },
+        }],
+        usage: { prompt_tokens: 2, completion_tokens: 3 },
+      });
+    };
+    const scoreFile = await runBenchmark({
+      config: testConfig({
+        repeats: 1,
+        judgeModelId: 'openai/gpt-5-nano',
+        models: [{ id: 'openai/gpt-5-nano', enabled: true, inputPerMillionUsd: 0, outputPerMillionUsd: 0 }],
+      }),
+      client: createOpenRouterClient({
+        apiKey: 'sk-test-secret',
+        baseUrl: 'https://openrouter.ai/api/v1',
+        fetchImpl,
+        sleep: async () => {},
+      }),
+      scenarios: [
+        { id: 'one', text: 'scenario one' },
+        { id: 'two', text: 'scenario two' },
+      ],
+      now: fixedNow,
+      scoreFilePath: path.join(dir, 'scores.json'),
+      ledgerPath: path.join(dir, 'ledger.jsonl'),
+      existingScoreFile: null,
+    });
+    expect(scoreFile.models[0].scored_runs).toBe(1);
+    expect(scoreFile.models[0].failed_runs).toBe(0);
+    expect(scoreFile.models[0].runs[0].provider).toBe('DeepInfra');
+    expect(scoreFile.models[0].traits.openness.mean).toBe(70);
+    const ledger = readLedger(path.join(dir, 'ledger.jsonl'));
+    expect(ledger.filter((entry) => entry.kind === 'interview')).toHaveLength(2);
+    expect(ledger.filter((entry) => entry.kind === 'judge')).toHaveLength(1);
+    expect(interviews).toBe(3);
+  });
+
+  it('joins distinct interview providers and leaves one unscored repeat when 429s are exhausted', async () => {
+    const dir = tempDir();
+    let interviews = 0;
+    const fetchImpl: FetchLike = async (_url, init) => {
+      const body = JSON.parse(init.body) as { messages: Array<{ role: string }> };
+      const interview = body.messages.every((message) => message.role !== 'system');
+      if (interview) {
+        interviews += 1;
+        if (interviews <= OPENROUTER_MAX_ATTEMPTS) {
+          return {
+            ok: false,
+            status: 429,
+            async text() {
+              return JSON.stringify({ error: { message: 'Provider returned error' } });
+            },
+          };
+        }
+        return jsonResponse({
+          model: 'openai/gpt-5-nano',
+          provider: interviews === OPENROUTER_MAX_ATTEMPTS + 1 ? 'Together' : 'DeepInfra',
+          choices: [{ message: { content: 'answer' } }],
+          usage: { prompt_tokens: 2, completion_tokens: 3 },
+        });
+      }
+      return jsonResponse({
+        model: 'openai/gpt-5-nano',
+        provider: 'Google',
+        choices: [{ message: { content: scoreText(neutralScores({ openness: 40 })) } }],
+        usage: { prompt_tokens: 2, completion_tokens: 3 },
+      });
+    };
+    const scoreFile = await runBenchmark({
+      config: testConfig({
+        repeats: 2,
+        judgeModelId: 'openai/gpt-5-nano',
+        models: [{ id: 'openai/gpt-5-nano', enabled: true, inputPerMillionUsd: 0, outputPerMillionUsd: 0 }],
+      }),
+      client: createOpenRouterClient({
+        apiKey: 'sk-test-secret',
+        baseUrl: 'https://openrouter.ai/api/v1',
+        fetchImpl,
+        sleep: async () => {},
+      }),
+      scenarios: [
+        { id: 'one', text: 'scenario one' },
+        { id: 'two', text: 'scenario two' },
+      ],
+      now: fixedNow,
+      scoreFilePath: path.join(dir, 'scores.json'),
+      ledgerPath: path.join(dir, 'ledger.jsonl'),
+      existingScoreFile: null,
+    });
+    expect(scoreFile.models[0].scored_runs).toBe(1);
+    expect(scoreFile.models[0].failed_runs).toBe(1);
+    expect(scoreFile.models[0].not_scored_reason).toBeNull();
+    expect(scoreFile.models[0].failures[0]).toMatchObject({ kind: 'interview', repeat: 1 });
+    expect(scoreFile.models[0].failures[0].reason).toMatch(/\(429\) after 6 attempts/);
+    expect(scoreFile.models[0].runs[0].provider).toBe('Together, DeepInfra');
+    expect(scoreFile.models[0].providers_seen).toEqual([
+      { provider: 'Together', count: 1 },
+      { provider: 'DeepInfra', count: 1 },
+    ]);
+    expect(scoreFile.models[0].traits.openness.mean).toBe(40);
+    const ledger = readLedger(path.join(dir, 'ledger.jsonl'));
+    expect(ledger.filter((entry) => entry.repeat === 1)).toHaveLength(1);
+    expect(ledger.filter((entry) => entry.repeat === 1)[0]).toMatchObject({ kind: 'interview', estimated: true });
+  });
+
+  it('scores a judge call that succeeds on the fifth attempt and records a 429 that uses every attempt', async () => {
+    const dir = tempDir();
+    let judgeTries = 0;
+    const retryDelays: number[] = [];
+    const fetchImpl: FetchLike = async (_url, init) => {
+      const body = JSON.parse(init.body) as { messages: Array<{ role: string }> };
+      const interview = body.messages.every((message) => message.role !== 'system');
+      if (!interview) {
+        judgeTries += 1;
+        if (judgeTries < 5) {
+          return {
+            ok: false,
+            status: 429,
+            async text() {
+              return JSON.stringify({ error: { message: 'Provider returned error' } });
+            },
+          };
+        }
+      }
+      return jsonResponse({
+        model: 'openai/gpt-5-nano',
+        provider: 'Google',
+        choices: [{
+          message: { content: interview ? 'answer' : scoreText(neutralScores({ openness: 33 })) },
+        }],
+        usage: { prompt_tokens: 2, completion_tokens: 2 },
+      });
+    };
+    const scored = await runBenchmark({
+      config: testConfig({
+        repeats: 1,
+        judgeModelId: 'openai/gpt-5-nano',
+        models: [{ id: 'openai/gpt-5-nano', enabled: true, inputPerMillionUsd: 0, outputPerMillionUsd: 0 }],
+      }),
+      client: createOpenRouterClient({
+        apiKey: 'sk-test-secret',
+        baseUrl: 'https://openrouter.ai/api/v1',
+        fetchImpl,
+        random: () => 0.5,
+        sleep: async (ms) => {
+          retryDelays.push(ms);
+        },
+      }),
+      scenarios: [{ id: 'one', text: 'scenario' }],
+      now: fixedNow,
+      scoreFilePath: path.join(dir, 'scores-a.json'),
+      ledgerPath: path.join(dir, 'ledger-a.jsonl'),
+      existingScoreFile: null,
+    });
+    expect(judgeTries).toBe(5);
+    expect(retryDelays).toEqual([2000, 4000, 8000, 16000]);
+    expect(scored.models[0].scored_runs).toBe(1);
+    expect(scored.models[0].failed_runs).toBe(0);
+    expect(scored.models[0].traits.openness.mean).toBe(33);
+    expect(scored.schema_version).toBe(4);
+
+    let failedJudgeTries = 0;
+    const failedPath = path.join(dir, 'scores-b.json');
+    await expect(runBenchmark({
+      config: testConfig({
+        repeats: 1,
+        judgeModelId: 'openai/gpt-5-nano',
+        models: [{ id: 'openai/gpt-5-nano', enabled: true, inputPerMillionUsd: 0, outputPerMillionUsd: 0 }],
+      }),
+      client: createOpenRouterClient({
+        apiKey: 'sk-test-secret',
+        baseUrl: 'https://openrouter.ai/api/v1',
+        fetchImpl: async (_url, init) => {
+          const body = JSON.parse(init.body) as { messages: Array<{ role: string }> };
+          const interview = body.messages.every((message) => message.role !== 'system');
+          if (!interview) {
+            failedJudgeTries += 1;
+            return {
+              ok: false,
+              status: 429,
+              async text() {
+                return JSON.stringify({ error: { message: 'Provider returned error' } });
+              },
+            };
+          }
+          return jsonResponse({
+            model: 'openai/gpt-5-nano',
+            choices: [{ message: { content: 'answer' } }],
+            usage: { prompt_tokens: 1, completion_tokens: 1 },
+          });
+        },
+        random: () => 0.5,
+        sleep: async () => {},
+      }),
+      scenarios: [{ id: 'one', text: 'scenario' }],
+      now: fixedNow,
+      scoreFilePath: failedPath,
+      ledgerPath: path.join(dir, 'ledger-b.jsonl'),
+      existingScoreFile: null,
+    })).rejects.toBeInstanceOf(AllModelsFailedError);
+    const failed = readScoreFile(failedPath);
+    expect(failedJudgeTries).toBe(OPENROUTER_MAX_ATTEMPTS);
+    expect(failed?.models[0].scored_runs).toBe(0);
+    expect(failed?.models[0].failed_runs).toBe(1);
+    expect(failed?.models[0].failures[0]).toMatchObject({ kind: 'judge', repeat: 1 });
+    expect(failed?.models[0].failures[0].reason).toMatch(/\(429\) after 6 attempts: Provider returned error/);
+  });
+
+  it('paces interview and judge calls that share the judge model id', async () => {
+    const dir = tempDir();
+    const gaps: number[] = [];
+    let clock = 0;
+    const calls: string[] = [];
+    const scoreFile = await runBenchmark({
+      config: testConfig({
+        repeats: 2,
+        judgeMinIntervalMs: 750,
+        judgeModelId: 'google/gemini-2.5-flash-lite',
+        models: [
+          { id: 'openai/gpt-5-nano', enabled: true, inputPerMillionUsd: 0, outputPerMillionUsd: 0 },
+          { id: 'google/gemini-2.5-flash-lite', enabled: true, inputPerMillionUsd: 0, outputPerMillionUsd: 0 },
+        ],
+      }),
+      client: {
+        async complete(request) {
+          calls.push(`${request.kind}:${request.model}`);
+          return {
+            content: request.kind === 'judge' ? scoreText(neutralScores({ openness: 40 })) : 'answer',
+            modelVersion: request.model,
+            promptTokens: 1,
+            completionTokens: 1,
+            usageEstimated: false,
+            provider: null,
+          };
+        },
+      },
+      scenarios: [{ id: 'one', text: 'scenario' }],
+      now: fixedNow,
+      clock: () => clock,
+      sleep: async (ms) => {
+        gaps.push(ms);
+        clock += ms;
+      },
+      scoreFilePath: path.join(dir, 'scores.json'),
+      ledgerPath: path.join(dir, 'ledger.jsonl'),
+      existingScoreFile: null,
+    });
+    expect(calls).toEqual([
+      'interview:openai/gpt-5-nano',
+      'judge:google/gemini-2.5-flash-lite',
+      'interview:openai/gpt-5-nano',
+      'judge:google/gemini-2.5-flash-lite',
+      'interview:google/gemini-2.5-flash-lite',
+      'judge:google/gemini-2.5-flash-lite',
+      'interview:google/gemini-2.5-flash-lite',
+      'judge:google/gemini-2.5-flash-lite',
+    ]);
+    expect(gaps).toEqual([750, 750, 750, 750, 750]);
+    expect(scoreFile.models.map((model) => model.scored_runs)).toEqual([2, 2]);
   });
 });
 

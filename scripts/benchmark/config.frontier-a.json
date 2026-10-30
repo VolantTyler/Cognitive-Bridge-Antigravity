@@ -1,0 +1,72 @@
+{
+  "priceDate": "2026-10-30",
+  "run_label": "frontier-a",
+  "priceNote": "USD per 1,000,000 tokens. The four enabled models are OpenRouter list prices from priceDate. google/gemini-2.5-flash-lite is disabled and is listed only so the pinned judge has a price (0.10 / 0.40, same as config.json). At most maxEnabledModels models may be enabled.",
+  "baseUrl": "https://openrouter.ai/api/v1",
+  "interview": {
+    "systemPrompt": null,
+    "temperature": 0.8,
+    "maxOutputTokens": 8192,
+    "retryMaxOutputTokens": 16384,
+    "reasoningEffort": "minimal",
+    "repeats": 10
+  },
+  "judge": {
+    "modelId": "google/gemini-2.5-flash-lite",
+    "temperature": 0,
+    "maxOutputTokens": 8192,
+    "version": null
+  },
+  "limits": {
+    "warnPerRunUsd": 10,
+    "hardStopPerRunUsd": 15,
+    "warnPerMonthUsd": 40
+  },
+  "maxEnabledModels": 12,
+  "judgeMinIntervalMs": 750,
+  "wideRangeThreshold": 40,
+  "spreadThreshold": 10,
+  "traitConfidence": {
+    "openness": "normal",
+    "conscientiousness": "normal",
+    "extroversion": "low",
+    "agreeableness": "normal",
+    "neuroticism": "normal"
+  },
+  "paths": {
+    "scoreFile": "scripts/benchmark/output/scores.json",
+    "ledger": "scripts/benchmark/output/ledger.jsonl"
+  },
+  "models": [
+    {
+      "id": "google/gemini-3.8-flash",
+      "enabled": true,
+      "inputPerMillionUsd": 0.825,
+      "outputPerMillionUsd": 4.125
+    },
+    {
+      "id": "x-ai/grok-4.7",
+      "enabled": true,
+      "inputPerMillionUsd": 2,
+      "outputPerMillionUsd": 6
+    },
+    {
+      "id": "anthropic/claude-opus-5.5",
+      "enabled": true,
+      "inputPerMillionUsd": 4,
+      "outputPerMillionUsd": 20
+    },
+    {
+      "id": "openai/gpt-6-luna",
+      "enabled": true,
+      "inputPerMillionUsd": 0.1,
+      "outputPerMillionUsd": 0.5
+    },
+    {
+      "id": "google/gemini-2.5-flash-lite",
+      "enabled": false,
+      "inputPerMillionUsd": 0.1,
+      "outputPerMillionUsd": 0.4
+    }
+  ]
+}
