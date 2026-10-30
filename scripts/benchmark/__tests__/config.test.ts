@@ -3,9 +3,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import path from 'path';
 import { describe, expect, it } from 'vitest';
 import { INITIAL_MIRROR_MESSAGE, MIRROR_SYSTEM_PROMPT } from '../../../src/constants';
-import { loadConfig, parseConfig, runnableModels, skippedModels } from '../config';
+import { DEFAULT_CONFIG_PATH, loadConfig, parseConfig, runnableModels, skippedModels } from '../config';
 import { ConfigError } from '../errors';
 import { interviewScenarios } from '../scenarios';
 
@@ -120,6 +121,37 @@ describe('shipped benchmark config', () => {
     const parsed = parseConfig(raw);
     expect(skippedModels(parsed)).toContainEqual({ id: 'x-ai/grok-4.3', reason: 'no price' });
     expect(runnableModels(parsed).map((model) => model.id)).not.toContain('x-ai/grok-4.3');
+  });
+});
+
+describe('frontier benchmark config', () => {
+  const frontierPath = path.join(path.dirname(DEFAULT_CONFIG_PATH), 'config.frontier.json');
+  const frontier = loadConfig(frontierPath);
+  const shipped = loadConfig();
+
+  it('enables exactly the four near-frontier models and keeps the default settings', () => {
+    expect(frontier.runLabel).toBe('frontier');
+    expect(frontier.priceDate).toBe('2026-10-30');
+    expect(frontier.interview).toEqual(shipped.interview);
+    expect(frontier.judge).toEqual(shipped.judge);
+    expect(frontier.limits).toEqual(shipped.limits);
+    expect(frontier.maxEnabledModels).toBe(shipped.maxEnabledModels);
+    expect(frontier.paths).toEqual(shipped.paths);
+    expect(frontier.traitConfidence).toEqual(shipped.traitConfidence);
+    expect(runnableModels(frontier).map((model) => [model.id, model.inputPerMillionUsd, model.outputPerMillionUsd])).toEqual([
+      ['google/gemini-3.8-flash', 0.825, 4.125],
+      ['x-ai/grok-4.7', 2, 6],
+      ['anthropic/claude-opus-5.5', 4, 20],
+      ['openai/gpt-6-luna', 0.1, 0.5],
+    ]);
+    expect(skippedModels(frontier)).toEqual([
+      { id: 'google/gemini-2.5-flash-lite', reason: 'disabled' },
+    ]);
+    expect(frontier.models.find((model) => model.id === 'google/gemini-2.5-flash-lite')).toMatchObject({
+      enabled: false,
+      inputPerMillionUsd: 0.1,
+      outputPerMillionUsd: 0.4,
+    });
   });
 });
 

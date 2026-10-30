@@ -2,10 +2,21 @@
 
 Offline-first pipeline that interviews the enabled OpenRouter models and caches Mirror scores. Commands and the list of what this does **not** validate are in the root README under "Model benchmark". The shipped file enables the original four and lists more candidates with `enabled: false`.
 
+Commands run from the repo root. `--config` is optional. Without it, the CLI reads `scripts/benchmark/config.json` (the original four). `config.frontier.json` enables Tyler's near-frontier four and does not change that default file. Both files write `scripts/benchmark/output/scores.json`. Each run replaces that file, so copy or rename it before the next run. A frontier run after an original-four run, or the reverse, drops the models that were not enabled for the new run.
+
 ```bash
 npm run benchmark:dry-run
+npm run benchmark:dry-run -- --config scripts/benchmark/config.frontier.json
+
 export OPENROUTER_API_KEY="your-openrouter-key"
 npm run benchmark
+npm run benchmark -- --config scripts/benchmark/config.frontier.json
+```
+
+Before switching configs:
+
+```bash
+cp scripts/benchmark/output/scores.json scripts/benchmark/output/scores-default.json
 ```
 
 Outputs (gitignored):
@@ -60,27 +71,17 @@ These are already in `config.json` with `"enabled": false`. Prices are the OpenR
 
 `z-ai/glm-4.7-flash` input is stored as 0.061. OpenRouter's per-token prompt price on 2026-10-30 was 0.0000000605, which is $0.0605 per 1M. Re-check it before a run if that gap matters.
 
-### Near-frontier candidates
+### Near-frontier run
 
-These ids are not in `config.json`. Re-verify the current OpenRouter price before enabling any of them. Do not copy a price from memory. On each model, read `pricing.prompt` and `pricing.completion` (USD per token) and multiply by 1,000,000.
+`config.frontier.json` enables exactly these four. Prices are OpenRouter list prices from 2026-10-30, USD per 1M tokens. All four list a reasoning parameter, so the shared `reasoning.effort` of `minimal` is sent to them the same way as to the original four. The public models list was checked on 2026-10-30; these four were not called live.
 
-Add an object to `models`, fill the two prices, and set `enabled` to true only for the set you want in that run:
+| id | input | output |
+| --- | --- | --- |
+| `google/gemini-3.8-flash` | 0.825 | 4.125 |
+| `x-ai/grok-4.7` | 2.00 | 6.00 |
+| `anthropic/claude-opus-5.5` | 4.00 | 20.00 |
+| `openai/gpt-6-luna` | 0.10 | 0.50 |
 
-```json
-{
-  "id": "google/gemini-3.8-flash",
-  "enabled": false,
-  "inputPerMillionUsd": null,
-  "outputPerMillionUsd": null
-}
-```
+`google/gemini-2.5-flash-lite` is in that file with `enabled: false` and the same 0.10 / 0.40 price as `config.json`. The pinned judge has to have a price, and this row is not interviewed. Caps, repeats, temperature, reasoning effort, and the $10 / $15 / $40 limits match `config.json`. `run_label` is `frontier`.
 
-Replace both nulls with the figures you just checked. Leave `enabled` false until then. An enabled model with a null price is skipped. Stay within `maxEnabledModels`.
-
-Candidates, prices intentionally omitted:
-
-- `google/gemini-3.8-flash`
-- `anthropic/claude-sonnet-5.5`
-- `x-ai/grok-4.7`
-- `anthropic/claude-opus-5.5`
-- `openai/gpt-5.5`
+`anthropic/claude-sonnet-5.5` and `openai/gpt-5.5` are still not in either file. Re-check OpenRouter's per-token `pricing.prompt` and `pricing.completion`, multiply by 1,000,000, and add a priced row before enabling either one.

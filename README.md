@@ -98,12 +98,17 @@ When a user clicks "Leave Feedback" in the footer and submits the feedback form:
 Tyler can estimate or run the Cognitive Bridge 2.0 model benchmark without changing the app. The pipeline lives in `scripts/benchmark/`. It interviews each enabled model with the same five scenarios, in the same order, and asks one pinned judge to score **behavior in those answers** with the Mirror `JSON_SCORES` rubric. It does not ask a model to fill out a personality questionnaire about itself.
 
 ```bash
-# No key and no network. Prints an upper-bound USD estimate.
+# No key and no network. Prints an upper-bound USD estimate for config.json.
 npm run benchmark:dry-run
 
+# Same estimate for the near-frontier four in config.frontier.json.
+npm run benchmark:dry-run -- --config scripts/benchmark/config.frontier.json
+
 # Live run. The key is read only from the environment.
+# Copy scores.json before switching configs. Each run replaces that file.
 export OPENROUTER_API_KEY="your-openrouter-key"
 npm run benchmark
+npm run benchmark -- --config scripts/benchmark/config.frontier.json
 ```
 
 Cached scores are written to `scripts/benchmark/output/scores.json` (gitignored, schema version 4). The file includes `run_label` next to `generated_at` (a file that omits it loads as unlabeled) and each model's `providers_seen`. Each run replaces that file with only the models enabled for that run. It does not merge repeats or models into an older file. The default is 10 repeats, with the same judge, interview temperature 0.8, 8192 output cap, and `minimal` reasoning effort. `config.json` may enable at most `maxEnabledModels` (12). Extra candidates stay in the file with `enabled: false`. Every call's token counts and USD cost are appended to `scripts/benchmark/output/ledger.jsonl`. If a previous score file was produced by a different judge version string, the CLI stops and tells you to rerun with `npm run benchmark -- --rescore-all`. A score file from schema version 3 will not load. A stored strategy table that differs, including the previous extroversion `exclusion_reason` wording, fails `matchModels` and tells you to delete `scripts/benchmark/output/scores.json` and re-run. Loading that file for a new benchmark run does not do that check, so the run replaces the file when the judge version string still matches.
