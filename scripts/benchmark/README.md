@@ -1,6 +1,6 @@
 # Model benchmark
 
-Offline-first pipeline that interviews four OpenRouter models and caches Mirror scores. Commands and the list of what this does **not** validate are in the root README under "Model benchmark".
+Offline-first pipeline that interviews the enabled OpenRouter models and caches Mirror scores. Commands and the list of what this does **not** validate are in the root README under "Model benchmark". The shipped file enables the original four and lists more candidates with `enabled: false`.
 
 ```bash
 npm run benchmark:dry-run
@@ -10,7 +10,7 @@ npm run benchmark
 
 Outputs (gitignored):
 
-- `scripts/benchmark/output/scores.json` — schema version 4. Each run replaces this file and does not merge an older one. Default repeats: 10. Delete an older file if matching or loading tells you the schema or strategy table is out of date.
+- `scripts/benchmark/output/scores.json` — schema version 4. Each run replaces this file and does not merge an older one. The new file contains only the models enabled for that run, so a model scored earlier and left disabled is dropped. The previous file is read first only to refuse a different judge version string (`--rescore-all` overrides that). A hard stop after at least one model has finished also replaces the file with those finished models (`partial: true`). A hard stop before any model finishes leaves the previous file in place. `matchModels` compares `strategy_table`, including `exclusion_reason`. A score file from PR #34, whose extroversion exclusion wording still says the means were between 55 and 61, fails that check. Loading the file does not. Delete it and re-run, or run the benchmark again with the same judge version string so the file is replaced. Default repeats: 10.
 - `scripts/benchmark/output/ledger.jsonl` — one row per call with token counts and USD cost. Estimated rows (no usage came back) do not count toward the $40 monthly warning.
 
 Every model and the judge use the same `maxOutputTokens` (8192) and the same OpenRouter `reasoning.effort` (`minimal`). A length cutoff with empty `message.content` retries once at `retryMaxOutputTokens` (16384). The judge scores `message.content` only, never `message.reasoning`. One model's failed repeat does not stop the others. `runs` is the number of scored repeats, `fewer_runs` is true when that is short of the configured count, and a model that fails more than half its repeats is `not_scored` with `not_scored_reason`. Exit code 4 means every model failed. The dry run assumes each call uses the full cap, because reasoning tokens are billed as completion tokens.
@@ -21,4 +21,48 @@ Active traits are strictly above 70 or below 30, same as `getActiveDirectives`. 
 
 OpenRouter's response `model` field is often only the requested model id, not a dated build. The score file stores that string as `judge.version` and a UTC `judge.recorded_at` beside it. Each run stores `recorded_at` beside `judge_version`. The mix guard compares version strings, so a new timestamp alone does not force `--rescore-all`.
 
-Each trait has `wide_range`. The model-level `wide_range` is true when any trait flag is. When `spread_warning` is true, `matchModels` adds `relative_rank` (1 is closest to the target profile) and `ranking_note` ("Ranking is relative because models cluster"). Tiers stay. A model missing any active trait that counts toward the tier is `not_scored` with `missing_traits`, and is not ranked. Both extroversion rows are excluded from tiering (`exclusion_reason` explains why). Extroversion means, min, max, and the low-confidence flag stay in the score file, and extroversion still appears in `active_traits`. If it is the only active trait, the result is `no strong recommendation`. UI cards should read each model's `driving_traits` for the tier and `exclusion_reason` for an excluded trait. A judge HTTP 429 leaves that repeat unscored. A model that fails more than half of its repeats (6 or more of 10) is `not_scored`.
+Each trait has `wide_range`. The model-level `wide_range` is true when any trait flag is. When `spread_warning` is true, `matchModels` adds `relative_rank` (1 is closest to the target profile) and `ranking_note` ("Ranking is relative because models cluster"). Tiers stay. A model missing any active trait that counts toward the tier is `not_scored` with `missing_traits`, and is not ranked. Both extroversion rows are excluded from tiering (`exclusion_reason` explains why: no benchmarked model scored extroversion below 50, and the table needs one). Extroversion means, min, max, and the low-confidence flag stay in the score file, and extroversion still appears in `active_traits`. If it is the only active trait, the result is `no strong recommendation`. UI cards should read each model's `driving_traits` for the tier and `exclusion_reason` for an excluded trait. A judge HTTP 429 leaves that repeat unscored. A model that fails more than half of its repeats (6 or more of 10) is `not_scored`.
+
+## Enabling more models
+
+`maxEnabledModels` in `config.json` is 12. Disabled models are skipped and do not count toward the cap. Turn a set on by setting `enabled` to true, staying at or under 12. Prices below are USD per 1,000,000 tokens.
+
+### Open-weight candidates
+
+These are already in `config.json` with `"enabled": false`. Prices are the OpenRouter snapshot from 2026-10-29. The original four stay on the 2026-10-05 prices in the same file.
+
+| id | input | output |
+| --- | --- | --- |
+| `deepseek/deepseek-v4-flash` | 0.091 | 0.182 |
+| `z-ai/glm-4.7-flash` | 0.061 | 0.40 |
+| `stepfun/step-3.5-flash` | 0.10 | 0.30 |
+| `qwen/qwen3-235b-a22b-2507` | 0.09 | 0.55 |
+| `minimax/minimax-m2.7` | 0.30 | 1.20 |
+| `moonshotai/kimi-k2-0905` | 0.60 | 2.50 |
+
+`z-ai/glm-4.7-flash` input is stored as 0.061. OpenRouter's per-token prompt price on 2026-10-30 was 0.0000000605, which is $0.0605 per 1M. Re-check it before a run if that gap matters.
+
+### Near-frontier candidates
+
+These ids are not in `config.json`. Re-verify the current OpenRouter price before enabling any of them. Do not copy a price from memory. On each model, read `pricing.prompt` and `pricing.completion` (USD per token) and multiply by 1,000,000.
+
+Add an object to `models`, fill the two prices, and set `enabled` to true only for the set you want in that run:
+
+```json
+{
+  "id": "google/gemini-3.8-flash",
+  "enabled": false,
+  "inputPerMillionUsd": null,
+  "outputPerMillionUsd": null
+}
+```
+
+Replace both nulls with the figures you just checked. Leave `enabled` false until then. An enabled model with a null price is skipped. Stay within `maxEnabledModels`.
+
+Candidates, prices intentionally omitted:
+
+- `google/gemini-3.8-flash`
+- `anthropic/claude-sonnet-5.5`
+- `x-ai/grok-4.7`
+- `anthropic/claude-opus-5.5`
+- `openai/gpt-5.5`

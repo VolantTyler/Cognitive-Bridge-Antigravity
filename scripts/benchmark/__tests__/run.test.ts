@@ -9,7 +9,7 @@ import { describe, expect, it } from 'vitest';
 import { readLedger } from '../cost';
 import { AllModelsFailedError, HardStopError, JudgeMixError } from '../errors';
 import { createOpenRouterClient, type FetchLike } from '../openrouter';
-import { matchModels } from '../match';
+import { EXTROVERSION_EXCLUSION_REASON, matchModels } from '../match';
 import type { ChatClient, ChatRequest } from '../types';
 import { readScoreFile } from '../scorefile';
 import { runBenchmark } from '../run';
@@ -567,6 +567,68 @@ describe('benchmark run', () => {
     const saved = readScoreFile(scorePath);
     expect(saved?.models.map((model) => model.scored_runs)).toEqual([0, 0]);
     expect(saved?.models.every((model) => model.not_scored_reason)).toBe(true);
+  });
+
+  it('replaces scores.json with only this run’s enabled models', async () => {
+    const dir = tempDir();
+    const scorePath = path.join(dir, 'scores.json');
+    const ledgerPath = path.join(dir, 'ledger.jsonl');
+    const first = await runBenchmark({
+      config: testConfig({
+        models: [
+          { id: 'openai/gpt-5-nano', enabled: true, inputPerMillionUsd: 0, outputPerMillionUsd: 0 },
+          { id: 'google/gemini-2.5-flash-lite', enabled: true, inputPerMillionUsd: 0, outputPerMillionUsd: 0 },
+        ],
+      }),
+      client: recordingClient().client,
+      scenarios: [{ id: 'one', text: 'scenario' }],
+      now: fixedNow,
+      scoreFilePath: scorePath,
+      ledgerPath,
+    });
+    expect(first.models.map((model) => model.id)).toEqual([
+      'openai/gpt-5-nano',
+      'google/gemini-2.5-flash-lite',
+    ]);
+
+    const stored = JSON.parse(fs.readFileSync(scorePath, 'utf8')) as {
+      strategy_table: Array<{ trait: string; exclusion_reason: string | null }>;
+    };
+    const previousWording = 'Excluded from tiering: benchmarked models scored extroversion between 55 and 61, and the table needs a model below 50. Means are still reported.';
+    for (const row of stored.strategy_table) {
+      if (row.trait === 'extroversion') row.exclusion_reason = previousWording;
+    }
+    fs.writeFileSync(scorePath, JSON.stringify(stored));
+    const stale = readScoreFile(scorePath);
+    expect(stale).not.toBeNull();
+    expect(() => matchModels(neutralScores({ openness: 90 }), stale!)).toThrow(/exclusion_reason/);
+    expect(() => matchModels(neutralScores({ openness: 90 }), stale!)).toThrow(/Delete the existing scores.json/);
+
+    const replaced = await runBenchmark({
+      config: testConfig({
+        models: [
+          { id: 'openai/gpt-5-nano', enabled: false, inputPerMillionUsd: 0, outputPerMillionUsd: 0 },
+          { id: 'google/gemini-2.5-flash-lite', enabled: true, inputPerMillionUsd: 0, outputPerMillionUsd: 0 },
+          { id: 'qwen/qwen3-235b-a22b-2507', enabled: true, inputPerMillionUsd: 0.09, outputPerMillionUsd: 0.55 },
+        ],
+      }),
+      client: recordingClient({ scores: neutralScores({ openness: 11 }) }).client,
+      scenarios: [{ id: 'one', text: 'scenario' }],
+      now: fixedNow,
+      scoreFilePath: scorePath,
+      ledgerPath,
+    });
+    expect(replaced.models.map((model) => model.id)).toEqual([
+      'google/gemini-2.5-flash-lite',
+      'qwen/qwen3-235b-a22b-2507',
+    ]);
+    const saved = readScoreFile(scorePath);
+    expect(saved?.models.map((model) => model.id)).toEqual([
+      'google/gemini-2.5-flash-lite',
+      'qwen/qwen3-235b-a22b-2507',
+    ]);
+    expect(saved?.strategy_table.filter((row) => row.trait === 'extroversion').every((row) => row.exclusion_reason === EXTROVERSION_EXCLUSION_REASON)).toBe(true);
+    expect(JSON.stringify(saved)).not.toContain('between 55 and 61');
   });
 });
 

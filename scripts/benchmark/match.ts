@@ -23,7 +23,7 @@ import {
   type TargetDirection,
 } from './types';
 
-export const EXTROVERSION_EXCLUSION_REASON = 'Excluded from tiering: benchmarked models scored extroversion between 55 and 61, and the table needs a model below 50. Means are still reported.';
+export const EXTROVERSION_EXCLUSION_REASON = 'Excluded from tiering: no benchmarked model scored extroversion below 50, and the table needs one. Means are still reported.';
 
 const counted = { exclude_from_tiering: false, exclusion_reason: null } as const;
 
@@ -103,7 +103,7 @@ export function assertStoredStrategyTable(stored: StrategyRow[] | undefined): vo
     && stored.every((row, index) => sameStrategyRow(row, STRATEGY_TABLE[index]));
   if (!matches) {
     throw new Error(
-      'Score file strategy_table does not match the in-code STRATEGY_TABLE. Refusing to match against a different hypothesis. Delete the existing scores.json and re-run the benchmark. This run does not merge an older score file.',
+      'Score file strategy_table does not match the in-code STRATEGY_TABLE, including a changed exclusion_reason. A score file written with the previous extroversion exclusion wording fails this check. Refusing to match against a different hypothesis. Delete the existing scores.json and re-run the benchmark. This run does not merge an older score file.',
     );
   }
 }
