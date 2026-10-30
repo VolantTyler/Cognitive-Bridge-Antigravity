@@ -68,6 +68,8 @@ export interface BenchmarkConfig {
     hardStopPerRunUsd: number;
     warnPerMonthUsd: number;
   };
+  /** How many models may have `enabled: true` in one run. */
+  maxEnabledModels: number;
   wideRangeThreshold: number;
   spreadThreshold: number;
   /** Published confidence copied onto each model's trait stats in the score file. */

@@ -139,6 +139,11 @@ export function parseConfig(value: unknown): BenchmarkConfig {
     throw new ConfigError('cost limits must be non-negative');
   }
 
+  const maxEnabledModels = requireNumber(value.maxEnabledModels, 'maxEnabledModels');
+  if (!Number.isInteger(maxEnabledModels) || maxEnabledModels < 1) {
+    throw new ConfigError('maxEnabledModels must be a positive integer');
+  }
+
   const wideRangeThreshold = requireNumber(value.wideRangeThreshold, 'wideRangeThreshold');
   const spreadThreshold = requireNumber(value.spreadThreshold, 'spreadThreshold');
   if (!isRecord(value.traitConfidence)) {
@@ -173,8 +178,10 @@ export function parseConfig(value: unknown): BenchmarkConfig {
     ids.add(model.id);
   }
   const enabledCount = models.filter((model) => model.enabled).length;
-  if (enabledCount > 4) {
-    throw new ConfigError(`At most 4 models may be enabled (found ${enabledCount}). Do not add a fifth.`);
+  if (enabledCount > maxEnabledModels) {
+    throw new ConfigError(
+      `At most ${maxEnabledModels} models may be enabled (found ${enabledCount}).`,
+    );
   }
 
   const config: BenchmarkConfig = {
@@ -195,6 +202,7 @@ export function parseConfig(value: unknown): BenchmarkConfig {
       version: judgeVersion,
     },
     limits: { warnPerRunUsd, hardStopPerRunUsd, warnPerMonthUsd },
+    maxEnabledModels,
     wideRangeThreshold,
     spreadThreshold,
     traitConfidence,

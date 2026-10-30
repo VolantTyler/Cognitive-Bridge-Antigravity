@@ -1,6 +1,6 @@
 {
   "priceDate": "2026-10-05",
-  "priceNote": "USD per 1,000,000 tokens as of priceDate. An enabled model with a null input or output price is skipped. At most 4 models may be enabled.",
+  "priceNote": "USD per 1,000,000 tokens. The four enabled models are priced as of priceDate (2026-10-05). The six disabled open-weight models are the OpenRouter snapshot from 2026-10-29. An enabled model with a null input or output price is skipped. At most maxEnabledModels models may be enabled.",
   "baseUrl": "https://openrouter.ai/api/v1",
   "interview": {
     "systemPrompt": null,
@@ -21,6 +21,7 @@
     "hardStopPerRunUsd": 15,
     "warnPerMonthUsd": 40
   },
+  "maxEnabledModels": 12,
   "wideRangeThreshold": 40,
   "spreadThreshold": 10,
   "traitConfidence": {
@@ -57,6 +58,42 @@
       "id": "x-ai/grok-4.3",
       "enabled": true,
       "inputPerMillionUsd": 1.25,
+      "outputPerMillionUsd": 2.5
+    },
+    {
+      "id": "deepseek/deepseek-v4-flash",
+      "enabled": false,
+      "inputPerMillionUsd": 0.091,
+      "outputPerMillionUsd": 0.182
+    },
+    {
+      "id": "z-ai/glm-4.7-flash",
+      "enabled": false,
+      "inputPerMillionUsd": 0.061,
+      "outputPerMillionUsd": 0.4
+    },
+    {
+      "id": "stepfun/step-3.5-flash",
+      "enabled": false,
+      "inputPerMillionUsd": 0.1,
+      "outputPerMillionUsd": 0.3
+    },
+    {
+      "id": "qwen/qwen3-235b-a22b-2507",
+      "enabled": false,
+      "inputPerMillionUsd": 0.09,
+      "outputPerMillionUsd": 0.55
+    },
+    {
+      "id": "minimax/minimax-m2.7",
+      "enabled": false,
+      "inputPerMillionUsd": 0.3,
+      "outputPerMillionUsd": 1.2
+    },
+    {
+      "id": "moonshotai/kimi-k2-0905",
+      "enabled": false,
+      "inputPerMillionUsd": 0.6,
       "outputPerMillionUsd": 2.5
     }
   ]

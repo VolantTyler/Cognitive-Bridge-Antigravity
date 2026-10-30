@@ -25,6 +25,7 @@ describe('shipped benchmark config', () => {
     expect(config.judge.modelId).toBe('google/gemini-2.5-flash-lite');
     expect(config.judge.temperature).toBe(0);
     expect(config.limits).toEqual({ warnPerRunUsd: 10, hardStopPerRunUsd: 15, warnPerMonthUsd: 40 });
+    expect(config.maxEnabledModels).toBe(12);
     expect(config.traitConfidence.extroversion).toBe('low');
     expect(runnableModels(config).map((model) => [model.id, model.inputPerMillionUsd, model.outputPerMillionUsd])).toEqual([
       ['openai/gpt-5-nano', 0.05, 0.4],
@@ -33,18 +34,45 @@ describe('shipped benchmark config', () => {
       ['x-ai/grok-4.3', 1.25, 2.5],
     ]);
     expect(config.models.filter((model) => model.enabled)).toHaveLength(4);
+    expect(config.models.filter((model) => !model.enabled).map((model) => [model.id, model.inputPerMillionUsd, model.outputPerMillionUsd])).toEqual([
+      ['deepseek/deepseek-v4-flash', 0.091, 0.182],
+      ['z-ai/glm-4.7-flash', 0.061, 0.4],
+      ['stepfun/step-3.5-flash', 0.1, 0.3],
+      ['qwen/qwen3-235b-a22b-2507', 0.09, 0.55],
+      ['minimax/minimax-m2.7', 0.3, 1.2],
+      ['moonshotai/kimi-k2-0905', 0.6, 2.5],
+    ]);
+    expect(skippedModels(config).map((model) => model.reason)).toEqual([
+      'disabled',
+      'disabled',
+      'disabled',
+      'disabled',
+      'disabled',
+      'disabled',
+    ]);
   });
 
-  it('rejects a fifth enabled model and a zero interview temperature', () => {
-    const raw = JSON.parse(JSON.stringify(config)) as Record<string, unknown>;
-    const models = (raw.models as unknown[]).concat({
-      id: 'extra/model',
+  it('allows more than four enabled models up to maxEnabledModels', () => {
+    const raw = JSON.parse(JSON.stringify(config)) as {
+      models: Array<{ id: string; enabled: boolean }>;
+      maxEnabledModels: number;
+    };
+    const five = raw.models.map((model, index) => ({ ...model, enabled: index < 5 }));
+    expect(parseConfig({ ...raw, models: five }).models.filter((model) => model.enabled)).toHaveLength(5);
+    const extras = Array.from({ length: 9 }, (_, index) => ({
+      id: `extra/model-${index}`,
       enabled: true,
       inputPerMillionUsd: 1,
       outputPerMillionUsd: 1,
-    });
-    expect(() => parseConfig({ ...raw, models })).toThrow(ConfigError);
-    expect(() => parseConfig({ ...raw, models })).toThrow(/fifth|At most 4/);
+    }));
+    expect(() => parseConfig({ ...raw, models: [...raw.models, ...extras] })).toThrow(ConfigError);
+    expect(() => parseConfig({ ...raw, models: [...raw.models, ...extras] })).toThrow(/At most 12 models may be enabled \(found 13\)/);
+    expect(() => parseConfig({ ...raw, maxEnabledModels: 3 })).toThrow(/At most 3 models may be enabled \(found 4\)/);
+    expect(() => parseConfig({ ...raw, maxEnabledModels: 0 })).toThrow(/positive integer/);
+  });
+
+  it('rejects a zero interview temperature', () => {
+    const raw = JSON.parse(JSON.stringify(config)) as Record<string, unknown>;
     expect(() => parseConfig({
       ...raw,
       interview: { ...(raw.interview as object), temperature: 0 },
