@@ -5,7 +5,8 @@
 
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { RELATIVE_RANKING_NOTE } from '../../../scripts/benchmark/match';
+import { RELATIVE_RANKING_NOTE, matchModels } from '../../../scripts/benchmark/match';
+import { buildScoreFile, type CompletedModelRun } from '../../../scripts/benchmark/scorefile';
 import { HYPOTHESIS_LABEL, type MatchResult, type ScoreFile } from '../../../scripts/benchmark/types';
 import { agreeablenessTieView, realScoreFile, sampleEntry, sampleView } from '../__fixtures__/joinSamples';
 import {
@@ -382,11 +383,177 @@ describe('acceptance fixtures', () => {
     renderView(buildView(match, file));
     expect(screen.getAllByText('Strong fit').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Decent fit').length).toBeGreaterThan(0);
-    expect(screen.getByText('Closest to your target: 1 of 2')).toBeInTheDocument();
-    expect(screen.getByText('Closest to your target: 2 of 2')).toBeInTheDocument();
+    expect(screen.getAllByText('rank 1 of 1 in this group')).toHaveLength(2);
+    expect(screen.queryByText(/of 2/)).toBeNull();
     expect(screen.getAllByText(RELATIVE_RANKING_NOTE)).toHaveLength(1);
     const decent = screen.getByRole('list', { name: 'Decent fit' });
     expect(within(decent).getByText('a/model')).toBeInTheDocument();
+    expect(within(decent).getByText('rank 1 of 1 in this group')).toBeInTheDocument();
+  });
+
+  it('renumbers a global rank inside each tier when that rank crosses tiers', () => {
+    const trait = {
+      strategy: 'congruent' as const,
+      target_direction: 'high' as const,
+      confidence: 'normal' as const,
+      included_in_tier: true,
+      exclusion_reason: null,
+      user_score: 90,
+    };
+    const match: MatchResult = {
+      label: HYPOTHESIS_LABEL,
+      recommendation: 'tiers',
+      targets: [{
+        trait: 'openness', threshold: 'high', strategy: 'congruent', target_direction: 'high',
+        confidence: 'normal', exclude_from_tiering: false, exclusion_reason: null, user_score: 90,
+      }],
+      strategy_table: [],
+      active_traits: ['openness'],
+      ranking_note: RELATIVE_RANKING_NOTE,
+      models: [
+        {
+          model_id: 'a-strong-far',
+          tier: 'strong',
+          driving_traits: ['openness'],
+          missing_traits: [],
+          relative_rank: 3,
+          traits: { openness: { ...trait, model_mean: 60, model_low: 55, model_high: 65 } },
+        },
+        {
+          model_id: 'z-strong-closer',
+          tier: 'strong',
+          driving_traits: ['openness'],
+          missing_traits: [],
+          relative_rank: 2,
+          traits: { openness: { ...trait, model_mean: 64, model_low: 58, model_high: 70 } },
+        },
+        {
+          model_id: 'm-decent-closest',
+          tier: 'decent',
+          driving_traits: ['openness'],
+          missing_traits: [],
+          relative_rank: 1,
+          traits: { openness: { ...trait, model_mean: 70, model_low: 40, model_high: 90 } },
+        },
+      ],
+    };
+    const file = { ...realScoreFile, spread_warning: true } as ScoreFile;
+    renderView(buildView(match, file));
+    const strong = screen.getByRole('list', { name: 'Strong fit' });
+    expect(within(strong).getAllByRole('heading', { level: 4 }).map((node) => node.textContent)).toEqual([
+      'z-strong-closer',
+      'a-strong-far',
+    ]);
+    expect(within(strong).getByText('rank 1 of 2 in this group')).toBeInTheDocument();
+    expect(within(strong).getByText('rank 2 of 2 in this group')).toBeInTheDocument();
+    const decent = screen.getByRole('list', { name: 'Decent fit' });
+    expect(within(decent).getByText('rank 1 of 1 in this group')).toBeInTheDocument();
+    expect(screen.queryByText(/of 3/)).toBeNull();
+    expect(screen.getAllByText(RELATIVE_RANKING_NOTE)).toHaveLength(1);
+  });
+
+  it('can come from matchModels: a decent model closer to the target outranks a strong one', () => {
+    const neutral = {
+      openness: 50,
+      conscientiousness: 50,
+      extroversion: 50,
+      agreeableness: 50,
+      neuroticism: 50,
+    };
+    const model = (id: string, openness: number[]): CompletedModelRun => ({
+      id,
+      costUsd: 0.1,
+      timestamp: '2026-11-01T00:00:00.000Z',
+      repeats: openness.map((value, index) => ({
+        repeat: index + 1,
+        modelVersion: id,
+        judgeVersion: 'judge-v1',
+        scores: { ...neutral, openness: value },
+      })),
+    });
+    const file = buildScoreFile({
+      models: [
+        model('strong-just-past-midpoint', [58, 60, 62]),
+        model('decent-closer-to-target', [45, 72, 75]),
+      ],
+      judge: { modelId: 'google/gemini-2.5-flash-lite', version: 'judge-v1', temperature: 0 },
+      interviewTemperature: 0,
+      repeats: 3,
+      generatedAt: '2026-11-01T00:00:00.000Z',
+      priceDate: '2026-10-05',
+      wideRangeThreshold: 40,
+      spreadThreshold: 10,
+      traitConfidence: {
+        openness: 'normal',
+        conscientiousness: 'normal',
+        extroversion: 'normal',
+        agreeableness: 'normal',
+        neuroticism: 'normal',
+      },
+    });
+    const result = matchModels({ ...neutral, openness: 90 }, file);
+    expect(result.ranking_note).toBe(RELATIVE_RANKING_NOTE);
+    const strong = result.models.find((item) => item.model_id === 'strong-just-past-midpoint');
+    const decent = result.models.find((item) => item.model_id === 'decent-closer-to-target');
+    expect(strong?.tier).toBe('strong');
+    expect(decent?.tier).toBe('decent');
+    expect(decent?.relative_rank).toBe(1);
+    expect(strong?.relative_rank).toBe(2);
+    const view = buildView(result, file);
+    renderView(view);
+    expect(screen.getAllByText('rank 1 of 1 in this group')).toHaveLength(2);
+    expect(screen.queryByText('rank 1 of 2 in this group')).toBeNull();
+  });
+
+  it('shows no rank when spread_warning is false, even if relative_rank is set', () => {
+    const match: MatchResult = {
+      label: HYPOTHESIS_LABEL,
+      recommendation: 'tiers',
+      targets: [{
+        trait: 'openness', threshold: 'high', strategy: 'congruent', target_direction: 'high',
+        confidence: 'normal', exclude_from_tiering: false, exclusion_reason: null, user_score: 90,
+      }],
+      strategy_table: [],
+      active_traits: ['openness'],
+      ranking_note: RELATIVE_RANKING_NOTE,
+      models: [
+        {
+          model_id: 'b-model',
+          tier: 'strong',
+          driving_traits: ['openness'],
+          missing_traits: [],
+          relative_rank: 1,
+          traits: {
+            openness: {
+              strategy: 'congruent', target_direction: 'high', confidence: 'normal', included_in_tier: true,
+              exclusion_reason: null, user_score: 90, model_mean: 80, model_low: 70, model_high: 90,
+            },
+          },
+        },
+        {
+          model_id: 'a-model',
+          tier: 'strong',
+          driving_traits: ['openness'],
+          missing_traits: [],
+          relative_rank: 2,
+          traits: {
+            openness: {
+              strategy: 'congruent', target_direction: 'high', confidence: 'normal', included_in_tier: true,
+              exclusion_reason: null, user_score: 90, model_mean: 75, model_low: 70, model_high: 80,
+            },
+          },
+        },
+      ],
+    };
+    renderView(buildView(match, { ...realScoreFile, spread_warning: false } as ScoreFile));
+    expect(screen.queryByText(/in this group/)).toBeNull();
+    expect(screen.queryByText(RELATIVE_RANKING_NOTE)).toBeNull();
+    const strong = screen.getByRole('list', { name: 'Strong fit' });
+    expect(strong).toHaveAttribute('data-ordered', 'model-id');
+    expect(within(strong).getAllByRole('heading', { level: 4 }).map((node) => node.textContent)).toEqual([
+      'a-model',
+      'b-model',
+    ]);
   });
 
   it('tags a low-confidence driving trait from the score file, not the strategy row', () => {

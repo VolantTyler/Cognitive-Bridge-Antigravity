@@ -52,7 +52,7 @@ const NOTES: Record<StateName, string> = {
   error: 'A listed run failed to load. Retry checks that run again.',
   balanced: 'No active traits. No strong recommendation.',
   'low-confidence': 'Openness confidence is low on the score file.',
-  'relative-rank': 'spread_warning is true. Ranks are relative.',
+  'relative-rank': 'matchModels output for a synthetic cluster. The decent model is globally closer. The cards renumber inside each tier.',
 };
 
 function Preview() {
@@ -118,6 +118,7 @@ function Preview() {
             onRetry={() => undefined}
             timeZone="America/New_York"
             initialPoorOpen={params.get('expand') === '1'}
+            initialWhyOpen={params.get('why') === '1'}
             onOpenLeaderboard={(modelId) => setPage(modelId ?? 'leaderboard')}
           />
         ) : (

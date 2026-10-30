@@ -209,6 +209,8 @@ export interface CardModel {
   rows: RowModel[];
   fewerRunsTag: string | null;
   missingTraitLabel: string | null;
+  /** matchModels rank across every scored model. Not shown. */
+  sourceRank: number | null;
   relativeRankLabel: string | null;
   timestampIso: string;
   runLabelChip: string | null;
@@ -316,35 +318,39 @@ function emptyStateFor(match: MatchResult): SectionModel['emptyState'] {
   return { kind: 'excluded', message: NO_RECOMMENDATION };
 }
 
-function sortModels(models: CardModel[], byRank: boolean): CardModel[] {
+/**
+ * Order and label stay inside one tier. matchModels numbers every scored model
+ * in one list, so a decent model can have a better global rank than a strong one.
+ * The displayed "N of M" counts only this group.
+ */
+function orderGroup(models: CardModel[], byRank: boolean): CardModel[] {
   const copy = [...models];
   if (!byRank) {
     copy.sort((a, b) => a.modelId.localeCompare(b.modelId));
-    return copy;
+    return copy.map((card) => ({ ...card, relativeRankLabel: null }));
   }
   copy.sort((a, b) => {
-    const rankA = a.relativeRankLabel == null ? Number.POSITIVE_INFINITY : rankValue(a.relativeRankLabel);
-    const rankB = b.relativeRankLabel == null ? Number.POSITIVE_INFINITY : rankValue(b.relativeRankLabel);
-    if (rankA !== rankB) return rankA - rankB;
-    return a.modelId.localeCompare(b.modelId);
+    if (a.sourceRank == null && b.sourceRank == null) return a.modelId.localeCompare(b.modelId);
+    if (a.sourceRank == null) return 1;
+    if (b.sourceRank == null) return -1;
+    return a.sourceRank - b.sourceRank || a.modelId.localeCompare(b.modelId);
   });
-  return copy;
+  const total = copy.filter((card) => card.sourceRank != null).length;
+  let place = 0;
+  return copy.map((card) => {
+    if (card.sourceRank == null) return { ...card, relativeRankLabel: null };
+    place += 1;
+    return { ...card, relativeRankLabel: `rank ${place} of ${total} in this group` };
+  });
 }
 
-function rankValue(label: string): number {
-  const match = label.match(/(\d+)/);
-  return match ? Number(match[1]) : Number.POSITIVE_INFINITY;
-}
-
-function cardFor(
-  model: MatchModelResult,
-  view: ModelMatchView,
-  rankedCount: number,
-): CardModel {
+function cardFor(model: MatchModelResult, view: ModelMatchView): CardModel {
   const stats = view.statsById[model.model_id];
   const repeats = view.context.repeats;
   const fewerTag = stats ? fewerRunsTag(stats.scored_runs, repeats, stats.fewer_runs) : null;
-  const showRank = view.context.spreadWarning && model.relative_rank != null && model.tier !== 'not_scored';
+  const sourceRank = view.context.spreadWarning && model.tier !== 'not_scored' && model.relative_rank != null
+    ? model.relative_rank
+    : null;
   const rows: RowModel[] = [];
   if (model.tier !== 'not_scored') {
     for (const trait of model.driving_traits) {
@@ -389,7 +395,8 @@ function cardFor(
     missingTraitLabel: model.tier === 'not_scored' && missing.length > 0
       ? `Missing scores for ${joinTraitNames(missing)}.`
       : null,
-    relativeRankLabel: showRank ? `Closest to your target: ${model.relative_rank} of ${rankedCount}` : null,
+    sourceRank,
+    relativeRankLabel: null,
     timestampIso: stats?.timestamp || view.context.generatedAt,
     runLabelChip: displayRunLabel(view.context.runLabel),
     repeats,
@@ -415,12 +422,12 @@ export function deriveSection(view: ModelMatchView): SectionModel {
   const distinctTiers = new Set(scored.map((model) => model.tier));
   const allPoor = scored.length > 0 && scored.every((model) => model.tier === 'poor');
   const allTie = scored.length > 1 && distinctTiers.size === 1 && !allPoor;
-  const rankedCount = match.models.filter((model) => model.relative_rank != null && model.tier !== 'not_scored').length;
-  const byRank = context.spreadWarning && rankedCount > 0;
-  const cards = match.models.map((model) => cardFor(model, view, rankedCount));
+  const byRank = context.spreadWarning && match.ranking_note != null
+    && match.models.some((model) => model.tier !== 'not_scored' && model.relative_rank != null);
+  const cards = match.models.map((model) => cardFor(model, view));
   const groups: GroupModel[] = [];
   for (const id of GROUP_ORDER) {
-    const models = sortModels(
+    const models = orderGroup(
       cards.filter((card) => (id === 'not_scored' ? card.tier === 'not_scored' : card.tier === id)),
       byRank && id !== 'not_scored',
     );

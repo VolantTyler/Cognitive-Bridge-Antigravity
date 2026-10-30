@@ -63,4 +63,29 @@ describe('useModelMatch', () => {
     expect(load).toHaveBeenCalledTimes(2);
     expect(screen.getByRole('alert')).toBeInTheDocument();
   });
+
+  it('does not reload forever when load is a new function every render', () => {
+    vi.useFakeTimers();
+    let calls = 0;
+    function Parent() {
+      useModelMatch(scores, {
+        availability: () => 'present',
+        load: () => {
+          calls += 1;
+          return { status: 'error', failure: 'missing-file' };
+        },
+      });
+      return null;
+    }
+    render(<Parent />);
+    act(() => {
+      vi.advanceTimersByTime(LOAD_DELAY_MS);
+    });
+    const afterFirst = calls;
+    act(() => {
+      vi.advanceTimersByTime(LOAD_DELAY_MS * 8);
+    });
+    expect(afterFirst).toBeGreaterThan(0);
+    expect(calls).toBe(afterFirst);
+  });
 });

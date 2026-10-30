@@ -5,7 +5,8 @@
  * Preview-only views. Not imported by the app.
  */
 
-import { RELATIVE_RANKING_NOTE } from '../../../scripts/benchmark/match';
+import { matchModels } from '../../../scripts/benchmark/match';
+import { buildScoreFile } from '../../../scripts/benchmark/scorefile';
 import { HYPOTHESIS_LABEL, type MatchResult, type ScoreFile } from '../../../scripts/benchmark/types';
 import { realScoreFile } from '../__fixtures__/joinSamples';
 import { buildView, type ModelMatchView } from '../derive';
@@ -62,28 +63,54 @@ export function lowConfidenceView(): ModelMatchView {
   }], null), file);
 }
 
+/**
+ * Real matchModels output, not the 10-repeat file. A strong model sits just
+ * past 50. A decent model has a higher mean but a range that crosses 50, so
+ * it is closer to a high target and receives the better global rank.
+ * Means stay within the spread threshold, so spread_warning is true.
+ */
 export function relativeRankView(): ModelMatchView {
-  const file = structuredClone(realScoreFile) as ScoreFile;
-  file.spread_warning = true;
-  file.run_label = 'original four';
-  return buildView(opennessMatch([
-    {
-      model_id: 'x-ai/grok-4.3',
-      tier: 'strong',
-      driving_traits: ['openness'],
-      missing_traits: [],
-      relative_rank: 2,
-      traits: { openness: { ...opennessTrait, model_mean: 78, model_low: 70, model_high: 88 } },
+  const neutral = {
+    openness: 50,
+    conscientiousness: 50,
+    extroversion: 50,
+    agreeableness: 50,
+    neuroticism: 50,
+  };
+  const model = (id: string, openness: number[]) => ({
+    id,
+    costUsd: 0.1,
+    timestamp: '2026-11-01T00:00:00.000Z',
+    repeats: openness.map((value, index) => ({
+      repeat: index + 1,
+      modelVersion: id,
+      judgeVersion: 'judge-v1',
+      scores: { ...neutral, openness: value },
+    })),
+  });
+  const file = buildScoreFile({
+    models: [
+      model('lab/strong-just-past-50', [58, 60, 62]),
+      model('lab/decent-closer-to-target', [45, 72, 75]),
+    ],
+    judge: { modelId: 'google/gemini-2.5-flash-lite', version: 'judge-v1', temperature: 0 },
+    interviewTemperature: 0,
+    repeats: 3,
+    generatedAt: '2026-11-01T00:00:00.000Z',
+    priceDate: '2026-10-05',
+    wideRangeThreshold: 40,
+    spreadThreshold: 10,
+    traitConfidence: {
+      openness: 'normal',
+      conscientiousness: 'normal',
+      extroversion: 'normal',
+      agreeableness: 'normal',
+      neuroticism: 'normal',
     },
-    {
-      model_id: 'anthropic/claude-haiku-4.5',
-      tier: 'decent',
-      driving_traits: ['openness'],
-      missing_traits: [],
-      relative_rank: 1,
-      traits: { openness: { ...opennessTrait, model_mean: 70, model_low: 40, model_high: 90 } },
-    },
-  ], RELATIVE_RANKING_NOTE), file);
+    runLabel: 'rank example',
+  });
+  const result = matchModels({ ...neutral, openness: 90 }, file);
+  return buildView(result, file);
 }
 
 export function balancedView(): ModelMatchView {

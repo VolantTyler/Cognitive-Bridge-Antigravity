@@ -38,6 +38,8 @@ interface ModelMatchSectionProps {
   timeZone?: string;
   /** Screenshot preview opens the all-poor cards. The app leaves them closed. */
   initialPoorOpen?: boolean;
+  /** Screenshot preview opens Charlie's extroversion paragraph. */
+  initialWhyOpen?: boolean;
 }
 
 function Legend() {
@@ -59,8 +61,8 @@ function Legend() {
   );
 }
 
-export default function ModelMatchSection({ state, onRetry, onOpenLeaderboard, timeZone, initialPoorOpen = false }: ModelMatchSectionProps) {
-  const [whyOpen, setWhyOpen] = useState(false);
+export default function ModelMatchSection({ state, onRetry, onOpenLeaderboard, timeZone, initialPoorOpen = false, initialWhyOpen = false }: ModelMatchSectionProps) {
+  const [whyOpen, setWhyOpen] = useState(initialWhyOpen);
   const [measuredOpen, setMeasuredOpen] = useState(false);
   const [poorOpen, setPoorOpen] = useState(initialPoorOpen);
   const ready = state.status === 'ready' ? deriveSection(state.view) : null;
@@ -220,6 +222,9 @@ export default function ModelMatchSection({ state, onRetry, onOpenLeaderboard, t
           </div>
 
           {ready.rankingNote && (
+            // Acceptance criterion 6 says the note appears once. Section 18 does not
+            // place it. The sentence is about the whole run, so one copy under the
+            // groups is true for every group that shows a within-tier rank.
             <p className="mt-4 text-sm text-text-secondary" data-ranking-note="true">{ready.rankingNote}</p>
           )}
 
