@@ -7,6 +7,16 @@ import type { OceanScores } from '../../src/types';
 
 export const SCORE_FILE_SCHEMA_VERSION = 4;
 
+/** Joins distinct interview upstreams stored on one scored repeat. */
+export const PROVIDER_LIST_SEPARATOR = ', ';
+
+/** Used when a score file written before run_label is loaded. */
+export const UNLABELED_RUN_LABEL = 'unlabeled';
+
+export const DEFAULT_RUN_LABEL = 'default';
+
+export const RUN_LABEL_MAX_LENGTH = 80;
+
 /** OpenRouter `reasoning.effort` values. The benchmark sends one value to every model. */
 export const REASONING_EFFORTS = ['none', 'minimal', 'low', 'medium', 'high'] as const;
 
@@ -32,6 +42,15 @@ export type AlignmentStrategy = 'congruent' | 'complementary' | 'compensatory';
 
 export type Tier = 'strong' | 'decent' | 'poor' | 'not_scored';
 
+/**
+ * OpenRouter request `provider` object. Only the fields this benchmark pins.
+ * Names are copied from a previous run's providers_seen, not invented here.
+ */
+export interface ProviderRoute {
+  order?: string[];
+  allow_fallbacks?: boolean;
+}
+
 export interface ModelConfig {
   id: string;
   enabled: boolean;
@@ -39,6 +58,8 @@ export interface ModelConfig {
   inputPerMillionUsd: number | null;
   /** USD per 1,000,000 output tokens. Null skips the model. */
   outputPerMillionUsd: number | null;
+  /** Interview-only routing pin. Omitted means OpenRouter's default routing. */
+  provider?: ProviderRoute;
 }
 
 export interface BenchmarkConfig {
@@ -70,6 +91,8 @@ export interface BenchmarkConfig {
   };
   /** How many models may have `enabled: true` in one run. */
   maxEnabledModels: number;
+  /** Short name for this run, copied onto the score file. */
+  runLabel: string;
   wideRangeThreshold: number;
   spreadThreshold: number;
   /** Published confidence copied onto each model's trait stats in the score file. */
@@ -101,6 +124,8 @@ export interface ChatRequest {
   reasoningEffort?: ReasoningEffort;
   scenarioId?: string;
   repeat?: number;
+  /** Interview routing pin. Omitted on judge calls and when the model has no pin. */
+  provider?: ProviderRoute;
 }
 
 export interface ChatResponse {
@@ -193,6 +218,11 @@ export interface ModelScore {
   not_scored_reason: string | null;
   failures: ModelFailure[];
   traits: Record<OceanTrait, TraitStats>;
+  /**
+   * Distinct interview upstreams across scored repeats, with how many repeats named each.
+   * Absent on score files written before this field. The judge's provider is not included.
+   */
+  providers_seen?: Array<{ provider: string; count: number }>;
   runs: ScoreRun[];
 }
 
@@ -204,6 +234,11 @@ export interface ScoreFile {
   wide_range_threshold: number;
   trait_spread: Record<OceanTrait, number | null>;
   generated_at: string;
+  /**
+   * Config run_label for this file. Files written before the field existed omit it;
+   * validation fills those in as unlabeled.
+   */
+  run_label: string;
   price_date: string;
   interview_temperature: number;
   repeats: number;

@@ -45,6 +45,7 @@ export function testConfig(patch?: {
   warnPerRunUsd?: number;
   warnPerMonthUsd?: number;
   maxEnabledModels?: number;
+  runLabel?: string;
   wideRangeThreshold?: number;
   spreadThreshold?: number;
   traitConfidence?: BenchmarkConfig['traitConfidence'];
@@ -79,6 +80,7 @@ export function testConfig(patch?: {
       warnPerMonthUsd: patch?.warnPerMonthUsd ?? 40,
     },
     maxEnabledModels: patch?.maxEnabledModels ?? 12,
+    run_label: patch?.runLabel,
     wideRangeThreshold: patch?.wideRangeThreshold ?? 40,
     spreadThreshold: patch?.spreadThreshold ?? 10,
     traitConfidence,

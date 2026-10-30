@@ -1,5 +1,6 @@
 {
   "priceDate": "2026-10-05",
+  "run_label": "default",
   "priceNote": "USD per 1,000,000 tokens. The four enabled models are priced as of priceDate (2026-10-05). The six disabled open-weight models are the OpenRouter snapshot from 2026-10-29. An enabled model with a null input or output price is skipped. At most maxEnabledModels models may be enabled.",
   "baseUrl": "https://openrouter.ai/api/v1",
   "interview": {

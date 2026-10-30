@@ -153,6 +153,12 @@ function requestPayload(request: ChatRequest): Record<string, unknown> {
   if (request.reasoningEffort) {
     payload.reasoning = { effort: request.reasoningEffort satisfies ReasoningEffort };
   }
+  if (request.provider) {
+    payload.provider = {
+      ...(request.provider.order ? { order: request.provider.order } : {}),
+      ...(request.provider.allow_fallbacks !== undefined ? { allow_fallbacks: request.provider.allow_fallbacks } : {}),
+    };
+  }
   return payload;
 }
 

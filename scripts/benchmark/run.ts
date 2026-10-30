@@ -34,7 +34,7 @@ import {
 } from './scorefile';
 import { buildInterviewTranscript, judgeMessages, parseMirrorScores } from './scorer';
 import { estimateMessagesTokens } from './tokens';
-import type { BenchmarkConfig, ChatClient, ChatRequest, ChatResponse, PricedModel, Scenario } from './types';
+import { PROVIDER_LIST_SEPARATOR, type BenchmarkConfig, type ChatClient, type ChatRequest, type ChatResponse, type PricedModel, type ProviderRoute, type Scenario } from './types';
 
 export interface RunOptions {
   config: BenchmarkConfig;
@@ -284,6 +284,7 @@ export async function runBenchmark(options: RunOptions): Promise<ReturnType<type
         traitConfidence: config.traitConfidence,
         partial: true,
         outputBudget: outputBudgetOf(config),
+        runLabel: config.runLabel,
       });
       writeScoreFile(scoreFilePath, partial);
       logger('warn', `Wrote partial score file for ${completed.length} finished model(s) before the hard stop.`);
@@ -311,6 +312,7 @@ export async function runBenchmark(options: RunOptions): Promise<ReturnType<type
     traitConfidence: config.traitConfidence,
     partial: false,
     outputBudget: outputBudgetOf(config),
+    runLabel: config.runLabel,
   });
   writeScoreFile(scoreFilePath, scoreFile);
   logger('info', `Wrote ${scoreFilePath}`);
@@ -328,7 +330,11 @@ function joinProviders(values: string[]): string | null {
   for (const value of values) {
     if (!unique.includes(value)) unique.push(value);
   }
-  return unique.length === 0 ? null : unique.join(', ');
+  return unique.length === 0 ? null : unique.join(PROVIDER_LIST_SEPARATOR);
+}
+
+function interviewProviderRoute(config: BenchmarkConfig, modelId: string): ProviderRoute | undefined {
+  return config.models.find((model) => model.id === modelId)?.provider;
 }
 
 function outputBudgetOf(config: BenchmarkConfig) {
@@ -400,6 +406,7 @@ async function runOneModel(options: {
           reasoningEffort: effort,
           scenarioId: scenario.id,
           repeat,
+          provider: interviewProviderRoute(options.config, options.model.id),
         },
       });
       cost += billed.costUsd;

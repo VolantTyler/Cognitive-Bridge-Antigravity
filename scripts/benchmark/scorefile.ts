@@ -10,9 +10,12 @@ import { aggregateTraits, failedMostRuns, hasWideRange, spreadWarning, traitSpre
 import { JudgeMixError, ScoreFileSchemaError } from './errors';
 import { STRATEGY_TABLE } from './match';
 import {
+  DEFAULT_RUN_LABEL,
   HYPOTHESIS_LABEL,
   OCEAN_TRAITS,
+  PROVIDER_LIST_SEPARATOR,
   SCORE_FILE_SCHEMA_VERSION,
+  UNLABELED_RUN_LABEL,
   type Confidence,
   type ModelScore,
   type OceanTrait,
@@ -99,6 +102,7 @@ export function buildScoreFile(input: {
   partial?: boolean;
   strategyTable?: StrategyRow[];
   outputBudget?: { maxOutputTokens: number; retryMaxOutputTokens: number; reasoningEffort: ReasoningEffort };
+  runLabel?: string;
 }): ScoreFile {
   const strategyTable = input.strategyTable ?? STRATEGY_TABLE;
   const outputBudget = input.outputBudget ?? {
@@ -155,6 +159,7 @@ export function buildScoreFile(input: {
         reasoning_effort: failure.reasoningEffort,
       })),
       traits,
+      providers_seen: providersSeen(runs),
       runs,
     };
   });
@@ -167,6 +172,7 @@ export function buildScoreFile(input: {
     wide_range_threshold: input.wideRangeThreshold,
     trait_spread: spreads,
     generated_at: input.generatedAt,
+    run_label: input.runLabel && input.runLabel.trim() ? input.runLabel.trim() : DEFAULT_RUN_LABEL,
     price_date: input.priceDate,
     interview_temperature: input.interviewTemperature,
     repeats: input.repeats,
@@ -188,6 +194,21 @@ export function buildScoreFile(input: {
     },
     models,
   };
+}
+
+/** Distinct interview upstreams across scored repeats. A joined repeat counts each name once. */
+export function providersSeen(runs: Array<{ provider?: string | null }>): Array<{ provider: string; count: number }> {
+  const counts = new Map<string, number>();
+  for (const run of runs) {
+    if (typeof run.provider !== 'string' || run.provider.trim() === '') continue;
+    const names = new Set(
+      run.provider.split(PROVIDER_LIST_SEPARATOR).map((part) => part.trim()).filter((part) => part.length > 0),
+    );
+    for (const name of names) {
+      counts.set(name, (counts.get(name) ?? 0) + 1);
+    }
+  }
+  return [...counts.entries()].map(([provider, count]) => ({ provider, count }));
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -212,6 +233,11 @@ export function validateScoreFile(value: unknown): asserts value is ScoreFile {
   }
   if (value.label !== HYPOTHESIS_LABEL) {
     throw new ScoreFileSchemaError('label must be the design-hypothesis label');
+  }
+  if (!('run_label' in value) || value.run_label === undefined) {
+    value.run_label = UNLABELED_RUN_LABEL;
+  } else if (typeof value.run_label !== 'string' || value.run_label.trim() === '') {
+    throw new ScoreFileSchemaError('run_label must be a non-empty string. A score file that omits it is treated as unlabeled.');
   }
   if (typeof value.spread_warning !== 'boolean') {
     throw new ScoreFileSchemaError('spread_warning must be a boolean');
@@ -268,6 +294,23 @@ export function validateScoreFile(value: unknown): asserts value is ScoreFile {
     }
     if (!Array.isArray(model.failures)) {
       throw new ScoreFileSchemaError(`model ${String(model.id)} failures must be an array`);
+    }
+    if ('providers_seen' in model && model.providers_seen !== undefined) {
+      if (!Array.isArray(model.providers_seen)) {
+        throw new ScoreFileSchemaError(`model ${String(model.id)} providers_seen must be an array`);
+      }
+      for (const entry of model.providers_seen) {
+        if (
+          !isRecord(entry)
+          || typeof entry.provider !== 'string'
+          || entry.provider.trim() === ''
+          || typeof entry.count !== 'number'
+          || !Number.isInteger(entry.count)
+          || entry.count < 1
+        ) {
+          throw new ScoreFileSchemaError(`model ${String(model.id)} providers_seen entries need a provider name and a positive count`);
+        }
+      }
     }
     if (!isRecord(model.traits)) {
       throw new ScoreFileSchemaError(`model ${model.id} is missing traits`);

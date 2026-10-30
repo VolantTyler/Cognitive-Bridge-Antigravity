@@ -328,6 +328,38 @@ describe('OpenRouter client', () => {
     expect(delays).toEqual([2000, 2000, 2000, 2000]);
   });
 
+  it('sends provider routing only when the request sets it', async () => {
+    const seen: Array<Record<string, unknown>> = [];
+    const fetchImpl: FetchLike = async (_url, init) => {
+      seen.push(JSON.parse(init.body) as Record<string, unknown>);
+      return {
+        ok: true,
+        status: 200,
+        async text() {
+          return JSON.stringify({
+            model: 'openai/gpt-5-nano',
+            choices: [{ message: { content: 'answer' } }],
+            usage: { prompt_tokens: 2, completion_tokens: 2 },
+          });
+        },
+      };
+    };
+    const client = createOpenRouterClient({
+      apiKey: 'sk-test-secret',
+      baseUrl: 'https://openrouter.ai/api/v1',
+      fetchImpl,
+    });
+    await client.complete(request);
+    await client.complete({
+      ...request,
+      kind: 'judge',
+      provider: { order: ['ProviderName'], allow_fallbacks: false },
+    });
+    expect(seen[0].provider).toBeUndefined();
+    expect(seen[1].provider).toEqual({ order: ['ProviderName'], allow_fallbacks: false });
+    expect(seen[1].reasoning).toBeUndefined();
+  });
+
   it('does not retry a 401 or a length cutoff', async () => {
     let calls = 0;
     const fetchImpl: FetchLike = async () => {

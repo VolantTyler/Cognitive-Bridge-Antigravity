@@ -573,6 +573,56 @@ describe('benchmark run', () => {
     expect(saved?.models.every((model) => model.not_scored_reason)).toBe(true);
   });
 
+  it('writes run_label and pins provider routing on interview calls only', async () => {
+    const dir = tempDir();
+    const bodies: Array<Record<string, unknown>> = [];
+    const fetchImpl: FetchLike = async (_url, init) => {
+      const body = JSON.parse(init.body) as Record<string, unknown> & { messages: Array<{ role: string }> };
+      bodies.push(body);
+      const interview = body.messages.every((message) => message.role !== 'system');
+      return jsonResponse({
+        model: 'openai/gpt-5-nano',
+        provider: 'ProviderName',
+        choices: [{
+          message: { content: interview ? 'answer' : scoreText(neutralScores({ openness: 20 })) },
+        }],
+        usage: { prompt_tokens: 2, completion_tokens: 2 },
+      });
+    };
+    const scoreFile = await runBenchmark({
+      config: testConfig({
+        runLabel: 'october-open',
+        repeats: 1,
+        judgeModelId: 'openai/gpt-5-nano',
+        models: [{
+          id: 'openai/gpt-5-nano',
+          enabled: true,
+          inputPerMillionUsd: 0,
+          outputPerMillionUsd: 0,
+          provider: { order: ['ProviderName'], allow_fallbacks: false },
+        }],
+      }),
+      client: createOpenRouterClient({
+        apiKey: 'sk-test-secret',
+        baseUrl: 'https://openrouter.ai/api/v1',
+        fetchImpl,
+      }),
+      scenarios: [{ id: 'one', text: 'scenario' }],
+      now: fixedNow,
+      scoreFilePath: path.join(dir, 'scores.json'),
+      ledgerPath: path.join(dir, 'ledger.jsonl'),
+      existingScoreFile: null,
+    });
+    const interview = bodies.find((body) => (body.messages as Array<{ role: string }>).every((message) => message.role !== 'system'));
+    const judge = bodies.find((body) => (body.messages as Array<{ role: string }>).some((message) => message.role === 'system'));
+    expect(interview?.provider).toEqual({ order: ['ProviderName'], allow_fallbacks: false });
+    expect(judge?.provider).toBeUndefined();
+    expect(scoreFile.run_label).toBe('october-open');
+    expect(scoreFile.schema_version).toBe(4);
+    expect(scoreFile.models[0].providers_seen).toEqual([{ provider: 'ProviderName', count: 1 }]);
+    expect(scoreFile.models[0].runs[0].provider).toBe('ProviderName');
+  });
+
   it('replaces scores.json with only this run’s enabled models', async () => {
     const dir = tempDir();
     const scorePath = path.join(dir, 'scores.json');
@@ -752,6 +802,10 @@ describe('benchmark run', () => {
     expect(scoreFile.models[0].failures[0]).toMatchObject({ kind: 'interview', repeat: 1 });
     expect(scoreFile.models[0].failures[0].reason).toMatch(/after 3 attempts/);
     expect(scoreFile.models[0].runs[0].provider).toBe('Together, DeepInfra');
+    expect(scoreFile.models[0].providers_seen).toEqual([
+      { provider: 'Together', count: 1 },
+      { provider: 'DeepInfra', count: 1 },
+    ]);
     expect(scoreFile.models[0].traits.openness.mean).toBe(40);
     const ledger = readLedger(path.join(dir, 'ledger.jsonl'));
     expect(ledger.filter((entry) => entry.repeat === 1)).toHaveLength(1);

@@ -8,13 +8,16 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { ConfigError } from './errors';
 import {
+  DEFAULT_RUN_LABEL,
   OCEAN_TRAITS,
   REASONING_EFFORTS,
+  RUN_LABEL_MAX_LENGTH,
   type BenchmarkConfig,
   type Confidence,
   type ModelConfig,
   type OceanTrait,
   type PricedModel,
+  type ProviderRoute,
   type ReasoningEffort,
 } from './types';
 
@@ -46,12 +49,73 @@ function parseModel(value: unknown, index: number): ModelConfig {
   if (typeof value.enabled !== 'boolean') {
     throw new ConfigError(`models[${index}].enabled must be a boolean`);
   }
+  const provider = parseProviderRoute(value.provider, index);
   return {
     id: value.id,
     enabled: value.enabled,
     inputPerMillionUsd: parsePrice(value.inputPerMillionUsd, `models[${index}].inputPerMillionUsd`),
     outputPerMillionUsd: parsePrice(value.outputPerMillionUsd, `models[${index}].outputPerMillionUsd`),
+    ...(provider ? { provider } : {}),
   };
+}
+
+function parseProviderRoute(value: unknown, index: number): ProviderRoute | undefined {
+  if (value === undefined) return undefined;
+  if (!isRecord(value)) {
+    throw new ConfigError(`models[${index}].provider must be an object`);
+  }
+  const allowed = new Set(['order', 'allow_fallbacks']);
+  for (const key of Object.keys(value)) {
+    if (!allowed.has(key)) {
+      throw new ConfigError(`models[${index}].provider.${key} is not supported. Use order and allow_fallbacks.`);
+    }
+  }
+  const route: ProviderRoute = {};
+  if ('order' in value) {
+    if (!Array.isArray(value.order) || value.order.length === 0) {
+      throw new ConfigError(`models[${index}].provider.order must be a non-empty array of provider names`);
+    }
+    const order: string[] = [];
+    for (const entry of value.order) {
+      if (typeof entry !== 'string' || entry.trim() === '') {
+        throw new ConfigError(`models[${index}].provider.order entries must be non-empty strings`);
+      }
+      const name = entry.trim();
+      if (order.includes(name)) {
+        throw new ConfigError(`models[${index}].provider.order repeats ${name}`);
+      }
+      order.push(name);
+    }
+    route.order = order;
+  }
+  if ('allow_fallbacks' in value) {
+    if (typeof value.allow_fallbacks !== 'boolean') {
+      throw new ConfigError(`models[${index}].provider.allow_fallbacks must be a boolean`);
+    }
+    route.allow_fallbacks = value.allow_fallbacks;
+  }
+  if (route.order === undefined && route.allow_fallbacks === undefined) {
+    throw new ConfigError(`models[${index}].provider needs order or allow_fallbacks`);
+  }
+  return route;
+}
+
+function parseRunLabel(value: unknown): string {
+  if (value === undefined) return DEFAULT_RUN_LABEL;
+  if (typeof value !== 'string') {
+    throw new ConfigError('run_label must be a string');
+  }
+  const label = value.trim();
+  if (label.length === 0) {
+    throw new ConfigError('run_label must be a non-empty string');
+  }
+  if (label.length > RUN_LABEL_MAX_LENGTH) {
+    throw new ConfigError(`run_label must be at most ${RUN_LABEL_MAX_LENGTH} characters`);
+  }
+  if (/[\r\n]/.test(label)) {
+    throw new ConfigError('run_label must be a single line');
+  }
+  return label;
 }
 
 function parsePrice(value: unknown, label: string): number | null {
@@ -69,6 +133,7 @@ export function parseConfig(value: unknown): BenchmarkConfig {
   if (typeof value.priceDate !== 'string' || !value.priceDate.trim()) {
     throw new ConfigError('priceDate is required');
   }
+  const runLabel = parseRunLabel(value.run_label);
   if (typeof value.baseUrl !== 'string' || !value.baseUrl.startsWith('https://')) {
     throw new ConfigError('baseUrl must be an https URL');
   }
@@ -203,6 +268,7 @@ export function parseConfig(value: unknown): BenchmarkConfig {
     },
     limits: { warnPerRunUsd, hardStopPerRunUsd, warnPerMonthUsd },
     maxEnabledModels,
+    runLabel,
     wideRangeThreshold,
     spreadThreshold,
     traitConfidence,

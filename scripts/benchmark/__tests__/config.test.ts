@@ -26,6 +26,8 @@ describe('shipped benchmark config', () => {
     expect(config.judge.temperature).toBe(0);
     expect(config.limits).toEqual({ warnPerRunUsd: 10, hardStopPerRunUsd: 15, warnPerMonthUsd: 40 });
     expect(config.maxEnabledModels).toBe(12);
+    expect(config.runLabel).toBe('default');
+    expect(config.models.every((model) => model.provider === undefined)).toBe(true);
     expect(config.traitConfidence.extroversion).toBe('low');
     expect(runnableModels(config).map((model) => [model.id, model.inputPerMillionUsd, model.outputPerMillionUsd])).toEqual([
       ['openai/gpt-5-nano', 0.05, 0.4],
@@ -69,6 +71,39 @@ describe('shipped benchmark config', () => {
     expect(() => parseConfig({ ...raw, models: [...raw.models, ...extras] })).toThrow(/At most 12 models may be enabled \(found 13\)/);
     expect(() => parseConfig({ ...raw, maxEnabledModels: 3 })).toThrow(/At most 3 models may be enabled \(found 4\)/);
     expect(() => parseConfig({ ...raw, maxEnabledModels: 0 })).toThrow(/positive integer/);
+  });
+
+  it('defaults a missing run_label and rejects a blank or long one', () => {
+    const raw = JSON.parse(JSON.stringify(config)) as Record<string, unknown>;
+    delete raw.run_label;
+    expect(parseConfig(raw).runLabel).toBe('default');
+    expect(parseConfig({ ...raw, run_label: '  october open  ' }).runLabel).toBe('october open');
+    expect(() => parseConfig({ ...raw, run_label: '   ' })).toThrow(/non-empty/);
+    expect(() => parseConfig({ ...raw, run_label: 'x'.repeat(81) })).toThrow(/80 characters/);
+    expect(() => parseConfig({ ...raw, run_label: 4 })).toThrow(/must be a string/);
+  });
+
+  it('accepts an interview provider pin and rejects a bad one', () => {
+    const raw = JSON.parse(JSON.stringify(config)) as { models: Array<Record<string, unknown>> };
+    raw.models[4] = {
+      ...raw.models[4],
+      provider: { order: [' ProviderName '], allow_fallbacks: false },
+    };
+    const parsed = parseConfig(raw);
+    expect(parsed.models[4].provider).toEqual({ order: ['ProviderName'], allow_fallbacks: false });
+    expect(parsed.models[0].provider).toBeUndefined();
+    expect(() => parseConfig({
+      ...raw,
+      models: [{ ...raw.models[0], provider: {} }],
+    })).toThrow(/needs order or allow_fallbacks/);
+    expect(() => parseConfig({
+      ...raw,
+      models: [{ ...raw.models[0], provider: { order: ['ProviderName'], only: ['ProviderName'] } }],
+    })).toThrow(/not supported/);
+    expect(() => parseConfig({
+      ...raw,
+      models: [{ ...raw.models[0], provider: { order: [] } }],
+    })).toThrow(/non-empty array/);
   });
 
   it('rejects a zero interview temperature', () => {
