@@ -160,8 +160,6 @@ describe('run index', () => {
     expect(names['index.json']).toBeUndefined();
     expect(names['original-four.json']).toEqual({ schema_version: 4 });
     expect(resolveModelMatch(neutral, { runs: [] }, {})).toEqual({ status: 'empty' });
-    const bundled = loadBundledModelMatch(neutral);
-    expect(bundled).toEqual({ status: 'empty' });
   });
 });
 

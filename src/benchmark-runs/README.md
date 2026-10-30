@@ -2,9 +2,11 @@
 
 The Bridge reads this folder. `index.json` lists the runs. Each run is one score file. The app shows the newest `tested_at` and does not merge files. Tiers are computed for that run only.
 
-There is no run checked in yet, and an empty `runs` array turns the section off. The Bridge draws no heading and no "Design hypothesis, not validated" label until a score file and an index entry are both added. That pair is what turns the section on.
+The shipped run is `2026-10-30-original-four.json`, copied byte for byte from Tyler's original-four benchmark on 2026-10-30 (`generated_at` `2026-10-30T20:31:25.661Z`, schema 4, 10 repeats, `run_label` `default`). That file plus its index entry is what turns the section on. The score file's `run_label` is still `default`, so the cards show the date and repeat count and no label chip. Do not edit the file to add a chip.
 
-The 2026-10-29 10-repeat file was written before the extroversion `exclusion_reason` was reworded, and `matchModels` rejects it. That file lives under `src/modelMatch/__fixtures__/` for tests. Do not copy it here, and do not edit it to make the check pass.
+An empty `runs` array turns the section off. The Bridge draws no heading until a score file and an index entry are both added.
+
+Earlier sample output and the 2026-10-29 10-repeat file live under `src/modelMatch/__fixtures__/`. That older file was written before the extroversion `exclusion_reason` was reworded, and `matchModels` rejects it. Do not copy it here, and do not edit it to make the check pass.
 
 ## Add a run
 

@@ -30,8 +30,8 @@ describe('useModelMatch', () => {
     vi.useRealTimers();
   });
 
-  it('renders nothing for the committed empty index and does not offer Retry', () => {
-    render(<Harness />);
+  it('renders nothing when the caller reports an empty index', () => {
+    render(<Harness source={{ availability: () => 'empty' }} />);
     expect(screen.queryByRole('heading', { name: 'Models that fit your profile' })).toBeNull();
     expect(screen.queryByText(STATUS_LABEL)).toBeNull();
     expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
