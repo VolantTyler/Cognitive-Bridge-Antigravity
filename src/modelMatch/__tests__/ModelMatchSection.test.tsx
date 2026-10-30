@@ -15,6 +15,7 @@ import {
   EXTROVERSION_SHORT,
   NO_TESTED_STRATEGY,
   STATUS_LABEL,
+  secondaryHypothesisLabel,
 } from '../copy';
 import { buildView, deriveSection, displayRunLabel, fewerRunsTag, formatTestedOn } from '../derive';
 import ModelMatchSection from '../ModelMatchSection';
@@ -59,6 +60,27 @@ describe('tested-on dates', () => {
   });
 });
 
+describe('hypothesis chip', () => {
+  it('hides the generic score-file label and shows a distinct one', () => {
+    expect(secondaryHypothesisLabel(HYPOTHESIS_LABEL)).toBeNull();
+    expect(secondaryHypothesisLabel('  DESIGN HYPOTHESIS, NOT VALIDATED  ')).toBeNull();
+    expect(secondaryHypothesisLabel('Frontier cluster, October')).toBe('Frontier cluster, October');
+
+    const { unmount } = renderView(sampleView('A'));
+    const generic = document.querySelector('[data-hypothesis-chip]');
+    expect(generic).toHaveTextContent(STATUS_LABEL);
+    expect(generic).not.toHaveTextContent(HYPOTHESIS_LABEL);
+    unmount();
+
+    const distinct = sampleView('A');
+    distinct.context.hypothesisLabel = 'Frontier cluster, October';
+    renderView(distinct);
+    const chip = document.querySelector('[data-hypothesis-chip]');
+    expect(chip).toHaveTextContent(STATUS_LABEL);
+    expect(chip).toHaveTextContent('Frontier cluster, October');
+  });
+});
+
 describe('sample A, the normal section', () => {
   it('shows the hypothesis label, driving-trait rows, and the three real-file cards', () => {
     renderView(sampleView('A'));
@@ -67,7 +89,7 @@ describe('sample A, the normal section', () => {
     expect(document.querySelectorAll('[data-hypothesis-chip]')).toHaveLength(1);
     const hypothesis = document.querySelector('[data-hypothesis-chip]');
     expect(hypothesis).toHaveTextContent(STATUS_LABEL);
-    expect(hypothesis).toHaveTextContent(HYPOTHESIS_LABEL);
+    expect(hypothesis).not.toHaveTextContent(HYPOTHESIS_LABEL);
     expect(screen.getByText(/hasn't been tested with real users yet/)).toBeVisible();
     expect(section.textContent).not.toMatch(/%/);
     expect(section.textContent).not.toMatch(/best model/i);

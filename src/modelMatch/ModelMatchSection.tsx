@@ -24,7 +24,7 @@ import {
   SHOW_POOR_CARDS,
   STATUS_LABEL,
   TARGETS_HEADING,
-  VERBATIM_HYPOTHESIS_LABEL,
+  secondaryHypothesisLabel,
 } from './copy';
 import { deriveSection, displayRunLabel, formatTestedOn, repeatCountLabel, type ModelMatchView } from './derive';
 import type { ModelMatchState } from './loadRuns';
@@ -44,17 +44,21 @@ interface ModelMatchSectionProps {
 
 function Legend() {
   return (
-    <ul aria-hidden="true" className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-xs text-text-muted">
+    <ul className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-xs text-text-muted">
       <li className="inline-flex items-center gap-1.5">
-        <span className="inline-block h-2.5 w-3.5 border border-[var(--match-zone-edge)] bg-[var(--match-zone)]" />
+        <span aria-hidden="true" className="inline-block h-2.5 w-3.5 border border-[var(--match-zone-edge)] bg-[var(--match-zone)]" />
         {LEGEND_ZONE}
       </li>
       <li className="inline-flex items-center gap-1.5">
-        <span className="inline-block h-2.5 w-3.5 bg-[var(--match-band)]" />
+        <span aria-hidden="true" className="inline-block h-2.5 w-3.5 bg-[var(--match-band)]" />
         {LEGEND_BAND}
       </li>
       <li className="inline-flex items-center gap-1.5">
-        <span className="inline-block h-3.5 w-0.5 bg-[var(--match-tick)]" />
+        <span
+          aria-hidden="true"
+          data-legend-swatch="average"
+          className="inline-block h-3.5 w-1.5 bg-[var(--match-tick)]"
+        />
         {LEGEND_MEAN}
       </li>
     </ul>
@@ -67,6 +71,7 @@ export default function ModelMatchSection({ state, onRetry, onOpenLeaderboard, t
   const [poorOpen, setPoorOpen] = useState(initialPoorOpen);
   const ready = state.status === 'ready' ? deriveSection(state.view) : null;
   const showBars = ready != null && ready.groups.some((group) => group.models.some((card) => card.rows.length > 0));
+  const secondaryLabel = secondaryHypothesisLabel(ready?.context.hypothesisLabel);
 
   if (state.status === 'empty') return null;
 
@@ -78,7 +83,7 @@ export default function ModelMatchSection({ state, onRetry, onOpenLeaderboard, t
       <p className="mt-2 max-w-full text-sm leading-relaxed break-words text-text-secondary">
         <span data-hypothesis-chip="true" className="mr-2 inline-flex max-w-full flex-wrap items-baseline gap-x-2 rounded border border-current px-2 py-0.5 align-middle text-xs text-text-primary">
           <span className="font-semibold">{STATUS_LABEL}</span>
-          <span className="font-normal text-text-muted">{VERBATIM_HYPOTHESIS_LABEL}</span>
+          {secondaryLabel && <span className="font-normal text-text-muted">{secondaryLabel}</span>}
         </span>
         {EXPLAINER}{' '}
         <a

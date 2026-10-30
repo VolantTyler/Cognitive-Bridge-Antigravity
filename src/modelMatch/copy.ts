@@ -13,8 +13,26 @@ export const SECTION_HEADING = 'Models that fit your profile';
 /** Brief's visible status. Shown without a hover or a disclosure. */
 export const STATUS_LABEL = 'Design hypothesis, not validated';
 
-/** Score-file label, shown verbatim. */
+/** Score-file label, shown verbatim only when it is not this generic line. */
 export const VERBATIM_HYPOTHESIS_LABEL = HYPOTHESIS_LABEL;
+
+function normalizeHypothesisText(value: string): string {
+  return value.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * Secondary chip text. Hidden when it repeats the primary line, or when the
+ * score file still carries the generic hypothesis label.
+ */
+export function secondaryHypothesisLabel(fileLabel: string | null | undefined): string | null {
+  if (fileLabel == null) return null;
+  const trimmed = fileLabel.trim();
+  if (trimmed === '') return null;
+  const normalized = normalizeHypothesisText(trimmed);
+  if (normalized === normalizeHypothesisText(STATUS_LABEL)) return null;
+  if (normalized === normalizeHypothesisText(VERBATIM_HYPOTHESIS_LABEL)) return null;
+  return trimmed;
+}
 
 export const EXPLAINER =
   "This matching approach is our best research-based guess and hasn't been tested with real users yet.";

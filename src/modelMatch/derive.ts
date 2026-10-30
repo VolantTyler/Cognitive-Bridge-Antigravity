@@ -102,6 +102,8 @@ export interface ModelStats {
 
 export interface RunContext {
   runLabel: string;
+  /** Score-file `label`. The chip hides this when it is the generic hypothesis line. */
+  hypothesisLabel: string;
   repeats: number;
   generatedAt: string;
   partial: boolean;
@@ -162,6 +164,7 @@ export function contextFromScoreFile(file: ScoreFile): RunContext {
     : 'unlabeled';
   return {
     runLabel,
+    hypothesisLabel: typeof file.label === 'string' ? file.label : '',
     repeats: file.repeats,
     generatedAt: file.generated_at,
     partial: file.partial === true,
