@@ -33,6 +33,10 @@
         "function": "chatProxy"
       },
       {
+        "source": "/api/judge",
+        "function": "judgeProxy"
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }

@@ -279,6 +279,7 @@ describe('OpenRouter client', () => {
         apiKey: 'sk-test-secret',
         baseUrl: 'https://openrouter.ai/api/v1',
         fetchImpl,
+        random: () => 0.5,
         sleep: async (ms) => {
           delays.push(ms);
         },
@@ -287,18 +288,27 @@ describe('OpenRouter client', () => {
       expect(response.content).toContain(kind === 'judge' ? 'JSON_SCORES' : 'answer');
       expect(response.provider).toBe('Google');
       expect(statuses).toEqual(kind === 'interview' ? [429, 500, 200] : [503, 200]);
-      expect(delays).toEqual(kind === 'interview' ? [500, 1000] : [500]);
+      expect(delays).toEqual(kind === 'interview' ? [2000, 4000] : [2000]);
     }
   });
 
-  it('honors Retry-After, caps it, and throws OpenRouterCallError after three 429s', async () => {
+  it('uses a 2s exponential schedule with jitter, and caps Retry-After at 60s', async () => {
     const nowMs = Date.parse('2026-10-30T12:00:00.000Z');
-    expect(retryDelayMs(1, '2', nowMs)).toBe(2000);
-    expect(retryDelayMs(1, new Date(nowMs + 2000).toUTCString(), nowMs)).toBe(2000);
-    expect(retryDelayMs(1, '120', nowMs)).toBe(OPENROUTER_MAX_RETRY_AFTER_MS);
-    expect(retryDelayMs(1, 'not-a-date', nowMs)).toBe(500);
-    expect(retryDelayMs(2, null, nowMs)).toBe(1000);
-    expect(OPENROUTER_MAX_ATTEMPTS).toBe(3);
+    const exact = (attempt: number, retryAfter: string | null = null) => retryDelayMs(attempt, retryAfter, nowMs, () => 0.5);
+    expect([1, 2, 3, 4, 5].map((attempt) => exact(attempt))).toEqual([2000, 4000, 8000, 16000, 32000]);
+    expect(exact(1, '2')).toBe(2000);
+    expect(exact(1, new Date(nowMs + 2000).toUTCString())).toBe(2000);
+    expect(exact(1, '90')).toBe(OPENROUTER_MAX_RETRY_AFTER_MS);
+    expect(retryDelayMs(1, null, nowMs, () => 0)).toBe(1600);
+    expect(retryDelayMs(1, null, nowMs, () => 1)).toBe(2400);
+    expect(retryDelayMs(1, '90', nowMs, () => 1)).toBe(OPENROUTER_MAX_RETRY_AFTER_MS);
+    expect(exact(1, 'not-a-date')).toBe(2000);
+    expect(OPENROUTER_MAX_ATTEMPTS).toBe(6);
+    expect(OPENROUTER_MAX_RETRY_AFTER_MS).toBe(60_000);
+  });
+
+  it('honors Retry-After, caps it, and throws OpenRouterCallError after six 429s', async () => {
+    const nowMs = Date.parse('2026-10-30T12:00:00.000Z');
 
     const delays: number[] = [];
     let calls = 0;
@@ -318,14 +328,15 @@ describe('OpenRouter client', () => {
       baseUrl: 'https://openrouter.ai/api/v1',
       fetchImpl,
       now: () => nowMs,
+      random: () => 0.5,
       sleep: async (ms) => {
         delays.push(ms);
       },
     });
     await expect(client.complete(request)).rejects.toBeInstanceOf(OpenRouterCallError);
-    await expect(client.complete(request)).rejects.toThrow(/failed \(429\) after 3 attempts: Provider returned error/);
+    await expect(client.complete(request)).rejects.toThrow(/failed \(429\) after 6 attempts: Provider returned error/);
     expect(calls).toBe(OPENROUTER_MAX_ATTEMPTS * 2);
-    expect(delays).toEqual([2000, 2000, 2000, 2000]);
+    expect(delays).toEqual(Array(10).fill(2000));
   });
 
   it('sends provider routing only when the request sets it', async () => {

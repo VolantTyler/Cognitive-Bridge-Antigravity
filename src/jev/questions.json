@@ -1,0 +1,60 @@
+{
+  "model": "jev-latest",
+  "gates": {
+    "traitMatchConfidence": 0.6,
+    "alignmentNoul": 0.7
+  },
+  "bleedNote": "Working overnight or taking on extra work is not automatically high Conscientiousness. That behavior can be Agreeableness: helping others or avoiding conflict. Judge Conscientiousness from order, follow-through, and standards. Judge Agreeableness from concern for other people.",
+  "bands": {
+    "low": "below 30",
+    "mid": "30 to 70",
+    "high": "above 70"
+  },
+  "ocean": {
+    "traitInstruction": "The proposed {label} score is {score} out of 100. Bands: below 30 is low, 30 to 70 is mid, above 70 is high. Which label describes that score against the user's own words?",
+    "traitCriteria": {
+      "matches": "The proposed score sits in the same band the user's words support.",
+      "too_high": "The proposed score is a higher band than the user's words support.",
+      "too_low": "The proposed score is a lower band than the user's words support.",
+      "insufficient_evidence": "The user's words do not contain enough evidence to place this trait."
+    },
+    "profileUsable": {
+      "type": "noul",
+      "instructions": "Did the user say enough, across their answers, to place all five OCEAN traits?"
+    }
+  },
+  "alignment": {
+    "questions": {
+      "aligned_applies_directives": {
+        "type": "noul",
+        "instructions": "Does the aligned reply apply the aligned steering directives, rather than only giving similar practical advice?"
+      },
+      "unaligned_applies_inverse": {
+        "type": "noul",
+        "instructions": "Does the unaligned reply apply the inverse steering directives and reinforce the user's extreme traits?"
+      },
+      "replies_materially_different": {
+        "type": "noul",
+        "instructions": "Do the two replies give different practical guidance, rather than the same advice in different words?"
+      },
+      "aligned_highlight_kind": {
+        "type": "choice",
+        "instructions": "What does the aligned reply's highlight explanation actually do?",
+        "criteria": {
+          "alignment_mechanism": "It explains why the phrasing aligns with or balances the user's profile.",
+          "advice_summary": "It restates the advice or cites a trait without explaining the alignment mechanism.",
+          "missing": "There is no highlight explanation."
+        }
+      },
+      "unaligned_highlight_kind": {
+        "type": "choice",
+        "instructions": "What does the unaligned reply's highlight explanation actually do?",
+        "criteria": {
+          "misalignment_mechanism": "It explains how the phrasing reinforces an extreme or mismatches the user's needs.",
+          "advice_summary": "It restates the advice or cites a trait without explaining the misalignment.",
+          "missing": "There is no highlight explanation."
+        }
+      }
+    }
+  }
+}

@@ -45,6 +45,7 @@ export function testConfig(patch?: {
   warnPerRunUsd?: number;
   warnPerMonthUsd?: number;
   maxEnabledModels?: number;
+  judgeMinIntervalMs?: number;
   runLabel?: string;
   wideRangeThreshold?: number;
   spreadThreshold?: number;
@@ -80,6 +81,7 @@ export function testConfig(patch?: {
       warnPerMonthUsd: patch?.warnPerMonthUsd ?? 40,
     },
     maxEnabledModels: patch?.maxEnabledModels ?? 12,
+    judgeMinIntervalMs: patch?.judgeMinIntervalMs ?? 0,
     run_label: patch?.runLabel,
     wideRangeThreshold: patch?.wideRangeThreshold ?? 40,
     spreadThreshold: patch?.spreadThreshold ?? 10,

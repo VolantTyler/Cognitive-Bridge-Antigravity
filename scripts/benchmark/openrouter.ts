@@ -22,10 +22,10 @@ export interface FetchResult {
 }
 
 /** Total attempts for one interview or judge call, including the first. */
-export const OPENROUTER_MAX_ATTEMPTS = 3;
-const BACKOFF_BASE_MS = 500;
-/** A Retry-After longer than this is capped so one call cannot stall the run. */
-export const OPENROUTER_MAX_RETRY_AFTER_MS = 30_000;
+export const OPENROUTER_MAX_ATTEMPTS = 6;
+const BACKOFF_BASE_MS = 2_000;
+/** A Retry-After or jittered backoff longer than this is capped so one call cannot stall the run. */
+export const OPENROUTER_MAX_RETRY_AFTER_MS = 60_000;
 
 export type FetchLike = (url: string, init: FetchInit) => Promise<FetchResult>;
 
@@ -104,13 +104,22 @@ export function readProvider(value: unknown): string | null {
 
 /**
  * Wait before the next attempt. `attempt` is the 1-based index of the attempt that just failed.
- * A parseable Retry-After replaces the exponential delay and is capped.
+ * The base schedule is 2s, 4s, 8s, 16s, 32s. `random` in [0, 1] applies ±20% jitter.
+ * A parseable Retry-After replaces that base and is still jittered, then capped at 60s.
+ * Pass `random` of 0.5 in tests for the exact base delay.
  */
-export function retryDelayMs(attempt: number, retryAfter: string | null, nowMs: number = Date.now()): number {
+export function retryDelayMs(
+  attempt: number,
+  retryAfter: string | null,
+  nowMs: number = Date.now(),
+  random: () => number = () => 0.5,
+): number {
   const exponential = BACKOFF_BASE_MS * 2 ** (attempt - 1);
   const headerMs = parseRetryAfterMs(retryAfter, nowMs);
-  if (headerMs === null) return exponential;
-  return Math.min(headerMs, OPENROUTER_MAX_RETRY_AFTER_MS);
+  const base = headerMs === null ? exponential : headerMs;
+  const unit = Math.min(1, Math.max(0, random()));
+  const factor = 0.8 + unit * 0.4;
+  return Math.min(Math.round(base * factor), OPENROUTER_MAX_RETRY_AFTER_MS);
 }
 
 function parseRetryAfterMs(value: string | null, nowMs: number): number | null {
@@ -263,10 +272,13 @@ export function createOpenRouterClient(options: {
   sleep?: (ms: number) => Promise<void>;
   /** Test hook for Retry-After HTTP dates. Defaults to Date.now. */
   now?: () => number;
+  /** Test hook. Defaults to Math.random so live waits are ±20% of the base delay. */
+  random?: () => number;
 }): ChatClient {
   const fetchImpl = options.fetchImpl ?? defaultFetch;
   const sleep = options.sleep ?? defaultSleep;
   const now = options.now ?? Date.now;
+  const random = options.random ?? Math.random;
   const endpoint = `${options.baseUrl.replace(/\/$/, '')}/chat/completions`;
 
   return {
@@ -277,7 +289,7 @@ export function createOpenRouterClient(options: {
         if (outcome.kind === 'done') return outcome.response;
         lastRetry = outcome;
         if (attempt === OPENROUTER_MAX_ATTEMPTS) break;
-        await sleep(retryDelayMs(attempt, outcome.retryAfter, now()));
+        await sleep(retryDelayMs(attempt, outcome.retryAfter, now(), random));
       }
       const failed = lastRetry as Extract<AttemptOutcome, { kind: 'retry' }>;
       throw new OpenRouterCallError(

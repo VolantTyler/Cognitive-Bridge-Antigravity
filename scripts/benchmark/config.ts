@@ -118,6 +118,14 @@ function parseRunLabel(value: unknown): string {
   return label;
 }
 
+function parseJudgeMinIntervalMs(value: unknown): number {
+  if (value === undefined) return 750;
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 0 || value > 60_000) {
+    throw new ConfigError('judgeMinIntervalMs must be an integer from 0 through 60000');
+  }
+  return value;
+}
+
 function parsePrice(value: unknown, label: string): number | null {
   if (value === null) return null;
   if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
@@ -134,6 +142,7 @@ export function parseConfig(value: unknown): BenchmarkConfig {
     throw new ConfigError('priceDate is required');
   }
   const runLabel = parseRunLabel(value.run_label);
+  const judgeMinIntervalMs = parseJudgeMinIntervalMs(value.judgeMinIntervalMs);
   if (typeof value.baseUrl !== 'string' || !value.baseUrl.startsWith('https://')) {
     throw new ConfigError('baseUrl must be an https URL');
   }
@@ -268,6 +277,7 @@ export function parseConfig(value: unknown): BenchmarkConfig {
     },
     limits: { warnPerRunUsd, hardStopPerRunUsd, warnPerMonthUsd },
     maxEnabledModels,
+    judgeMinIntervalMs,
     runLabel,
     wideRangeThreshold,
     spreadThreshold,
