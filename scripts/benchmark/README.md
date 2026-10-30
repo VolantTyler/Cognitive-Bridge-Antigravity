@@ -2,7 +2,7 @@
 
 Offline-first pipeline that interviews the enabled OpenRouter models and caches Mirror scores. Commands and the list of what this does **not** validate are in the root README under "Model benchmark". The shipped file enables the original four and lists more candidates with `enabled: false`.
 
-Commands run from the repo root. `--config` is optional. Without it, the CLI reads `scripts/benchmark/config.json` (the original four). `config.frontier.json` enables Tyler's near-frontier four and does not change that default file. Both files write `scripts/benchmark/output/scores.json`. Each run replaces that file, so copy or rename it before the next run. A frontier run after an original-four run, or the reverse, drops the models that were not enabled for the new run.
+Commands run from the repo root. `--config` is optional. Without it, the CLI reads `scripts/benchmark/config.json` (the original four). `config.frontier.json` enables Tyler's near-frontier four and does not change that default file. `config.frontier-a.json` and `config.frontier-b.json` are the same settings with `run_label` `frontier-a` and `frontier-b`. Use those files instead of editing the label by hand. All of these files write `scripts/benchmark/output/scores.json`. Each run replaces that file, so copy or rename it before the next run. A frontier run after an original-four run, or the reverse, drops the models that were not enabled for the new run.
 
 ```bash
 npm run benchmark:dry-run
@@ -18,6 +18,26 @@ Before switching configs:
 ```bash
 cp scripts/benchmark/output/scores.json scripts/benchmark/output/scores-default.json
 ```
+
+Labelled frontier runs. Dry-run first, then the live run. Run A, check the score file, copy it, then run B.
+
+```bash
+npm run benchmark:dry-run -- --config scripts/benchmark/config.frontier-a.json
+npm run benchmark:dry-run -- --config scripts/benchmark/config.frontier-b.json
+
+export OPENROUTER_API_KEY="your-openrouter-key"
+npm run benchmark -- --config scripts/benchmark/config.frontier-a.json
+```
+
+After run A, confirm `run_label` is `frontier-a` and `generated_at` is the time of that run, not an older timestamp, before starting run B:
+
+```bash
+node --input-type=module -e 'import { readFileSync } from "node:fs"; const score = JSON.parse(readFileSync("scripts/benchmark/output/scores.json", "utf8")); console.log(score.run_label); console.log(score.generated_at);'
+cp scripts/benchmark/output/scores.json scripts/benchmark/output/scores-frontier-a.json
+npm run benchmark -- --config scripts/benchmark/config.frontier-b.json
+```
+
+After run B, copy `scores.json` to `scores-frontier-b.json` if you need to keep it. `run_label` on that file is `frontier-b`.
 
 Outputs (gitignored):
 
@@ -82,6 +102,6 @@ These are already in `config.json` with `"enabled": false`. Prices are the OpenR
 | `anthropic/claude-opus-5.5` | 4.00 | 20.00 |
 | `openai/gpt-6-luna` | 0.10 | 0.50 |
 
-`google/gemini-2.5-flash-lite` is in that file with `enabled: false` and the same 0.10 / 0.40 price as `config.json`. The pinned judge has to have a price, and this row is not interviewed. Caps, repeats, temperature, reasoning effort, and the $10 / $15 / $40 limits match `config.json`. `run_label` is `frontier`.
+`google/gemini-2.5-flash-lite` is in that file with `enabled: false` and the same 0.10 / 0.40 price as `config.json`. The pinned judge has to have a price, and this row is not interviewed. Caps, repeats, temperature, reasoning effort, and the $10 / $15 / $40 limits match `config.json`. `run_label` is `frontier` in `config.frontier.json`, `frontier-a` in `config.frontier-a.json`, and `frontier-b` in `config.frontier-b.json`. Those two copies differ from `config.frontier.json` only in that label.
 
 `anthropic/claude-sonnet-5.5` and `openai/gpt-5.5` are still not in either file. Re-check OpenRouter's per-token `pricing.prompt` and `pricing.completion`, multiply by 1,000,000, and add a priced row before enabling either one.

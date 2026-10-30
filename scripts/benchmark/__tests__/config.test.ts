@@ -3,10 +3,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import fs from 'fs';
 import path from 'path';
 import { describe, expect, it } from 'vitest';
 import { INITIAL_MIRROR_MESSAGE, MIRROR_SYSTEM_PROMPT } from '../../../src/constants';
 import { DEFAULT_CONFIG_PATH, loadConfig, parseConfig, runnableModels, skippedModels } from '../config';
+import { estimateDryRun } from '../dryrun';
 import { ConfigError } from '../errors';
 import { interviewScenarios } from '../scenarios';
 
@@ -152,6 +154,30 @@ describe('frontier benchmark config', () => {
       inputPerMillionUsd: 0.1,
       outputPerMillionUsd: 0.4,
     });
+  });
+
+  it('keeps frontier-a and frontier-b identical to config.frontier.json except run_label', () => {
+    const dir = path.dirname(DEFAULT_CONFIG_PATH);
+    const read = (name: string) => JSON.parse(fs.readFileSync(path.join(dir, name), 'utf8')) as Record<string, unknown>;
+    const frontierFile = read('config.frontier.json');
+    const copyA = read('config.frontier-a.json');
+    const copyB = read('config.frontier-b.json');
+    expect(frontierFile.run_label).toBe('frontier');
+    expect(copyA.run_label).toBe('frontier-a');
+    expect(copyB.run_label).toBe('frontier-b');
+    const withoutLabel = (value: Record<string, unknown>) => {
+      const copy = { ...value };
+      delete copy.run_label;
+      return copy;
+    };
+    expect(withoutLabel(copyA)).toEqual(withoutLabel(frontierFile));
+    expect(withoutLabel(copyB)).toEqual(withoutLabel(frontierFile));
+    const total = (name: string) => estimateDryRun(loadConfig(path.join(dir, name))).totalCostUsd;
+    expect(loadConfig(path.join(dir, 'config.frontier-a.json')).runLabel).toBe('frontier-a');
+    expect(loadConfig(path.join(dir, 'config.frontier-b.json')).runLabel).toBe('frontier-b');
+    expect(total('config.frontier-a.json')).toBe(total('config.frontier.json'));
+    expect(total('config.frontier-b.json')).toBe(total('config.frontier.json'));
+    expect(total('config.frontier.json').toFixed(6)).toBe('12.865240');
   });
 });
 
