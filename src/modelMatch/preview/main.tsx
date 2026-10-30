@@ -6,7 +6,7 @@
  * not in the production bundle. The data is labeled example data.
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import '../../index.css';
 import LeaderboardPage from '../LeaderboardPage';
@@ -14,8 +14,9 @@ import ModelMatchSection from '../ModelMatchSection';
 import OceanCards from '../../components/OceanCards';
 import type { ModelMatchState } from '../loadRuns';
 import { agreeablenessTieView, sampleEntry, sampleView } from '../__fixtures__/joinSamples';
+import { balancedView, lowConfidenceView, relativeRankView } from './extraViews';
 
-const STATES = ['normal', 'tie', 'poor', 'extroversion', 'neuroticism', 'wide', 'loading', 'error'] as const;
+const STATES = ['normal', 'tie', 'poor', 'extroversion', 'neuroticism', 'wide', 'balanced', 'low-confidence', 'relative-rank', 'loading', 'error'] as const;
 type StateName = (typeof STATES)[number];
 
 const SAMPLE_FOR_STATE: Partial<Record<StateName, 'A' | 'B' | 'C' | 'D' | 'E'>> = {
@@ -34,6 +35,9 @@ function viewFor(name: StateName): ModelMatchState {
   if (name === 'extroversion') return { status: 'ready', view: sampleView('C') };
   if (name === 'neuroticism') return { status: 'ready', view: sampleView('D') };
   if (name === 'wide') return { status: 'ready', view: sampleView('E') };
+  if (name === 'balanced') return { status: 'ready', view: balancedView() };
+  if (name === 'low-confidence') return { status: 'ready', view: lowConfidenceView() };
+  if (name === 'relative-rank') return { status: 'ready', view: relativeRankView() };
   return { status: 'ready', view: sampleView('A') };
 }
 
@@ -45,7 +49,10 @@ const NOTES: Record<StateName, string> = {
   neuroticism: 'Sample D. active_traits is empty. The chip comes from targets.',
   wide: 'Sample E, high openness only. GPT-5 Nano openness is the wide-range row.',
   loading: 'Skeleton state. No tiers.',
-  error: 'Unknown schema. No tiers.',
+  error: 'A listed run failed to load. Retry checks that run again.',
+  balanced: 'No active traits. No strong recommendation.',
+  'low-confidence': 'Openness confidence is low on the score file.',
+  'relative-rank': 'spread_warning is true. Ranks are relative.',
 };
 
 function Preview() {
@@ -56,6 +63,20 @@ function Preview() {
   const [page, setPage] = useState<'section' | string>('section');
   const hideChrome = params.get('chrome') === '0';
   const state = viewFor(name);
+  const focus = params.get('focus');
+
+  useEffect(() => {
+    const options = { focusVisible: true } as FocusOptions;
+    if (focus === 'measured') {
+      document.querySelector<HTMLElement>('[aria-controls="how-we-measured"]')?.focus(options);
+    }
+    if (focus === 'scores') {
+      const link = [...document.querySelectorAll<HTMLAnchorElement>('a')].find((anchor) =>
+        anchor.textContent?.includes('See all scores for this model'),
+      );
+      link?.focus(options);
+    }
+  }, [focus, name, page]);
 
   return (
     <div className="min-h-screen bg-bg-primary px-4 py-6 text-text-primary">

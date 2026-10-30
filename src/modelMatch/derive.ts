@@ -414,7 +414,7 @@ export function deriveSection(view: ModelMatchView): SectionModel {
   const scored = match.models.filter((model) => model.tier !== 'not_scored');
   const distinctTiers = new Set(scored.map((model) => model.tier));
   const allPoor = scored.length > 0 && scored.every((model) => model.tier === 'poor');
-  const allTie = scored.length > 0 && distinctTiers.size === 1 && !allPoor;
+  const allTie = scored.length > 1 && distinctTiers.size === 1 && !allPoor;
   const rankedCount = match.models.filter((model) => model.relative_rank != null && model.tier !== 'not_scored').length;
   const byRank = context.spreadWarning && rankedCount > 0;
   const cards = match.models.map((model) => cardFor(model, view, rankedCount));

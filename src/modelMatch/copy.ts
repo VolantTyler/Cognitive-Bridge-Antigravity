@@ -39,11 +39,11 @@ export const EXTROVERSION_CHIP = 'Extroversion: not used';
 export const EXTROVERSION_SHORT =
   "Extroversion isn't used to rank models. In our tests, every model landed in a similar middle range on it, so it couldn't tell them apart.";
 
-/** Spec section 4, the longer note behind "Why?". */
-export const EXTROVERSION_LONG =
-  "We left extroversion out of matching. Every model we tested scores a bit above the midpoint on it, and the scores swing a lot between runs, so it can't tell the models apart yet.";
+/** Title of Charlie's disclosure. The body is EXTROVERSION_WHY_BODY, with no numbers. */
+export const EXTROVERSION_WHY_TITLE = "Why we don't use extroversion to pick a model";
 
-export const WHY_LABEL = 'Why?';
+export const EXTROVERSION_WHY_BODY =
+  "We tested each AI model on all five personality traits, repeating the test many times. On extroversion, every model landed a little above the middle of the scale. Scores for the same model also moved around a lot from one run to the next. Because the models look alike on this trait, and the results aren't steady enough to tell them apart, ranking models by it would suggest a difference we can't show. We'll revisit this as we test more models. If extroversion is your strongest trait, we don't have a strong model recommendation for you yet.";
 
 /** Spec 14b, only when extroversion is the only active target. */
 export const EXTROVERSION_ONLY =

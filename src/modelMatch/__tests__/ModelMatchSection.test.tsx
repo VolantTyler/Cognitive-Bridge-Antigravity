@@ -9,7 +9,8 @@ import { RELATIVE_RANKING_NOTE } from '../../../scripts/benchmark/match';
 import { HYPOTHESIS_LABEL, type MatchResult, type ScoreFile } from '../../../scripts/benchmark/types';
 import { agreeablenessTieView, realScoreFile, sampleEntry, sampleView } from '../__fixtures__/joinSamples';
 import {
-  EXTROVERSION_LONG,
+  EXTROVERSION_WHY_BODY,
+  EXTROVERSION_WHY_TITLE,
   EXTROVERSION_SHORT,
   NO_TESTED_STRATEGY,
   STATUS_LABEL,
@@ -62,8 +63,10 @@ describe('sample A, the normal section', () => {
     renderView(sampleView('A'));
     const section = screen.getByRole('region', { name: 'Models that fit your profile' });
 
-    expect(screen.getByText(STATUS_LABEL)).toBeVisible();
-    expect(screen.getByText(HYPOTHESIS_LABEL)).toBeVisible();
+    expect(document.querySelectorAll('[data-hypothesis-chip]')).toHaveLength(1);
+    const hypothesis = document.querySelector('[data-hypothesis-chip]');
+    expect(hypothesis).toHaveTextContent(STATUS_LABEL);
+    expect(hypothesis).toHaveTextContent(HYPOTHESIS_LABEL);
     expect(screen.getByText(/hasn't been tested with real users yet/)).toBeVisible();
     expect(section.textContent).not.toMatch(/%/);
     expect(section.textContent).not.toMatch(/best model/i);
@@ -159,10 +162,11 @@ describe('states from the samples', () => {
     expect(screen.queryByRole('heading', { level: 4 })).toBeNull();
     expect(document.body.textContent).not.toContain(OLD_REASON);
     expect(document.body.textContent).not.toContain('no benchmarked model scored extroversion below 50');
-    const why = screen.getByRole('button', { name: 'Why?' });
+    const why = screen.getByRole('button', { name: EXTROVERSION_WHY_TITLE });
     expect(why).toHaveAttribute('aria-expanded', 'false');
+    expect(EXTROVERSION_WHY_BODY).not.toMatch(/\d/);
     fireEvent.click(why);
-    expect(screen.getByText(EXTROVERSION_LONG)).toBeVisible();
+    expect(screen.getByText(EXTROVERSION_WHY_BODY)).toBeVisible();
   });
 
   it('draws the low-neuroticism chip from targets when active_traits is empty', () => {
@@ -426,6 +430,7 @@ describe('acceptance fixtures', () => {
     }];
     renderView(buildView(match, file));
     expect(within(article('low/model')).getByText('Low confidence')).toBeInTheDocument();
+    expect(screen.queryByText(/fit you about equally/)).toBeNull();
   });
 });
 
@@ -455,12 +460,38 @@ describe('load and empty chrome', () => {
     expect(retry).toHaveBeenCalledOnce();
   });
 
-  it('uses one column until the large breakpoint and clips horizontal overflow', () => {
+  it('uses one column until the large breakpoint without clipping overflow', () => {
     renderView(sampleView('A'));
     const section = screen.getByRole('region', { name: 'Models that fit your profile' });
-    expect(section.className).toMatch(/overflow-x-hidden/);
+    expect(section.className).not.toMatch(/overflow-x-hidden/);
+    expect(section.className).toMatch(/min-w-0/);
     const list = screen.getByRole('list', { name: 'Strong fit' });
     expect(list.className).toMatch(/grid-cols-1/);
     expect(list.className).toMatch(/lg:grid-cols-2/);
   });
+
+  it('renders nothing when the index has no runs', () => {
+    const { container } = render(
+      <ModelMatchSection state={{ status: 'empty' }} onRetry={vi.fn()} onOpenLeaderboard={vi.fn()} />,
+    );
+    expect(container).toBeEmptyDOMElement();
+    expect(screen.queryByRole('heading', { name: 'Models that fit your profile' })).toBeNull();
+    expect(screen.queryByText(STATUS_LABEL)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
+  });
+
+  it.each(['missing-file', 'unknown-schema', 'match-rejected'] as const)(
+    'shows an honest retry for a listed run that fails (%s)',
+    (failure) => {
+      const retry = vi.fn();
+      render(
+        <ModelMatchSection state={{ status: 'error', failure }} onRetry={retry} onOpenLeaderboard={vi.fn()} />,
+      );
+      expect(screen.getByRole('alert')).toHaveTextContent("We couldn't load benchmark scores.");
+      expect(screen.getByRole('alert')).toHaveAttribute('data-failure', failure);
+      expect(screen.queryByText('Strong fit')).toBeNull();
+      fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+      expect(retry).toHaveBeenCalledOnce();
+    },
+  );
 });

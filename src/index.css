@@ -73,12 +73,12 @@
   /* Model-match range bars. Marks stay 3:1 without relying on hue. */
   --match-zone: #163526;
   --match-zone-edge: #9ee0b8;
-  --match-band: #d5e1f5;
-  --match-tick: #f7f9fc;
+  --match-band: #d5deee;
+  --match-tick: #0c1730;
   --match-ink: #f4f1ea;
   --match-axis: #c8c2b4;
   --match-focus: #fdba74;
-  --match-hatch: #f7f9fc;
+  --match-hatch: #0c1730;
 }
 
 :root.light {
@@ -151,12 +151,12 @@
 
   --match-zone: #d3eadb;
   --match-zone-edge: #14532d;
-  --match-band: #3e5588;
-  --match-tick: #1b3358;
+  --match-band: #c5d0e2;
+  --match-tick: #0c1730;
   --match-ink: #1f1b14;
   --match-axis: #4a4336;
   --match-focus: #9a3412;
-  --match-hatch: #1b3358;
+  --match-hatch: #0c1730;
 }
 
 @theme {

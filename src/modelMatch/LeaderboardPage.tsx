@@ -37,7 +37,7 @@ export default function LeaderboardPage({ state, onBack, onRetry, focusModelId, 
   const label = view ? displayRunLabel(view.context.runLabel) : null;
 
   return (
-    <div id="benchmark-scores" className="model-match min-w-0 max-w-full overflow-x-hidden">
+    <div id="benchmark-scores" className="model-match min-w-0 max-w-full">
       <button
         ref={backRef}
         type="button"

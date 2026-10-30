@@ -36,6 +36,8 @@ export type LoadFailure = 'missing-file' | 'unknown-schema' | 'unreadable' | 'ma
 
 export type ModelMatchState =
   | { status: 'loading' }
+  /** Index lists no runs. The section stays off until a file and an index entry are added. */
+  | { status: 'empty' }
   | { status: 'error'; failure: LoadFailure }
   | { status: 'ready'; view: ModelMatchView };
 
@@ -121,7 +123,7 @@ export function resolveModelMatch(
   files: Record<string, unknown>,
 ): ModelMatchState {
   const entry = selectNewestEntry(index);
-  if (!entry) return { status: 'error', failure: 'missing-file' };
+  if (!entry) return { status: 'empty' };
   const read = readScoreFile(entry, files);
   if (read.ok === false) return { status: 'error', failure: read.failure };
   try {
@@ -137,6 +139,14 @@ function bundledIndex(): unknown {
     if (path.endsWith('index.json')) return value;
   }
   return undefined;
+}
+
+/** Empty means the section stays off. Unreadable is a real load error. Present means try the newest file. */
+export function bundledAvailability(): 'empty' | 'unreadable' | 'present' {
+  const index = parseRunIndex(bundledIndex());
+  if (!index) return 'unreadable';
+  if (index.runs.length === 0) return 'empty';
+  return 'present';
 }
 
 export function loadBundledModelMatch(scores: OceanScores): ModelMatchState {

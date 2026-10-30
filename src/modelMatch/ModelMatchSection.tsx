@@ -7,8 +7,9 @@ import { useState } from 'react';
 import {
   ALL_POOR,
   EXPLAINER,
-  EXTROVERSION_LONG,
   EXTROVERSION_SHORT,
+  EXTROVERSION_WHY_BODY,
+  EXTROVERSION_WHY_TITLE,
   HIDE_POOR_CARDS,
   HOW_MEASURED,
   LEADERBOARD_LINK,
@@ -24,7 +25,6 @@ import {
   STATUS_LABEL,
   TARGETS_HEADING,
   VERBATIM_HYPOTHESIS_LABEL,
-  WHY_LABEL,
 } from './copy';
 import { deriveSection, displayRunLabel, formatTestedOn, repeatCountLabel, type ModelMatchView } from './derive';
 import type { ModelMatchState } from './loadRuns';
@@ -66,17 +66,17 @@ export default function ModelMatchSection({ state, onRetry, onOpenLeaderboard, t
   const ready = state.status === 'ready' ? deriveSection(state.view) : null;
   const showBars = ready != null && ready.groups.some((group) => group.models.some((card) => card.rows.length > 0));
 
+  if (state.status === 'empty') return null;
+
   return (
-    <section aria-labelledby="model-match-heading" role="region" className="model-match min-w-0 max-w-full overflow-x-hidden" aria-busy={state.status === 'loading'}>
+    <section aria-labelledby="model-match-heading" role="region" className="model-match min-w-0 max-w-full" aria-busy={state.status === 'loading'}>
       <h2 id="model-match-heading" className="text-2xl font-semibold tracking-tight text-text-primary">
         {SECTION_HEADING}
       </h2>
-      <p className="mt-2 max-w-3xl text-sm leading-relaxed text-text-secondary">
-        <span className="mr-2 inline-flex rounded border border-current px-2 py-0.5 align-middle text-xs font-semibold text-text-primary">
-          {STATUS_LABEL}
-        </span>
-        <span className="mr-2 inline-flex rounded border border-current px-2 py-0.5 align-middle text-xs font-medium text-text-secondary">
-          {VERBATIM_HYPOTHESIS_LABEL}
+      <p className="mt-2 max-w-full text-sm leading-relaxed break-words text-text-secondary">
+        <span data-hypothesis-chip="true" className="mr-2 inline-flex max-w-full flex-wrap items-baseline gap-x-2 rounded border border-current px-2 py-0.5 align-middle text-xs text-text-primary">
+          <span className="font-semibold">{STATUS_LABEL}</span>
+          <span className="font-normal text-text-muted">{VERBATIM_HYPOTHESIS_LABEL}</span>
         </span>
         {EXPLAINER}{' '}
         <a
@@ -85,7 +85,7 @@ export default function ModelMatchSection({ state, onRetry, onOpenLeaderboard, t
             event.preventDefault();
             onOpenLeaderboard();
           }}
-          className="whitespace-nowrap font-medium text-text-primary underline underline-offset-2"
+          className="font-medium text-text-primary underline underline-offset-2"
         >
           {LEADERBOARD_LINK}
         </a>
@@ -138,18 +138,20 @@ export default function ModelMatchSection({ state, onRetry, onOpenLeaderboard, t
           {ready.showExtroversionNote && (
             <div className="mt-3 max-w-3xl text-sm leading-relaxed text-text-muted">
               <p>{EXTROVERSION_SHORT}</p>
-              <button
-                type="button"
-                aria-expanded={whyOpen}
-                aria-controls="extroversion-why"
-                onClick={() => setWhyOpen((open) => !open)}
-                className="mt-1 font-semibold text-text-primary underline underline-offset-2"
-              >
-                {WHY_LABEL}
-              </button>
+              <h3 className="mt-2 text-sm font-semibold text-text-primary">
+                <button
+                  type="button"
+                  aria-expanded={whyOpen}
+                  aria-controls="extroversion-why"
+                  onClick={() => setWhyOpen((open) => !open)}
+                  className="max-w-full text-left underline underline-offset-2"
+                >
+                  {EXTROVERSION_WHY_TITLE}
+                </button>
+              </h3>
               {whyOpen && (
                 <p id="extroversion-why" className="mt-2">
-                  {EXTROVERSION_LONG}
+                  {EXTROVERSION_WHY_BODY}
                 </p>
               )}
             </div>
