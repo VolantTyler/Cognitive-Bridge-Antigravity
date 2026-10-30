@@ -23,6 +23,7 @@
     "warnPerMonthUsd": 40
   },
   "maxEnabledModels": 12,
+  "judgeMinIntervalMs": 750,
   "wideRangeThreshold": 40,
   "spreadThreshold": 10,
   "traitConfidence": {

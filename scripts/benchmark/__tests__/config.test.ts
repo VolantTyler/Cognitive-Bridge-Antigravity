@@ -29,6 +29,7 @@ describe('shipped benchmark config', () => {
     expect(config.judge.temperature).toBe(0);
     expect(config.limits).toEqual({ warnPerRunUsd: 10, hardStopPerRunUsd: 15, warnPerMonthUsd: 40 });
     expect(config.maxEnabledModels).toBe(12);
+    expect(config.judgeMinIntervalMs).toBe(750);
     expect(config.runLabel).toBe('default');
     expect(config.models.every((model) => model.provider === undefined)).toBe(true);
     expect(config.traitConfidence.extroversion).toBe('low');
@@ -74,6 +75,16 @@ describe('shipped benchmark config', () => {
     expect(() => parseConfig({ ...raw, models: [...raw.models, ...extras] })).toThrow(/At most 12 models may be enabled \(found 13\)/);
     expect(() => parseConfig({ ...raw, maxEnabledModels: 3 })).toThrow(/At most 3 models may be enabled \(found 4\)/);
     expect(() => parseConfig({ ...raw, maxEnabledModels: 0 })).toThrow(/positive integer/);
+  });
+
+  it('defaults judgeMinIntervalMs to 750 and rejects a bad gap', () => {
+    const raw = JSON.parse(JSON.stringify(config)) as Record<string, unknown>;
+    delete raw.judgeMinIntervalMs;
+    expect(parseConfig(raw).judgeMinIntervalMs).toBe(750);
+    expect(parseConfig({ ...raw, judgeMinIntervalMs: 0 }).judgeMinIntervalMs).toBe(0);
+    expect(() => parseConfig({ ...raw, judgeMinIntervalMs: -1 })).toThrow(/judgeMinIntervalMs/);
+    expect(() => parseConfig({ ...raw, judgeMinIntervalMs: 1.5 })).toThrow(/judgeMinIntervalMs/);
+    expect(() => parseConfig({ ...raw, judgeMinIntervalMs: 60_001 })).toThrow(/judgeMinIntervalMs/);
   });
 
   it('defaults a missing run_label and rejects a blank or long one', () => {
@@ -139,6 +150,8 @@ describe('frontier benchmark config', () => {
     expect(frontier.limits).toEqual(shipped.limits);
     expect(frontier.maxEnabledModels).toBe(shipped.maxEnabledModels);
     expect(frontier.paths).toEqual(shipped.paths);
+    expect(frontier.judgeMinIntervalMs).toBe(750);
+    expect(frontier.judgeMinIntervalMs).toBe(shipped.judgeMinIntervalMs);
     expect(frontier.traitConfidence).toEqual(shipped.traitConfidence);
     expect(runnableModels(frontier).map((model) => [model.id, model.inputPerMillionUsd, model.outputPerMillionUsd])).toEqual([
       ['google/gemini-3.8-flash', 0.825, 4.125],

@@ -91,6 +91,11 @@ export interface BenchmarkConfig {
   };
   /** How many models may have `enabled: true` in one run. */
   maxEnabledModels: number;
+  /**
+   * Minimum gap between calls to the judge model id, including interview calls
+   * to that same id. Zero disables the gap.
+   */
+  judgeMinIntervalMs: number;
   /** Short name for this run, copied onto the score file. */
   runLabel: string;
   wideRangeThreshold: number;
