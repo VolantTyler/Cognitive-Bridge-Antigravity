@@ -114,6 +114,7 @@ describe('benchmark run', () => {
           promptTokens: 0,
           completionTokens: 10,
           usageEstimated: false,
+          provider: null,
         };
       },
     };
@@ -189,6 +190,7 @@ describe('benchmark run', () => {
           promptTokens: 1,
           completionTokens: 1,
           usageEstimated: false,
+          provider: null,
         };
       },
     };
@@ -473,6 +475,7 @@ describe('benchmark run', () => {
           promptTokens: 3,
           completionTokens: 4,
           usageEstimated: false,
+          provider: null,
         };
       },
     };
@@ -513,6 +516,7 @@ describe('benchmark run', () => {
           promptTokens: 2,
           completionTokens: 3,
           usageEstimated: false,
+          provider: null,
         };
       },
     };
@@ -629,6 +633,129 @@ describe('benchmark run', () => {
     ]);
     expect(saved?.strategy_table.filter((row) => row.trait === 'extroversion').every((row) => row.exclusion_reason === EXTROVERSION_EXCLUSION_REASON)).toBe(true);
     expect(JSON.stringify(saved)).not.toContain('between 55 and 61');
+  });
+
+  it('scores a repeat after an interview 429 and does not ledger the failed attempt', async () => {
+    const dir = tempDir();
+    let interviews = 0;
+    const fetchImpl: FetchLike = async (_url, init) => {
+      const body = JSON.parse(init.body) as { messages: Array<{ role: string }> };
+      const interview = body.messages.every((message) => message.role !== 'system');
+      if (interview) {
+        interviews += 1;
+        if (interviews === 1) {
+          return {
+            ok: false,
+            status: 429,
+            headers: { get: () => '0' },
+            async text() {
+              return JSON.stringify({ error: { message: 'Provider returned error' } });
+            },
+          };
+        }
+      }
+      return jsonResponse({
+        model: 'openai/gpt-5-nano',
+        provider: interview ? 'DeepInfra' : 'Google',
+        choices: [{
+          message: { content: interview ? 'answer' : scoreText(neutralScores({ openness: 70 })) },
+        }],
+        usage: { prompt_tokens: 2, completion_tokens: 3 },
+      });
+    };
+    const scoreFile = await runBenchmark({
+      config: testConfig({
+        repeats: 1,
+        judgeModelId: 'openai/gpt-5-nano',
+        models: [{ id: 'openai/gpt-5-nano', enabled: true, inputPerMillionUsd: 0, outputPerMillionUsd: 0 }],
+      }),
+      client: createOpenRouterClient({
+        apiKey: 'sk-test-secret',
+        baseUrl: 'https://openrouter.ai/api/v1',
+        fetchImpl,
+        sleep: async () => {},
+      }),
+      scenarios: [
+        { id: 'one', text: 'scenario one' },
+        { id: 'two', text: 'scenario two' },
+      ],
+      now: fixedNow,
+      scoreFilePath: path.join(dir, 'scores.json'),
+      ledgerPath: path.join(dir, 'ledger.jsonl'),
+      existingScoreFile: null,
+    });
+    expect(scoreFile.models[0].scored_runs).toBe(1);
+    expect(scoreFile.models[0].failed_runs).toBe(0);
+    expect(scoreFile.models[0].runs[0].provider).toBe('DeepInfra');
+    expect(scoreFile.models[0].traits.openness.mean).toBe(70);
+    const ledger = readLedger(path.join(dir, 'ledger.jsonl'));
+    expect(ledger.filter((entry) => entry.kind === 'interview')).toHaveLength(2);
+    expect(ledger.filter((entry) => entry.kind === 'judge')).toHaveLength(1);
+    expect(interviews).toBe(3);
+  });
+
+  it('joins distinct interview providers and leaves one unscored repeat when 429s are exhausted', async () => {
+    const dir = tempDir();
+    let interviews = 0;
+    const fetchImpl: FetchLike = async (_url, init) => {
+      const body = JSON.parse(init.body) as { messages: Array<{ role: string }> };
+      const interview = body.messages.every((message) => message.role !== 'system');
+      if (interview) {
+        interviews += 1;
+        if (interviews <= 3) {
+          return {
+            ok: false,
+            status: 429,
+            async text() {
+              return JSON.stringify({ error: { message: 'Provider returned error' } });
+            },
+          };
+        }
+        return jsonResponse({
+          model: 'openai/gpt-5-nano',
+          provider: interviews === 4 ? 'Together' : 'DeepInfra',
+          choices: [{ message: { content: 'answer' } }],
+          usage: { prompt_tokens: 2, completion_tokens: 3 },
+        });
+      }
+      return jsonResponse({
+        model: 'openai/gpt-5-nano',
+        provider: 'Google',
+        choices: [{ message: { content: scoreText(neutralScores({ openness: 40 })) } }],
+        usage: { prompt_tokens: 2, completion_tokens: 3 },
+      });
+    };
+    const scoreFile = await runBenchmark({
+      config: testConfig({
+        repeats: 2,
+        judgeModelId: 'openai/gpt-5-nano',
+        models: [{ id: 'openai/gpt-5-nano', enabled: true, inputPerMillionUsd: 0, outputPerMillionUsd: 0 }],
+      }),
+      client: createOpenRouterClient({
+        apiKey: 'sk-test-secret',
+        baseUrl: 'https://openrouter.ai/api/v1',
+        fetchImpl,
+        sleep: async () => {},
+      }),
+      scenarios: [
+        { id: 'one', text: 'scenario one' },
+        { id: 'two', text: 'scenario two' },
+      ],
+      now: fixedNow,
+      scoreFilePath: path.join(dir, 'scores.json'),
+      ledgerPath: path.join(dir, 'ledger.jsonl'),
+      existingScoreFile: null,
+    });
+    expect(scoreFile.models[0].scored_runs).toBe(1);
+    expect(scoreFile.models[0].failed_runs).toBe(1);
+    expect(scoreFile.models[0].not_scored_reason).toBeNull();
+    expect(scoreFile.models[0].failures[0]).toMatchObject({ kind: 'interview', repeat: 1 });
+    expect(scoreFile.models[0].failures[0].reason).toMatch(/after 3 attempts/);
+    expect(scoreFile.models[0].runs[0].provider).toBe('Together, DeepInfra');
+    expect(scoreFile.models[0].traits.openness.mean).toBe(40);
+    const ledger = readLedger(path.join(dir, 'ledger.jsonl'));
+    expect(ledger.filter((entry) => entry.repeat === 1)).toHaveLength(1);
+    expect(ledger.filter((entry) => entry.repeat === 1)[0]).toMatchObject({ kind: 'interview', estimated: true });
   });
 });
 

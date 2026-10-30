@@ -4,8 +4,15 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { OpenRouterError, TruncatedOutputError } from '../errors';
-import { createOpenRouterClient, interviewMessages, type FetchLike } from '../openrouter';
+import { OpenRouterCallError, OpenRouterError, TruncatedOutputError } from '../errors';
+import {
+  OPENROUTER_MAX_ATTEMPTS,
+  OPENROUTER_MAX_RETRY_AFTER_MS,
+  createOpenRouterClient,
+  interviewMessages,
+  retryDelayMs,
+  type FetchLike,
+} from '../openrouter';
 import { buildInterviewTranscript, parseMirrorScores } from '../scorer';
 import type { ChatRequest } from '../types';
 
@@ -182,5 +189,182 @@ describe('OpenRouter client', () => {
       expect(truncated.message).not.toContain('SECRET_REASONING_TEXT');
       expect(truncated.message).not.toContain('sk-test-secret');
     }
+  });
+
+  it('sends reasoning.effort for Qwen and Kimi and keeps a normal answer', async () => {
+    for (const model of ['qwen/qwen3-235b-a22b-2507', 'moonshotai/kimi-k2-0905'] as const) {
+      const seen: Array<Record<string, unknown>> = [];
+      const fetchImpl: FetchLike = async (_url, init) => {
+        seen.push(JSON.parse(init.body) as Record<string, unknown>);
+        return {
+          ok: true,
+          status: 200,
+          async text() {
+            return JSON.stringify({
+              model,
+              choices: [{ finish_reason: 'stop', message: { content: 'answer' } }],
+              usage: { prompt_tokens: 3, completion_tokens: 4 },
+            });
+          },
+        };
+      };
+      const client = createOpenRouterClient({
+        apiKey: 'sk-test-secret',
+        baseUrl: 'https://openrouter.ai/api/v1',
+        fetchImpl,
+      });
+      const response = await client.complete({ ...request, model, kind: 'interview', reasoningEffort: 'minimal' });
+      expect(seen).toHaveLength(1);
+      expect(seen[0].model).toBe(model);
+      expect(seen[0].reasoning).toEqual({ effort: 'minimal' });
+      expect(response.content).toBe('answer');
+      expect(response.provider).toBeNull();
+    }
+  });
+
+  it('records the OpenRouter provider when the body includes one', async () => {
+    const fetchImpl: FetchLike = async () => ({
+      ok: true,
+      status: 200,
+      async text() {
+        return JSON.stringify({
+          model: 'openai/gpt-5-nano',
+          provider: '  Google AI Studio  ',
+          choices: [{ message: { content: 'answer' } }],
+          usage: { prompt_tokens: 2, completion_tokens: 3 },
+        });
+      },
+    });
+    const client = createOpenRouterClient({
+      apiKey: 'sk-test-secret',
+      baseUrl: 'https://openrouter.ai/api/v1',
+      fetchImpl,
+    });
+    const response = await client.complete(request);
+    expect(response.provider).toBe('Google AI Studio');
+  });
+
+  it('retries 429 and 5xx on interview and judge calls, then records the successful response', async () => {
+    for (const kind of ['interview', 'judge'] as const) {
+      const statuses: number[] = [];
+      const delays: number[] = [];
+      const fetchImpl: FetchLike = async () => {
+        const plan = kind === 'interview' ? [429, 500, 200] : [503, 200];
+        const status = plan[statuses.length] ?? 200;
+        statuses.push(status);
+        if (status !== 200) {
+          return {
+            ok: false,
+            status,
+            headers: { get: () => null },
+            async text() {
+              return JSON.stringify({ error: { message: 'Provider returned error' } });
+            },
+          };
+        }
+        return {
+          ok: true,
+          status: 200,
+          async text() {
+            return JSON.stringify({
+              model: 'google/gemini-2.5-flash-lite',
+              provider: 'Google',
+              choices: [{ message: { content: kind === 'judge' ? 'JSON_SCORES: {"openness":1}' : 'answer' } }],
+              usage: { prompt_tokens: 4, completion_tokens: 5 },
+            });
+          },
+        };
+      };
+      const client = createOpenRouterClient({
+        apiKey: 'sk-test-secret',
+        baseUrl: 'https://openrouter.ai/api/v1',
+        fetchImpl,
+        sleep: async (ms) => {
+          delays.push(ms);
+        },
+      });
+      const response = await client.complete({ ...request, kind, reasoningEffort: 'minimal' });
+      expect(response.content).toContain(kind === 'judge' ? 'JSON_SCORES' : 'answer');
+      expect(response.provider).toBe('Google');
+      expect(statuses).toEqual(kind === 'interview' ? [429, 500, 200] : [503, 200]);
+      expect(delays).toEqual(kind === 'interview' ? [500, 1000] : [500]);
+    }
+  });
+
+  it('honors Retry-After, caps it, and throws OpenRouterCallError after three 429s', async () => {
+    const nowMs = Date.parse('2026-10-30T12:00:00.000Z');
+    expect(retryDelayMs(1, '2', nowMs)).toBe(2000);
+    expect(retryDelayMs(1, new Date(nowMs + 2000).toUTCString(), nowMs)).toBe(2000);
+    expect(retryDelayMs(1, '120', nowMs)).toBe(OPENROUTER_MAX_RETRY_AFTER_MS);
+    expect(retryDelayMs(1, 'not-a-date', nowMs)).toBe(500);
+    expect(retryDelayMs(2, null, nowMs)).toBe(1000);
+    expect(OPENROUTER_MAX_ATTEMPTS).toBe(3);
+
+    const delays: number[] = [];
+    let calls = 0;
+    const fetchImpl: FetchLike = async () => {
+      calls += 1;
+      return {
+        ok: false,
+        status: 429,
+        headers: { get: (name) => (name.toLowerCase() === 'retry-after' ? '2' : null) },
+        async text() {
+          return JSON.stringify({ error: { message: 'Provider returned error' } });
+        },
+      };
+    };
+    const client = createOpenRouterClient({
+      apiKey: 'sk-test-secret',
+      baseUrl: 'https://openrouter.ai/api/v1',
+      fetchImpl,
+      now: () => nowMs,
+      sleep: async (ms) => {
+        delays.push(ms);
+      },
+    });
+    await expect(client.complete(request)).rejects.toBeInstanceOf(OpenRouterCallError);
+    await expect(client.complete(request)).rejects.toThrow(/failed \(429\) after 3 attempts: Provider returned error/);
+    expect(calls).toBe(OPENROUTER_MAX_ATTEMPTS * 2);
+    expect(delays).toEqual([2000, 2000, 2000, 2000]);
+  });
+
+  it('does not retry a 401 or a length cutoff', async () => {
+    let calls = 0;
+    const fetchImpl: FetchLike = async () => {
+      calls += 1;
+      if (calls === 1) {
+        return {
+          ok: false,
+          status: 401,
+          async text() {
+            return 'invalid key sk-test-secret';
+          },
+        };
+      }
+      return {
+        ok: true,
+        status: 200,
+        async text() {
+          return JSON.stringify({
+            model: 'openai/gpt-5-nano',
+            choices: [{ finish_reason: 'length', message: { content: null } }],
+            usage: { prompt_tokens: 1, completion_tokens: 2 },
+          });
+        },
+      };
+    };
+    const delays: number[] = [];
+    const client = createOpenRouterClient({
+      apiKey: 'sk-test-secret',
+      baseUrl: 'https://openrouter.ai/api/v1',
+      fetchImpl,
+      sleep: async (ms) => {
+        delays.push(ms);
+      },
+    });
+    await expect(client.complete(request)).rejects.toThrow(/failed \(401\)/);
+    await expect(client.complete(request)).rejects.toBeInstanceOf(TruncatedOutputError);
+    expect(calls).toBe(2);
+    expect(delays).toEqual([]);
   });
 });

@@ -119,6 +119,7 @@ export function recordingClient(options?: {
           promptTokens,
           completionTokens,
           usageEstimated: false,
+          provider: null,
         };
       }
       return {
@@ -127,6 +128,7 @@ export function recordingClient(options?: {
         promptTokens,
         completionTokens,
         usageEstimated: false,
+        provider: null,
       };
     },
   };

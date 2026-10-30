@@ -59,6 +59,14 @@ describe('score file schema', () => {
     expect(scoreFile.models[0].traits.openness.wide_range).toBe(false);
     expect(scoreFile.models[0].version).toBe('openai/gpt-5-nano-2026-10-05');
     expect(scoreFile.models[0].runs[0].model_version).toBe('openai/gpt-5-nano-2026-10-05');
+    expect(scoreFile.models[0].runs[0].provider).toBeNull();
+    const withoutProvider = JSON.parse(JSON.stringify(scoreFile)) as {
+      models: Array<{ id: string; runs: Array<Record<string, unknown>> }>;
+    };
+    delete withoutProvider.models[0].runs[0].provider;
+    expect(() => validateScoreFile(withoutProvider)).not.toThrow();
+    withoutProvider.models[0].runs[0].provider = 4;
+    expect(() => validateScoreFile(withoutProvider)).toThrow(/provider must be a non-empty string or null/);
     expect(scoreFile.models[0].cost_usd).toBe(1.25);
     expect(scoreFile.models[0].timestamp).toBe('2026-10-25T03:00:00.000Z');
     for (const trait of OCEAN_TRAITS) {

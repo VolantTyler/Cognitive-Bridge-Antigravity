@@ -42,6 +42,7 @@ export interface CompletedModelRun {
     recordedAt?: string;
     maxOutputTokens?: number;
     reasoningEffort?: ReasoningEffort;
+    provider?: string | null;
     scores: OceanScores;
   }>;
   failures?: AttemptFailure[];
@@ -116,6 +117,7 @@ export function buildScoreFile(input: {
       recorded_at: repeat.recordedAt ?? model.timestamp,
       max_output_tokens: repeat.maxOutputTokens ?? outputBudget.maxOutputTokens,
       reasoning_effort: repeat.reasoningEffort ?? outputBudget.reasoningEffort,
+      provider: repeat.provider ?? null,
       scores: repeat.scores,
     }));
     const traits = aggregateTraits(
@@ -310,6 +312,9 @@ export function validateScoreFile(value: unknown): asserts value is ScoreFile {
       }
       if (typeof run.max_output_tokens !== 'number' || typeof run.reasoning_effort !== 'string' || !run.reasoning_effort) {
         throw new ScoreFileSchemaError(`model ${model.id} runs must record max_output_tokens and reasoning_effort`);
+      }
+      if ('provider' in run && run.provider !== null && (typeof run.provider !== 'string' || run.provider.trim() === '')) {
+        throw new ScoreFileSchemaError(`model ${model.id} run provider must be a non-empty string or null`);
       }
       if (!isRecord(run.scores)) {
         throw new ScoreFileSchemaError(`model ${model.id} run is missing scores`);

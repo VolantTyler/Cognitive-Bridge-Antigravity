@@ -323,6 +323,14 @@ export async function runBenchmark(options: RunOptions): Promise<ReturnType<type
   return scoreFile;
 }
 
+function joinProviders(values: string[]): string | null {
+  const unique: string[] = [];
+  for (const value of values) {
+    if (!unique.includes(value)) unique.push(value);
+  }
+  return unique.length === 0 ? null : unique.join(', ');
+}
+
 function outputBudgetOf(config: BenchmarkConfig) {
   return {
     maxOutputTokens: config.interview.maxOutputTokens,
@@ -369,6 +377,7 @@ async function runOneModel(options: {
   for (let repeat = 1; repeat <= options.config.interview.repeats; repeat += 1) {
     const answers: Array<{ scenario: Scenario; answer: string }> = [];
     let modelVersion = options.model.id;
+    const interviewProviders: string[] = [];
     let maxUsed = options.config.interview.maxOutputTokens;
     let repeatFailed = false;
 
@@ -410,6 +419,7 @@ async function runOneModel(options: {
         break;
       }
       modelVersion = billed.response.modelVersion;
+      if (billed.response.provider) interviewProviders.push(billed.response.provider);
       answers.push({ scenario, answer: billed.response.content });
       options.logger('info', `interview ${options.model.id} repeat ${repeat} ${scenario.id} ${billed.response.modelVersion}`);
     }
@@ -460,6 +470,7 @@ async function runOneModel(options: {
         recordedAt: options.now().toISOString(),
         maxOutputTokens: maxUsed,
         reasoningEffort: effort,
+        provider: joinProviders(interviewProviders),
         scores,
       });
     } catch (error) {

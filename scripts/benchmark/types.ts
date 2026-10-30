@@ -110,6 +110,11 @@ export interface ChatResponse {
   promptTokens: number;
   completionTokens: number;
   usageEstimated: boolean;
+  /**
+   * OpenRouter's top-level `provider` (the upstream that answered).
+   * Null when the body omits it.
+   */
+  provider: string | null;
 }
 
 export interface ChatClient {
@@ -145,6 +150,12 @@ export interface ScoreRun {
   max_output_tokens: number;
   /** OpenRouter reasoning.effort sent with this repeat. */
   reasoning_effort: ReasoningEffort;
+  /**
+   * Upstream named by OpenRouter `provider` on the interview calls in this repeat.
+   * Unique values are joined when scenarios differ. Null when every response omitted it.
+   * Omitted entirely on score files written before this field existed.
+   */
+  provider?: string | null;
   scores: OceanScores;
 }
 
