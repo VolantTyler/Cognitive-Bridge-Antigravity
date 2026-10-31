@@ -19,6 +19,8 @@ import type {
 import { OCEAN_TRAITS } from '../../scripts/benchmark/types';
 import {
   BALANCED_PROFILE,
+  CLOSE_CALL_NOTE,
+  DECENT_SENTENCE,
   EXTROVERSION_ONLY,
   NO_RECOMMENDATION,
   NO_TESTED_STRATEGY,
@@ -211,6 +213,8 @@ export interface CardModel {
   sentence: string;
   rows: RowModel[];
   fewerRunsTag: string | null;
+  /** Set on a Decent card when every driving-trait low is exactly 50. */
+  closeCallNote: string | null;
   missingTraitLabel: string | null;
   /** matchModels rank across every scored model. Not shown. */
   sourceRank: number | null;
@@ -260,10 +264,19 @@ export function tieBanner(count: number, spreadWarning: boolean): string {
 }
 
 function fitSentence(tier: 'strong' | 'decent' | 'poor', traits: OceanTrait[]): string {
+  if (tier === 'decent') return DECENT_SENTENCE;
   const names = joinTraitNames(traits);
   if (tier === 'strong') return `Matches you on ${names}.`;
-  if (tier === 'decent') return `Matches you on average, but some runs crossed the midpoint on ${names}.`;
   return `Falls outside your target on ${names}.`;
+}
+
+/**
+ * Decent only. Strong fails when a driving trait's low is not strictly above 50.
+ * The close-call note is for the case where that low is exactly 50 on every
+ * driving trait, so no run scored below the midpoint. A low under 50 is not a close call.
+ */
+export function closeCallFromDrivingLows(lows: number[]): boolean {
+  return lows.length > 0 && lows.every((low) => low === 50);
 }
 
 function notScoredSentence(stats: ModelStats | undefined, repeats: number, missing: OceanTrait[]): string {
@@ -388,6 +401,9 @@ function cardFor(model: MatchModelResult, view: ModelMatchView): CardModel {
   const sentence = model.tier === 'not_scored'
     ? notScoredSentence(stats, repeats, missing)
     : fitSentence(model.tier, model.driving_traits);
+  const closeCallNote = model.tier === 'decent' && closeCallFromDrivingLows(rows.map((row) => row.low))
+    ? CLOSE_CALL_NOTE
+    : null;
   return {
     modelId: model.model_id,
     tier: model.tier,
@@ -395,6 +411,7 @@ function cardFor(model: MatchModelResult, view: ModelMatchView): CardModel {
     sentence,
     rows,
     fewerRunsTag: fewerTag,
+    closeCallNote,
     missingTraitLabel: model.tier === 'not_scored' && missing.length > 0
       ? `Missing scores for ${joinTraitNames(missing)}.`
       : null,

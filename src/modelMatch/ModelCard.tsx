@@ -69,6 +69,12 @@ export default function ModelCard({ card, timeZone, onOpenLeaderboard }: ModelCa
         )}
       </div>
 
+      {card.closeCallNote && (
+        <p data-close-call="true" className="mt-2 max-w-full break-words text-xs leading-relaxed text-text-muted">
+          {card.closeCallNote}
+        </p>
+      )}
+
       <p className="mt-3 text-sm leading-relaxed text-text-secondary">
         {card.sentence}
         {card.fewerRunsTag && (
