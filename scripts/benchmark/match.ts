@@ -3,7 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  *
  * One match function. Replace STRATEGY_TABLE in this file to swap the hypothesis.
- * A score file whose stored table differs is rejected. Active traits follow
+ * A score file whose stored table differs is rejected. Reading an already-written
+ * file still accepts LEGACY_EXTROVERSION_EXCLUSION_REASONS on extroversion rows.
+ * New runs stamp EXTROVERSION_EXCLUSION_REASON. Active traits follow
  * getActiveDirectives (strictly >70 or <30). Tiers are fit bands against 50.
  * When the score file's spread_warning is true, models are also ranked by
  * distance from the target profile.
@@ -23,7 +25,15 @@ import {
   type TargetDirection,
 } from './types';
 
-export const EXTROVERSION_EXCLUSION_REASON = 'Excluded from tiering: no benchmarked model scored extroversion below 50, and the table needs one. Means are still reported.';
+export const EXTROVERSION_EXCLUSION_REASON = 'Excluded from tiering: extroversion scores sit near the middle of the scale and swing from run to run by about as much as models differ from each other, so they cannot separate models reliably. Means are still reported.';
+
+/**
+ * Accepted only while reading an already-written score file. buildScoreFile
+ * stamps EXTROVERSION_EXCLUSION_REASON. Any other sentence still fails the check.
+ */
+export const LEGACY_EXTROVERSION_EXCLUSION_REASONS = [
+  'Excluded from tiering: no benchmarked model scored extroversion below 50, and the table needs one. Means are still reported.',
+] as const;
 
 const counted = { exclude_from_tiering: false, exclusion_reason: null } as const;
 
@@ -87,6 +97,14 @@ export function distanceFromTarget(points: Array<{ mean: number; target: TargetD
   return Math.sqrt(sum);
 }
 
+function exclusionReasonMatches(stored: StrategyRow, expected: StrategyRow): boolean {
+  if (stored.exclusion_reason === expected.exclusion_reason) return true;
+  if (stored.trait !== 'extroversion' || expected.trait !== 'extroversion') return false;
+  if (expected.exclusion_reason !== EXTROVERSION_EXCLUSION_REASON) return false;
+  return typeof stored.exclusion_reason === 'string'
+    && (LEGACY_EXTROVERSION_EXCLUSION_REASONS as readonly string[]).includes(stored.exclusion_reason);
+}
+
 function sameStrategyRow(stored: StrategyRow, expected: StrategyRow): boolean {
   return stored.trait === expected.trait
     && stored.threshold === expected.threshold
@@ -94,7 +112,7 @@ function sameStrategyRow(stored: StrategyRow, expected: StrategyRow): boolean {
     && stored.target_direction === expected.target_direction
     && stored.confidence === expected.confidence
     && stored.exclude_from_tiering === expected.exclude_from_tiering
-    && stored.exclusion_reason === expected.exclusion_reason;
+    && exclusionReasonMatches(stored, expected);
 }
 
 export function assertStoredStrategyTable(stored: StrategyRow[] | undefined): void {
@@ -103,7 +121,7 @@ export function assertStoredStrategyTable(stored: StrategyRow[] | undefined): vo
     && stored.every((row, index) => sameStrategyRow(row, STRATEGY_TABLE[index]));
   if (!matches) {
     throw new Error(
-      'Score file strategy_table does not match the in-code STRATEGY_TABLE, including a changed exclusion_reason. A score file written with the previous extroversion exclusion wording fails this check. Refusing to match against a different hypothesis. Delete the existing scores.json and re-run the benchmark. This run does not merge an older score file.',
+      'Score file strategy_table does not match the in-code STRATEGY_TABLE, including a changed exclusion_reason. Reading an already-written score file still accepts one legacy extroversion exclusion sentence. Any other exclusion wording fails this check. Refusing to match against a different hypothesis. Delete the existing scores.json and re-run the benchmark. This run does not merge an older score file.',
     );
   }
 }
