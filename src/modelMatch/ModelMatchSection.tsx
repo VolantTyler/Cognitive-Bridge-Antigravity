@@ -18,6 +18,7 @@ import {
   LEGEND_ZONE,
   LOADING_LABEL,
   LOAD_ERROR,
+  MATCH_REJECTED_DETAIL,
   NO_TESTED_STRATEGY,
   RETRY_LABEL,
   SECTION_HEADING,
@@ -111,6 +112,9 @@ export default function ModelMatchSection({ state, onRetry, onOpenLeaderboard, t
       {state.status === 'error' && (
         <div className="mt-6 rounded-lg border border-border-primary border-l-4 border-l-[var(--match-ink)] bg-bg-secondary p-4" role="alert" data-failure={state.failure}>
           <p className="text-sm font-medium text-text-primary">{LOAD_ERROR}</p>
+          {state.failure === 'match-rejected' && (
+            <p className="mt-2 text-sm leading-relaxed text-text-secondary">{MATCH_REJECTED_DETAIL}</p>
+          )}
           <button
             type="button"
             onClick={onRetry}

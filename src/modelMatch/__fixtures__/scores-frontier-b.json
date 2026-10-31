@@ -1,0 +1,962 @@
+{
+  "schema_version": 4,
+  "label": "design hypothesis based on research",
+  "spread_warning": false,
+  "spread_threshold": 10,
+  "wide_range_threshold": 40,
+  "trait_spread": {
+    "openness": 13.57142857142857,
+    "conscientiousness": 12.539682539682545,
+    "extroversion": 11.904761904761905,
+    "agreeableness": 8.49206349206348,
+    "neuroticism": 3.0555555555555536
+  },
+  "generated_at": "2026-10-30T18:04:31.563Z",
+  "run_label": "frontier-b",
+  "price_date": "2026-10-30",
+  "interview_temperature": 0.8,
+  "repeats": 10,
+  "partial": false,
+  "output_budget": {
+    "max_output_tokens": 8192,
+    "retry_max_output_tokens": 16384,
+    "reasoning_effort": "minimal"
+  },
+  "judge": {
+    "model_id": "google/gemini-2.5-flash-lite",
+    "version": "google/gemini-2.5-flash-lite",
+    "recorded_at": "2026-10-30T18:04:31.563Z",
+    "temperature": 0
+  },
+  "strategy_table": [
+    {
+      "trait": "openness",
+      "threshold": "high",
+      "strategy": "congruent",
+      "target_direction": "high",
+      "confidence": "normal",
+      "exclude_from_tiering": false,
+      "exclusion_reason": null
+    },
+    {
+      "trait": "openness",
+      "threshold": "low",
+      "strategy": "congruent",
+      "target_direction": "low",
+      "confidence": "normal",
+      "exclude_from_tiering": false,
+      "exclusion_reason": null
+    },
+    {
+      "trait": "conscientiousness",
+      "threshold": "high",
+      "strategy": "congruent",
+      "target_direction": "high",
+      "confidence": "normal",
+      "exclude_from_tiering": false,
+      "exclusion_reason": null
+    },
+    {
+      "trait": "conscientiousness",
+      "threshold": "low",
+      "strategy": "compensatory",
+      "target_direction": "high",
+      "confidence": "normal",
+      "exclude_from_tiering": false,
+      "exclusion_reason": null
+    },
+    {
+      "trait": "extroversion",
+      "threshold": "high",
+      "strategy": "complementary",
+      "target_direction": "low",
+      "confidence": "low",
+      "exclude_from_tiering": true,
+      "exclusion_reason": "Excluded from tiering: no benchmarked model scored extroversion below 50, and the table needs one. Means are still reported."
+    },
+    {
+      "trait": "extroversion",
+      "threshold": "low",
+      "strategy": "congruent",
+      "target_direction": "low",
+      "confidence": "normal",
+      "exclude_from_tiering": true,
+      "exclusion_reason": "Excluded from tiering: no benchmarked model scored extroversion below 50, and the table needs one. Means are still reported."
+    },
+    {
+      "trait": "agreeableness",
+      "threshold": "high",
+      "strategy": "congruent",
+      "target_direction": "high",
+      "confidence": "normal",
+      "exclude_from_tiering": false,
+      "exclusion_reason": null
+    },
+    {
+      "trait": "agreeableness",
+      "threshold": "low",
+      "strategy": "congruent",
+      "target_direction": "low",
+      "confidence": "normal",
+      "exclude_from_tiering": false,
+      "exclusion_reason": null
+    },
+    {
+      "trait": "neuroticism",
+      "threshold": "high",
+      "strategy": "compensatory",
+      "target_direction": "low",
+      "confidence": "normal",
+      "exclude_from_tiering": false,
+      "exclusion_reason": null
+    },
+    {
+      "trait": "neuroticism",
+      "threshold": "low",
+      "strategy": "complementary",
+      "target_direction": null,
+      "confidence": "not_scored",
+      "exclude_from_tiering": true,
+      "exclusion_reason": null
+    }
+  ],
+  "confidence_policy": {
+    "published_trait_confidence": {
+      "openness": "normal",
+      "conscientiousness": "normal",
+      "extroversion": "low",
+      "agreeableness": "normal",
+      "neuroticism": "normal"
+    }
+  },
+  "models": [
+    {
+      "id": "google/gemini-3.8-flash",
+      "version": "google/gemini-3.8-flash",
+      "timestamp": "2026-10-30T17:44:31.443Z",
+      "cost_usd": 0.09926225,
+      "wide_range": false,
+      "fewer_runs": true,
+      "scored_runs": 9,
+      "failed_runs": 1,
+      "not_scored_reason": null,
+      "failures": [
+        {
+          "repeat": 9,
+          "scenario_id": null,
+          "kind": "judge",
+          "reason": "OpenRouter request failed (429) after 3 attempts: Provider returned error",
+          "max_output_tokens": 8192,
+          "reasoning_effort": "minimal"
+        }
+      ],
+      "traits": {
+        "openness": {
+          "mean": 81.11111111111111,
+          "low": 75,
+          "high": 85,
+          "runs": 9,
+          "confidence": "normal",
+          "wide_range": false,
+          "fewer_runs": true
+        },
+        "conscientiousness": {
+          "mean": 73.88888888888889,
+          "low": 70,
+          "high": 80,
+          "runs": 9,
+          "confidence": "normal",
+          "wide_range": false,
+          "fewer_runs": true
+        },
+        "extroversion": {
+          "mean": 58.333333333333336,
+          "low": 50,
+          "high": 65,
+          "runs": 9,
+          "confidence": "low",
+          "wide_range": false,
+          "fewer_runs": true
+        },
+        "agreeableness": {
+          "mean": 92.77777777777777,
+          "low": 90,
+          "high": 95,
+          "runs": 9,
+          "confidence": "normal",
+          "wide_range": false,
+          "fewer_runs": true
+        },
+        "neuroticism": {
+          "mean": 27.22222222222222,
+          "low": 20,
+          "high": 30,
+          "runs": 9,
+          "confidence": "normal",
+          "wide_range": false,
+          "fewer_runs": true
+        }
+      },
+      "providers_seen": [
+        {
+          "provider": "Google",
+          "count": 9
+        },
+        {
+          "provider": "Google AI Studio",
+          "count": 3
+        }
+      ],
+      "runs": [
+        {
+          "repeat": 1,
+          "model_version": "google/gemini-3.8-flash",
+          "judge_version": "google/gemini-2.5-flash-lite",
+          "recorded_at": "2026-10-30T17:39:10.592Z",
+          "max_output_tokens": 8192,
+          "reasoning_effort": "minimal",
+          "provider": "Google",
+          "scores": {
+            "openness": 80,
+            "conscientiousness": 75,
+            "extroversion": 50,
+            "agreeableness": 90,
+            "neuroticism": 20
+          }
+        },
+        {
+          "repeat": 2,
+          "model_version": "google/gemini-3.8-flash",
+          "judge_version": "google/gemini-2.5-flash-lite",
+          "recorded_at": "2026-10-30T17:39:39.222Z",
+          "max_output_tokens": 8192,
+          "reasoning_effort": "minimal",
+          "provider": "Google",
+          "scores": {
+            "openness": 80,
+            "conscientiousness": 70,
+            "extroversion": 65,
+            "agreeableness": 95,
+            "neuroticism": 25
+          }
+        },
+        {
+          "repeat": 3,
+          "model_version": "google/gemini-3.8-flash",
+          "judge_version": "google/gemini-2.5-flash-lite",
+          "recorded_at": "2026-10-30T17:40:09.771Z",
+          "max_output_tokens": 8192,
+          "reasoning_effort": "minimal",
+          "provider": "Google",
+          "scores": {
+            "openness": 80,
+            "conscientiousness": 75,
+            "extroversion": 50,
+            "agreeableness": 95,
+            "neuroticism": 30
+          }
+        },
+        {
+          "repeat": 4,
+          "model_version": "google/gemini-3.8-flash",
+          "judge_version": "google/gemini-2.5-flash-lite",
+          "recorded_at": "2026-10-30T17:40:55.071Z",
+          "max_output_tokens": 8192,
+          "reasoning_effort": "minimal",
+          "provider": "Google, Google AI Studio",
+          "scores": {
+            "openness": 85,
+            "conscientiousness": 70,
+            "extroversion": 60,
+            "agreeableness": 95,
+            "neuroticism": 30
+          }
+        },
+        {
+          "repeat": 5,
+          "model_version": "google/gemini-3.8-flash",
+          "judge_version": "google/gemini-2.5-flash-lite",
+          "recorded_at": "2026-10-30T17:41:34.118Z",
+          "max_output_tokens": 8192,
+          "reasoning_effort": "minimal",
+          "provider": "Google, Google AI Studio",
+          "scores": {
+            "openness": 85,
+            "conscientiousness": 80,
+            "extroversion": 50,
+            "agreeableness": 95,
+            "neuroticism": 30
+          }
+        },
+        {
+          "repeat": 6,
+          "model_version": "google/gemini-3.8-flash",
+          "judge_version": "google/gemini-2.5-flash-lite",
+          "recorded_at": "2026-10-30T17:42:01.593Z",
+          "max_output_tokens": 8192,
+          "reasoning_effort": "minimal",
+          "provider": "Google",
+          "scores": {
+            "openness": 85,
+            "conscientiousness": 75,
+            "extroversion": 60,
+            "agreeableness": 95,
+            "neuroticism": 30
+          }
+        },
+        {
+          "repeat": 7,
+          "model_version": "google/gemini-3.8-flash",
+          "judge_version": "google/gemini-2.5-flash-lite",
+          "recorded_at": "2026-10-30T17:42:43.439Z",
+          "max_output_tokens": 8192,
+          "reasoning_effort": "minimal",
+          "provider": "Google, Google AI Studio",
+          "scores": {
+            "openness": 75,
+            "conscientiousness": 70,
+            "extroversion": 65,
+            "agreeableness": 90,
+            "neuroticism": 25
+          }
+        },
+        {
+          "repeat": 8,
+          "model_version": "google/gemini-3.8-flash",
+          "judge_version": "google/gemini-2.5-flash-lite",
+          "recorded_at": "2026-10-30T17:43:26.859Z",
+          "max_output_tokens": 8192,
+          "reasoning_effort": "minimal",
+          "provider": "Google",
+          "scores": {
+            "openness": 85,
+            "conscientiousness": 80,
+            "extroversion": 60,
+            "agreeableness": 90,
+            "neuroticism": 30
+          }
+        },
+        {
+          "repeat": 10,
+          "model_version": "google/gemini-3.8-flash",
+          "judge_version": "google/gemini-2.5-flash-lite",
+          "recorded_at": "2026-10-30T17:44:31.443Z",
+          "max_output_tokens": 8192,
+          "reasoning_effort": "minimal",
+          "provider": "Google",
+          "scores": {
+            "openness": 75,
+            "conscientiousness": 70,
+            "extroversion": 65,
+            "agreeableness": 90,
+            "neuroticism": 25
+          }
+        }
+      ]
+    },
+    {
+      "id": "x-ai/grok-4.7",
+      "version": "x-ai/grok-4.7",
+      "timestamp": "2026-10-30T17:51:23.456Z",
+      "cost_usd": 0.26032689999999997,
+      "wide_range": true,
+      "fewer_runs": true,
+      "scored_runs": 7,
+      "failed_runs": 3,
+      "not_scored_reason": null,
+      "failures": [
+        {
+          "repeat": 1,
+          "scenario_id": null,
+          "kind": "judge",
+          "reason": "OpenRouter request failed (429) after 3 attempts: Provider returned error",
+          "max_output_tokens": 8192,
+          "reasoning_effort": "minimal"
+        },
+        {
+          "repeat": 2,
+          "scenario_id": null,
+          "kind": "judge",
+          "reason": "OpenRouter request failed (429) after 3 attempts: Provider returned error",
+          "max_output_tokens": 8192,
+          "reasoning_effort": "minimal"
+        },
+        {
+          "repeat": 8,
+          "scenario_id": null,
+          "kind": "judge",
+          "reason": "OpenRouter request failed (429) after 3 attempts: Provider returned error",
+          "max_output_tokens": 8192,
+          "reasoning_effort": "minimal"
+        }
+      ],
+      "traits": {
+        "openness": {
+          "mean": 72.85714285714286,
+          "low": 50,
+          "high": 85,
+          "runs": 7,
+          "confidence": "normal",
+          "wide_range": false,
+          "fewer_runs": true
+        },
+        "conscientiousness": {
+          "mean": 86.42857142857143,
+          "low": 80,
+          "high": 90,
+          "runs": 7,
+          "confidence": "normal",
+          "wide_range": false,
+          "fewer_runs": true
+        },
+        "extroversion": {
+          "mean": 46.42857142857143,
+          "low": 30,
+          "high": 60,
+          "runs": 7,
+          "confidence": "low",
+          "wide_range": false,
+          "fewer_runs": true
+        },
+        "agreeableness": {
+          "mean": 84.28571428571429,
+          "low": 50,
+          "high": 95,
+          "runs": 7,
+          "confidence": "normal",
+          "wide_range": true,
+          "fewer_runs": true
+        },
+        "neuroticism": {
+          "mean": 27.142857142857142,
+          "low": 20,
+          "high": 30,
+          "runs": 7,
+          "confidence": "normal",
+          "wide_range": false,
+          "fewer_runs": true
+        }
+      },
+      "providers_seen": [
+        {
+          "provider": "xAI",
+          "count": 7
+        }
+      ],
+      "runs": [
+        {
+          "repeat": 3,
+          "model_version": "x-ai/grok-4.7",
+          "judge_version": "google/gemini-2.5-flash-lite",
+          "recorded_at": "2026-10-30T17:46:28.057Z",
+          "max_output_tokens": 8192,
+          "reasoning_effort": "minimal",
+          "provider": "xAI",
+          "scores": {
+            "openness": 60,
+            "conscientiousness": 90,
+            "extroversion": 30,
+            "agreeableness": 50,
+            "neuroticism": 20
+          }
+        },
+        {
+          "repeat": 4,
+          "model_version": "x-ai/grok-4.7",
+          "judge_version": "google/gemini-2.5-flash-lite",
+          "recorded_at": "2026-10-30T17:47:08.453Z",
+          "max_output_tokens": 8192,
+          "reasoning_effort": "minimal",
+          "provider": "xAI",
+          "scores": {
+            "openness": 85,
+            "conscientiousness": 80,
+            "extroversion": 60,
+            "agreeableness": 90,
+            "neuroticism": 30
+          }
+        },
+        {
+          "repeat": 5,
+          "model_version": "x-ai/grok-4.7",
+          "judge_version": "google/gemini-2.5-flash-lite",
+          "recorded_at": "2026-10-30T17:47:44.498Z",
+          "max_output_tokens": 8192,
+          "reasoning_effort": "minimal",
+          "provider": "xAI",
+          "scores": {
+            "openness": 70,
+            "conscientiousness": 85,
+            "extroversion": 55,
+            "agreeableness": 90,
+            "neuroticism": 25
+          }
+        },
+        {
+          "repeat": 6,
+          "model_version": "x-ai/grok-4.7",
+          "judge_version": "google/gemini-2.5-flash-lite",
+          "recorded_at": "2026-10-30T17:48:28.479Z",
+          "max_output_tokens": 8192,
+          "reasoning_effort": "minimal",
+          "provider": "xAI",
+          "scores": {
+            "openness": 85,
+            "conscientiousness": 90,
+            "extroversion": 60,
+            "agreeableness": 90,
+            "neuroticism": 30
+          }
+        },
+        {
+          "repeat": 7,
+          "model_version": "x-ai/grok-4.7",
+          "judge_version": "google/gemini-2.5-flash-lite",
+          "recorded_at": "2026-10-30T17:49:16.847Z",
+          "max_output_tokens": 8192,
+          "reasoning_effort": "minimal",
+          "provider": "xAI",
+          "scores": {
+            "openness": 85,
+            "conscientiousness": 80,
+            "extroversion": 40,
+            "agreeableness": 95,
+            "neuroticism": 30
+          }
+        },
+        {
+          "repeat": 9,
+          "model_version": "x-ai/grok-4.7",
+          "judge_version": "google/gemini-2.5-flash-lite",
+          "recorded_at": "2026-10-30T17:50:34.943Z",
+          "max_output_tokens": 8192,
+          "reasoning_effort": "minimal",
+          "provider": "xAI",
+          "scores": {
+            "openness": 50,
+            "conscientiousness": 90,
+            "extroversion": 40,
+            "agreeableness": 80,
+            "neuroticism": 30
+          }
+        },
+        {
+          "repeat": 10,
+          "model_version": "x-ai/grok-4.7",
+          "judge_version": "google/gemini-2.5-flash-lite",
+          "recorded_at": "2026-10-30T17:51:23.455Z",
+          "max_output_tokens": 8192,
+          "reasoning_effort": "minimal",
+          "provider": "xAI",
+          "scores": {
+            "openness": 75,
+            "conscientiousness": 90,
+            "extroversion": 40,
+            "agreeableness": 95,
+            "neuroticism": 25
+          }
+        }
+      ]
+    },
+    {
+      "id": "anthropic/claude-opus-5.5",
+      "version": "anthropic/claude-opus-5.5",
+      "timestamp": "2026-10-30T18:01:11.418Z",
+      "cost_usd": 0.7938608,
+      "wide_range": false,
+      "fewer_runs": true,
+      "scored_runs": 7,
+      "failed_runs": 3,
+      "not_scored_reason": null,
+      "failures": [
+        {
+          "repeat": 8,
+          "scenario_id": null,
+          "kind": "judge",
+          "reason": "OpenRouter request failed (429) after 3 attempts: Provider returned error",
+          "max_output_tokens": 8192,
+          "reasoning_effort": "minimal"
+        },
+        {
+          "repeat": 9,
+          "scenario_id": null,
+          "kind": "judge",
+          "reason": "OpenRouter request failed (429) after 3 attempts: Provider returned error",
+          "max_output_tokens": 8192,
+          "reasoning_effort": "minimal"
+        },
+        {
+          "repeat": 10,
+          "scenario_id": null,
+          "kind": "judge",
+          "reason": "OpenRouter request failed (429) after 3 attempts: Provider returned error",
+          "max_output_tokens": 8192,
+          "reasoning_effort": "minimal"
+        }
+      ],
+      "traits": {
+        "openness": {
+          "mean": 86.42857142857143,
+          "low": 85,
+          "high": 90,
+          "runs": 7,
+          "confidence": "normal",
+          "wide_range": false,
+          "fewer_runs": true
+        },
+        "conscientiousness": {
+          "mean": 78.57142857142857,
+          "low": 70,
+          "high": 85,
+          "runs": 7,
+          "confidence": "normal",
+          "wide_range": false,
+          "fewer_runs": true
+        },
+        "extroversion": {
+          "mean": 55.714285714285715,
+          "low": 50,
+          "high": 65,
+          "runs": 7,
+          "confidence": "low",
+          "wide_range": false,
+          "fewer_runs": true
+        },
+        "agreeableness": {
+          "mean": 92.14285714285714,
+          "low": 90,
+          "high": 95,
+          "runs": 7,
+          "confidence": "normal",
+          "wide_range": false,
+          "fewer_runs": true
+        },
+        "neuroticism": {
+          "mean": 27.142857142857142,
+          "low": 25,
+          "high": 30,
+          "runs": 7,
+          "confidence": "normal",
+          "wide_range": false,
+          "fewer_runs": true
+        }
+      },
+      "providers_seen": [
+        {
+          "provider": "Claude Platform on AWS",
+          "count": 7
+        }
+      ],
+      "runs": [
+        {
+          "repeat": 1,
+          "model_version": "anthropic/claude-opus-5.5",
+          "judge_version": "google/gemini-2.5-flash-lite",
+          "recorded_at": "2026-10-30T17:52:27.396Z",
+          "max_output_tokens": 8192,
+          "reasoning_effort": "minimal",
+          "provider": "Claude Platform on AWS",
+          "scores": {
+            "openness": 85,
+            "conscientiousness": 80,
+            "extroversion": 60,
+            "agreeableness": 90,
+            "neuroticism": 30
+          }
+        },
+        {
+          "repeat": 2,
+          "model_version": "anthropic/claude-opus-5.5",
+          "judge_version": "google/gemini-2.5-flash-lite",
+          "recorded_at": "2026-10-30T17:53:27.059Z",
+          "max_output_tokens": 8192,
+          "reasoning_effort": "minimal",
+          "provider": "Claude Platform on AWS",
+          "scores": {
+            "openness": 90,
+            "conscientiousness": 80,
+            "extroversion": 50,
+            "agreeableness": 95,
+            "neuroticism": 25
+          }
+        },
+        {
+          "repeat": 3,
+          "model_version": "anthropic/claude-opus-5.5",
+          "judge_version": "google/gemini-2.5-flash-lite",
+          "recorded_at": "2026-10-30T17:54:21.913Z",
+          "max_output_tokens": 8192,
+          "reasoning_effort": "minimal",
+          "provider": "Claude Platform on AWS",
+          "scores": {
+            "openness": 85,
+            "conscientiousness": 85,
+            "extroversion": 65,
+            "agreeableness": 95,
+            "neuroticism": 30
+          }
+        },
+        {
+          "repeat": 4,
+          "model_version": "anthropic/claude-opus-5.5",
+          "judge_version": "google/gemini-2.5-flash-lite",
+          "recorded_at": "2026-10-30T17:55:23.163Z",
+          "max_output_tokens": 8192,
+          "reasoning_effort": "minimal",
+          "provider": "Claude Platform on AWS",
+          "scores": {
+            "openness": 85,
+            "conscientiousness": 70,
+            "extroversion": 50,
+            "agreeableness": 90,
+            "neuroticism": 30
+          }
+        },
+        {
+          "repeat": 5,
+          "model_version": "anthropic/claude-opus-5.5",
+          "judge_version": "google/gemini-2.5-flash-lite",
+          "recorded_at": "2026-10-30T17:56:23.231Z",
+          "max_output_tokens": 8192,
+          "reasoning_effort": "minimal",
+          "provider": "Claude Platform on AWS",
+          "scores": {
+            "openness": 85,
+            "conscientiousness": 80,
+            "extroversion": 55,
+            "agreeableness": 90,
+            "neuroticism": 25
+          }
+        },
+        {
+          "repeat": 6,
+          "model_version": "anthropic/claude-opus-5.5",
+          "judge_version": "google/gemini-2.5-flash-lite",
+          "recorded_at": "2026-10-30T17:57:21.669Z",
+          "max_output_tokens": 8192,
+          "reasoning_effort": "minimal",
+          "provider": "Claude Platform on AWS",
+          "scores": {
+            "openness": 90,
+            "conscientiousness": 85,
+            "extroversion": 60,
+            "agreeableness": 95,
+            "neuroticism": 25
+          }
+        },
+        {
+          "repeat": 7,
+          "model_version": "anthropic/claude-opus-5.5",
+          "judge_version": "google/gemini-2.5-flash-lite",
+          "recorded_at": "2026-10-30T17:58:16.742Z",
+          "max_output_tokens": 8192,
+          "reasoning_effort": "minimal",
+          "provider": "Claude Platform on AWS",
+          "scores": {
+            "openness": 85,
+            "conscientiousness": 70,
+            "extroversion": 50,
+            "agreeableness": 90,
+            "neuroticism": 25
+          }
+        }
+      ]
+    },
+    {
+      "id": "openai/gpt-6-luna",
+      "version": "openai/gpt-6-luna",
+      "timestamp": "2026-10-30T18:04:31.562Z",
+      "cost_usd": 0.020870200000000005,
+      "wide_range": false,
+      "fewer_runs": true,
+      "scored_runs": 6,
+      "failed_runs": 4,
+      "not_scored_reason": null,
+      "failures": [
+        {
+          "repeat": 2,
+          "scenario_id": null,
+          "kind": "judge",
+          "reason": "OpenRouter request failed (429) after 3 attempts: Provider returned error",
+          "max_output_tokens": 8192,
+          "reasoning_effort": "minimal"
+        },
+        {
+          "repeat": 5,
+          "scenario_id": null,
+          "kind": "judge",
+          "reason": "OpenRouter request failed (429) after 3 attempts: Provider returned error",
+          "max_output_tokens": 8192,
+          "reasoning_effort": "minimal"
+        },
+        {
+          "repeat": 8,
+          "scenario_id": null,
+          "kind": "judge",
+          "reason": "OpenRouter request failed (429) after 3 attempts: Provider returned error",
+          "max_output_tokens": 8192,
+          "reasoning_effort": "minimal"
+        },
+        {
+          "repeat": 9,
+          "scenario_id": null,
+          "kind": "judge",
+          "reason": "OpenRouter request failed (429) after 3 attempts: Provider returned error",
+          "max_output_tokens": 8192,
+          "reasoning_effort": "minimal"
+        }
+      ],
+      "traits": {
+        "openness": {
+          "mean": 74.16666666666667,
+          "low": 65,
+          "high": 80,
+          "runs": 6,
+          "confidence": "normal",
+          "wide_range": false,
+          "fewer_runs": true
+        },
+        "conscientiousness": {
+          "mean": 80.83333333333333,
+          "low": 75,
+          "high": 90,
+          "runs": 6,
+          "confidence": "normal",
+          "wide_range": false,
+          "fewer_runs": true
+        },
+        "extroversion": {
+          "mean": 53.333333333333336,
+          "low": 40,
+          "high": 65,
+          "runs": 6,
+          "confidence": "low",
+          "wide_range": false,
+          "fewer_runs": true
+        },
+        "agreeableness": {
+          "mean": 92.5,
+          "low": 90,
+          "high": 95,
+          "runs": 6,
+          "confidence": "normal",
+          "wide_range": false,
+          "fewer_runs": true
+        },
+        "neuroticism": {
+          "mean": 24.166666666666668,
+          "low": 20,
+          "high": 30,
+          "runs": 6,
+          "confidence": "normal",
+          "wide_range": false,
+          "fewer_runs": true
+        }
+      },
+      "providers_seen": [
+        {
+          "provider": "OpenAI",
+          "count": 6
+        }
+      ],
+      "runs": [
+        {
+          "repeat": 1,
+          "model_version": "openai/gpt-6-luna",
+          "judge_version": "google/gemini-2.5-flash-lite",
+          "recorded_at": "2026-10-30T18:01:32.365Z",
+          "max_output_tokens": 8192,
+          "reasoning_effort": "minimal",
+          "provider": "OpenAI",
+          "scores": {
+            "openness": 80,
+            "conscientiousness": 85,
+            "extroversion": 65,
+            "agreeableness": 95,
+            "neuroticism": 25
+          }
+        },
+        {
+          "repeat": 3,
+          "model_version": "openai/gpt-6-luna",
+          "judge_version": "google/gemini-2.5-flash-lite",
+          "recorded_at": "2026-10-30T18:02:14.997Z",
+          "max_output_tokens": 8192,
+          "reasoning_effort": "minimal",
+          "provider": "OpenAI",
+          "scores": {
+            "openness": 65,
+            "conscientiousness": 75,
+            "extroversion": 55,
+            "agreeableness": 90,
+            "neuroticism": 30
+          }
+        },
+        {
+          "repeat": 4,
+          "model_version": "openai/gpt-6-luna",
+          "judge_version": "google/gemini-2.5-flash-lite",
+          "recorded_at": "2026-10-30T18:02:35.446Z",
+          "max_output_tokens": 8192,
+          "reasoning_effort": "minimal",
+          "provider": "OpenAI",
+          "scores": {
+            "openness": 75,
+            "conscientiousness": 80,
+            "extroversion": 40,
+            "agreeableness": 95,
+            "neuroticism": 20
+          }
+        },
+        {
+          "repeat": 6,
+          "model_version": "openai/gpt-6-luna",
+          "judge_version": "google/gemini-2.5-flash-lite",
+          "recorded_at": "2026-10-30T18:03:16.145Z",
+          "max_output_tokens": 8192,
+          "reasoning_effort": "minimal",
+          "provider": "OpenAI",
+          "scores": {
+            "openness": 80,
+            "conscientiousness": 75,
+            "extroversion": 55,
+            "agreeableness": 90,
+            "neuroticism": 25
+          }
+        },
+        {
+          "repeat": 7,
+          "model_version": "openai/gpt-6-luna",
+          "judge_version": "google/gemini-2.5-flash-lite",
+          "recorded_at": "2026-10-30T18:03:37.648Z",
+          "max_output_tokens": 8192,
+          "reasoning_effort": "minimal",
+          "provider": "OpenAI",
+          "scores": {
+            "openness": 65,
+            "conscientiousness": 80,
+            "extroversion": 40,
+            "agreeableness": 90,
+            "neuroticism": 20
+          }
+        },
+        {
+          "repeat": 10,
+          "model_version": "openai/gpt-6-luna",
+          "judge_version": "google/gemini-2.5-flash-lite",
+          "recorded_at": "2026-10-30T18:04:31.561Z",
+          "max_output_tokens": 8192,
+          "reasoning_effort": "minimal",
+          "provider": "OpenAI",
+          "scores": {
+            "openness": 80,
+            "conscientiousness": 90,
+            "extroversion": 65,
+            "agreeableness": 95,
+            "neuroticism": 25
+          }
+        }
+      ]
+    }
+  ]
+}

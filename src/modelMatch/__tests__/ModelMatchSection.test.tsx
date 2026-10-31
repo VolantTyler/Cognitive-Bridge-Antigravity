@@ -10,9 +10,12 @@ import { buildScoreFile, type CompletedModelRun } from '../../../scripts/benchma
 import { HYPOTHESIS_LABEL, type MatchResult, type ScoreFile } from '../../../scripts/benchmark/types';
 import { agreeablenessTieView, realScoreFile, sampleEntry, sampleView } from '../__fixtures__/joinSamples';
 import {
+  CLOSE_CALL_NOTE,
+  DECENT_SENTENCE,
   EXTROVERSION_WHY_BODY,
   EXTROVERSION_WHY_TITLE,
   EXTROVERSION_SHORT,
+  MATCH_REJECTED_DETAIL,
   NO_TESTED_STRATEGY,
   STATUS_LABEL,
   secondaryHypothesisLabel,
@@ -113,7 +116,9 @@ describe('sample A, the normal section', () => {
     const nano = article('openai/gpt-5-nano');
     expect(within(nano).getByText('Wide range')).toBeInTheDocument();
     expect(within(nano).getByText('Decent fit')).toBeInTheDocument();
-    expect(within(nano).getByText('Matches you on average, but some runs crossed the midpoint on openness.')).toBeInTheDocument();
+    expect(within(nano).getByText(DECENT_SENTENCE)).toBeInTheDocument();
+    expect(within(nano).queryByText(CLOSE_CALL_NOTE)).toBeNull();
+    expect(nano.textContent).not.toMatch(/crossed the midpoint/);
     expect(within(nano).queryByText(/conscientiousness/i)).toBeNull();
     expect(nano.querySelector('[data-hatched="true"]')).toBeTruthy();
     expect(nano.querySelector('[data-trait="openness"]')).toBeTruthy();
@@ -677,6 +682,11 @@ describe('load and empty chrome', () => {
         <ModelMatchSection state={{ status: 'error', failure }} onRetry={retry} onOpenLeaderboard={vi.fn()} />,
       );
       expect(screen.getByRole('alert')).toHaveTextContent("We couldn't load benchmark scores.");
+      if (failure === 'match-rejected') {
+        expect(screen.getByRole('alert')).toHaveTextContent(MATCH_REJECTED_DETAIL);
+      } else {
+        expect(screen.getByRole('alert')).not.toHaveTextContent(MATCH_REJECTED_DETAIL);
+      }
       expect(screen.getByRole('alert')).toHaveAttribute('data-failure', failure);
       expect(screen.queryByText('Strong fit')).toBeNull();
       fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
