@@ -140,7 +140,8 @@ describe('frontier A, profile A', () => {
       const card = article(id);
       const label = within(card).getByText(tag);
       expect(label.className).not.toMatch(/red|warning|orange|amber|danger/i);
-      expect(within(card).getByText('10 repeats')).toBeInTheDocument();
+      expect(within(card).queryByText('10 repeats')).toBeNull();
+      expect(within(card).queryByText(/^\d+ repeats$/)).toBeNull();
       expect(within(card).getByText('frontier-a')).toBeInTheDocument();
       expect(card.querySelector('[data-run-label]')).toHaveTextContent('frontier-a');
       const dashed = card.querySelector('[data-dashed="true"]');

@@ -7,11 +7,12 @@
  * They do not name the original-four model ids.
  */
 
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { matchModels } from '../../../scripts/benchmark/match';
 import { SCORE_FILE_SCHEMA_VERSION } from '../../../scripts/benchmark/types';
 import indexJson from '../../benchmark-runs/index.json';
+import { repeatCountLabel } from '../derive';
 import ModelMatchSection from '../ModelMatchSection';
 import {
   filesByBasename,
@@ -71,5 +72,38 @@ describe('shipped run', () => {
     if (show) fireEvent.click(show);
     const headings = screen.getAllByRole('heading', { level: 4 }).map((node) => node.textContent);
     expect(headings.slice().sort()).toEqual(fileIds);
+  });
+
+  it('shows the configured repeat count on a complete model and no second count', () => {
+    const index = parseRunIndex(indexJson);
+    expect(index).not.toBeNull();
+    if (!index) return;
+    const entry = selectNewestEntry(index);
+    expect(entry).not.toBeNull();
+    if (!entry) return;
+    const read = readScoreFile(entry, filesByBasename(bundled));
+    expect(read.ok).toBe(true);
+    if (!read.ok) return;
+
+    const complete = read.file.models.filter(
+      (model) => model.fewer_runs !== true && model.scored_runs === read.file.repeats,
+    );
+    expect(complete.length).toBe(read.file.models.length);
+
+    const state = loadBundledModelMatch(preset);
+    expect(state.status).toBe('ready');
+    if (state.status !== 'ready') return;
+    render(
+      <ModelMatchSection state={state} onRetry={() => undefined} onOpenLeaderboard={() => undefined} />,
+    );
+    const headerCount = repeatCountLabel(read.file.repeats);
+    for (const model of complete) {
+      const heading = screen.getByRole('heading', { level: 4, name: model.id });
+      const card = heading.closest('article');
+      expect(card).toBeTruthy();
+      if (!card) return;
+      expect(within(card).getByText(headerCount)).toBeInTheDocument();
+      expect(within(card).queryByText(new RegExp(`of ${read.file.repeats} runs`))).toBeNull();
+    }
   });
 });

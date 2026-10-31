@@ -50,7 +50,8 @@ export default function ModelCard({ card, timeZone, onOpenLeaderboard }: ModelCa
           <h4 className="break-all font-mono text-sm font-semibold text-text-primary">{card.modelId}</h4>
           <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-text-muted">
             <span>{formatTestedOn(card.timestampIso, timeZone)}</span>
-            <span>{repeatCountLabel(card.repeats)}</span>
+            {/* The scored-run tag already says "8 of 10 runs". A second "10 repeats" here is a different count. */}
+            {card.fewerRunsTag ? null : <span>{repeatCountLabel(card.repeats)}</span>}
             {card.runLabelChip && (
               <span data-run-label={card.runLabelChip} className="rounded border border-current px-1.5 py-0.5 text-[11px] font-semibold text-text-secondary">
                 {card.runLabelChip}
