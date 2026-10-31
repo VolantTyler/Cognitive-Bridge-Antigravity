@@ -169,7 +169,15 @@ describe('frontier benchmark config', () => {
     });
   });
 
-  it('keeps frontier-a and frontier-b identical to config.frontier.json except run_label', () => {
+  it('pins gemini-3.8-flash to Google and leaves every other frontier model unpinned', () => {
+    expect(frontier.models.find((model) => model.id === 'google/gemini-3.8-flash')?.provider).toEqual({
+      order: ['Google'],
+      allow_fallbacks: false,
+    });
+    expect(frontier.models.filter((model) => model.id !== 'google/gemini-3.8-flash').every((model) => model.provider === undefined)).toBe(true);
+  });
+
+  it('keeps frontier-a and frontier-b identical except run_label, without the frontier provider pin', () => {
     const dir = path.dirname(DEFAULT_CONFIG_PATH);
     const read = (name: string) => JSON.parse(fs.readFileSync(path.join(dir, name), 'utf8')) as Record<string, unknown>;
     const frontierFile = read('config.frontier.json');
@@ -183,8 +191,14 @@ describe('frontier benchmark config', () => {
       delete copy.run_label;
       return copy;
     };
+    expect(withoutLabel(copyA)).toEqual(withoutLabel(copyB));
+    const models = frontierFile.models as Array<Record<string, unknown>>;
+    const gemini = models.find((model) => model.id === 'google/gemini-3.8-flash');
+    expect(gemini?.provider).toEqual({ order: ['Google'], allow_fallbacks: false });
+    delete gemini?.provider;
     expect(withoutLabel(copyA)).toEqual(withoutLabel(frontierFile));
-    expect(withoutLabel(copyB)).toEqual(withoutLabel(frontierFile));
+    expect((copyA.models as Array<Record<string, unknown>>).every((model) => model.provider === undefined)).toBe(true);
+    expect((copyB.models as Array<Record<string, unknown>>).every((model) => model.provider === undefined)).toBe(true);
     const total = (name: string) => estimateDryRun(loadConfig(path.join(dir, name))).totalCostUsd;
     expect(loadConfig(path.join(dir, 'config.frontier-a.json')).runLabel).toBe('frontier-a');
     expect(loadConfig(path.join(dir, 'config.frontier-b.json')).runLabel).toBe('frontier-b');

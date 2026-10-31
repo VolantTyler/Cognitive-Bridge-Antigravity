@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { STEERING_LIBRARY, getActiveDirectives } from '../../../src/constants';
 import type { OceanScores } from '../../../src/types';
 import { buildScoreFile, type CompletedModelRun } from '../scorefile';
-import { EXTROVERSION_EXCLUSION_REASON, RELATIVE_RANKING_NOTE, STRATEGY_TABLE, matchModels, placement } from '../match';
+import { EXTROVERSION_EXCLUSION_REASON, LEGACY_EXTROVERSION_EXCLUSION_REASONS, RELATIVE_RANKING_NOTE, STRATEGY_TABLE, matchModels, placement } from '../match';
 import { HYPOTHESIS_LABEL, type OceanTrait, type StrategyRow } from '../types';
 import { neutralScores, scoresFor } from './fixture';
 
@@ -59,8 +59,11 @@ describe('strategy table', () => {
       exclusion_reason: EXTROVERSION_EXCLUSION_REASON,
     });
     expect(EXTROVERSION_EXCLUSION_REASON).toBe(
-      'Excluded from tiering: no benchmarked model scored extroversion below 50, and the table needs one. Means are still reported.',
+      'Excluded from tiering: extroversion scores sit near the middle of the scale and swing from run to run by about as much as models differ from each other, so they cannot separate models reliably. Means are still reported.',
     );
+    expect(LEGACY_EXTROVERSION_EXCLUSION_REASONS).toEqual([
+      'Excluded from tiering: no benchmarked model scored extroversion below 50, and the table needs one. Means are still reported.',
+    ]);
     expect(STRATEGY_TABLE.find((row) => row.trait === 'extroversion' && row.threshold === 'low')).toMatchObject({
       strategy: 'congruent',
       target_direction: 'low',
@@ -377,6 +380,45 @@ describe('match tiers', () => {
     expect(() => matchModels(neutralScores({ openness: 90 }), file)).toThrow(/STRATEGY_TABLE/);
     file.strategy_table = STRATEGY_TABLE.map((row) => ({ ...row }));
     expect(matchModels(neutralScores({ openness: 90 }), file).models[0].tier).toBe('strong');
+    expect(file.strategy_table.filter((row) => row.trait === 'extroversion').every((row) => row.exclusion_reason === EXTROVERSION_EXCLUSION_REASON)).toBe(true);
+  });
+
+  it('accepts the current sentence and one legacy extroversion sentence when reading a score file', () => {
+    const legacy = LEGACY_EXTROVERSION_EXCLUSION_REASONS[0];
+    const file = fileFor('openness', [80, 90]);
+    expect(file.strategy_table.filter((row) => row.trait === 'extroversion').every((row) => row.exclusion_reason === EXTROVERSION_EXCLUSION_REASON)).toBe(true);
+    const current = matchModels(neutralScores({ openness: 90 }), file);
+    expect(current.models[0].tier).toBe('strong');
+    expect(current.strategy_table.filter((row) => row.trait === 'extroversion').every((row) => row.exclusion_reason === EXTROVERSION_EXCLUSION_REASON)).toBe(true);
+
+    file.strategy_table = STRATEGY_TABLE.map((row) => (
+      row.trait === 'extroversion' ? { ...row, exclusion_reason: legacy } : { ...row }
+    ));
+    const accepted = matchModels(neutralScores({ extroversion: 88 }), file);
+    expect(accepted.recommendation).toBe('no strong recommendation');
+    expect(accepted.targets[0].exclusion_reason).toBe(EXTROVERSION_EXCLUSION_REASON);
+    expect(accepted.strategy_table.every((row, index) => row.exclusion_reason === STRATEGY_TABLE[index].exclusion_reason)).toBe(true);
+
+    const other = 'Excluded from tiering: extroversion was too noisy on this file. Means are still reported.';
+    file.strategy_table = STRATEGY_TABLE.map((row) => (
+      row.trait === 'extroversion' ? { ...row, exclusion_reason: other } : row
+    ));
+    expect(() => matchModels(neutralScores({ openness: 90 }), file)).toThrow(/Any other exclusion wording fails this check/);
+    expect(() => matchModels(neutralScores({ openness: 90 }), file)).toThrow(/Delete the existing scores.json/);
+
+    file.strategy_table = STRATEGY_TABLE.map((row) => (
+      row.trait === 'openness' && row.threshold === 'high'
+        ? { ...row, exclusion_reason: legacy }
+        : row
+    ));
+    expect(() => matchModels(neutralScores({ openness: 90 }), file)).toThrow(/exclusion_reason/);
+
+    file.strategy_table = STRATEGY_TABLE.map((row) => (
+      row.trait === 'extroversion' && row.threshold === 'high'
+        ? { ...row, exclusion_reason: legacy, strategy: 'congruent' }
+        : row
+    ));
+    expect(() => matchModels(neutralScores({ openness: 90 }), file)).toThrow(/STRATEGY_TABLE/);
   });
 });
 
