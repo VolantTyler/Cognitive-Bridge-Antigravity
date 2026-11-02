@@ -10,6 +10,8 @@ import { buildScoreFile, type CompletedModelRun } from '../../../scripts/benchma
 import { HYPOTHESIS_LABEL, type MatchResult, type ScoreFile } from '../../../scripts/benchmark/types';
 import { agreeablenessTieView, realScoreFile, sampleEntry, sampleView } from '../__fixtures__/joinSamples';
 import {
+  EXTROVERSION_CHIP,
+  EXTROVERSION_ONLY,
   EXTROVERSION_WHY_BODY,
   EXTROVERSION_WHY_TITLE,
   EXTROVERSION_SHORT,
@@ -178,6 +180,19 @@ describe('states from the samples', () => {
     const entry = sampleEntry('C');
     expect(entry.result.active_traits).toEqual(['extroversion']);
     expect(entry.result.models).toEqual([]);
+    expect(EXTROVERSION_CHIP).toBe('Extroversion: not used');
+    expect(EXTROVERSION_WHY_TITLE).toBe("Why we don't use extroversion to pick a model");
+    expect(EXTROVERSION_ONLY).toBe(
+      "Your strongest trait is extroversion, which we don't use for matching, so we don't have a strong model recommendation for you.",
+    );
+    expect(EXTROVERSION_SHORT).toBe(
+      "Extroversion isn't used to rank models. In our tests, every model scored near the middle on it and varied too much from run to run to tell them apart.",
+    );
+    expect(EXTROVERSION_WHY_BODY).toBe(
+      "We tested each AI model on all five personality traits, repeating the test many times. On extroversion, the models' averages sit around the middle of the scale, a few a little below it and a few a little above. Scores for the same model also swung widely from one run to the next, by about as much as the models differ from each other. Ranking models by it would suggest a difference we can't show. We'll revisit this as we test more models. If extroversion is your strongest trait, we don't have a strong model recommendation for you yet.",
+    );
+    expect(EXTROVERSION_SHORT).not.toContain('similar middle range');
+    expect(EXTROVERSION_WHY_BODY).not.toContain('landed a little above');
     renderView(sampleView('C'));
     expect(screen.getByText('Extroversion: not used')).toBeVisible();
     expect(screen.getByText(EXTROVERSION_SHORT)).toBeVisible();

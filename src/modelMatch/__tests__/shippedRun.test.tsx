@@ -3,13 +3,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { matchModels } from '../../../scripts/benchmark/match';
-import type { ScoreFile } from '../../../scripts/benchmark/types';
+import { EXTROVERSION_EXCLUSION_REASON, LEGACY_EXTROVERSION_EXCLUSION_REASONS, matchModels } from '../../../scripts/benchmark/match';
+import type { ScoreFile, StrategyRow } from '../../../scripts/benchmark/types';
 import shipped from '../../benchmark-runs/2026-10-30-original-four.json';
+import {
+  EXTROVERSION_SHORT,
+  EXTROVERSION_WHY_BODY,
+  EXTROVERSION_WHY_TITLE,
+} from '../copy';
 import ModelMatchSection from '../ModelMatchSection';
-import { loadBundledModelMatch } from '../loadRuns';
+import { loadBundledModelMatch, resolveModelMatch } from '../loadRuns';
 
 /** First Mirror preset: High Extroversion and Neuroticism. */
 const preset = {
@@ -52,5 +57,41 @@ describe('shipped 2026-10-30 original-four run', () => {
     expect(screen.queryByRole('heading', { name: 'Not enough data' })).toBeNull();
     expect(screen.getAllByRole('heading', { level: 4 })).toHaveLength(4);
     expect(screen.queryByText(/EXAMPLE DATA/)).toBeNull();
+    const legacy = LEGACY_EXTROVERSION_EXCLUSION_REASONS[0];
+    expect(JSON.stringify(shipped.strategy_table)).toContain(legacy);
+    expect(JSON.stringify(shipped)).not.toContain(EXTROVERSION_EXCLUSION_REASON);
+    expect(screen.getByText(EXTROVERSION_SHORT)).toBeVisible();
+    expect(document.body.textContent).not.toContain(legacy);
+    fireEvent.click(screen.getByRole('button', { name: EXTROVERSION_WHY_TITLE }));
+    expect(screen.getByText(EXTROVERSION_WHY_BODY)).toBeVisible();
+  });
+
+  it('loads a file that stores the current exclusion sentence and rejects any other sentence', () => {
+    const index = {
+      runs: [{
+        id: 'fresh',
+        file: 'fresh.json',
+        run_label: 'frontier',
+        tested_at: '2026-10-31T00:00:00.000Z',
+        repeats: 10,
+      }],
+    };
+    const withReason = (reason: string) => {
+      const file = structuredClone(shipped) as ScoreFile;
+      for (const row of file.strategy_table as StrategyRow[]) {
+        if (row.trait === 'extroversion') row.exclusion_reason = reason;
+      }
+      return file;
+    };
+    const current = resolveModelMatch(preset, index, { 'fresh.json': withReason(EXTROVERSION_EXCLUSION_REASON) });
+    expect(current.status).toBe('ready');
+    if (current.status !== 'ready') return;
+    expect(current.view.match.models).toHaveLength(4);
+    expect(current.view.match.strategy_table.filter((row) => row.trait === 'extroversion').every((row) => row.exclusion_reason === EXTROVERSION_EXCLUSION_REASON)).toBe(true);
+
+    const other = 'Excluded from tiering: a different hypothesis. Means are still reported.';
+    const rejected = withReason(other);
+    expect(resolveModelMatch(preset, index, { 'fresh.json': rejected })).toEqual({ status: 'error', failure: 'match-rejected' });
+    expect(() => matchModels(preset, rejected)).toThrow(/Any other exclusion wording fails this check/);
   });
 });
