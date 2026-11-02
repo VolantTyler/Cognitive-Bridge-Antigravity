@@ -42,7 +42,11 @@
       "id": "google/gemini-3.8-flash",
       "enabled": true,
       "inputPerMillionUsd": 0.825,
-      "outputPerMillionUsd": 4.125
+      "outputPerMillionUsd": 4.125,
+      "provider": {
+        "order": ["Google"],
+        "allow_fallbacks": false
+      }
     },
     {
       "id": "x-ai/grok-4.7",

@@ -72,7 +72,7 @@
       "target_direction": "low",
       "confidence": "low",
       "exclude_from_tiering": true,
-      "exclusion_reason": "Excluded from tiering: no benchmarked model scored extroversion below 50, and the table needs one. Means are still reported."
+      "exclusion_reason": "Excluded from tiering: extroversion scores sit near the middle of the scale and swing from run to run by about as much as models differ from each other, so they cannot separate models reliably. Means are still reported."
     },
     {
       "trait": "extroversion",
@@ -81,7 +81,7 @@
       "target_direction": "low",
       "confidence": "normal",
       "exclude_from_tiering": true,
-      "exclusion_reason": "Excluded from tiering: no benchmarked model scored extroversion below 50, and the table needs one. Means are still reported."
+      "exclusion_reason": "Excluded from tiering: extroversion scores sit near the middle of the scale and swing from run to run by about as much as models differ from each other, so they cannot separate models reliably. Means are still reported."
     },
     {
       "trait": "agreeableness",

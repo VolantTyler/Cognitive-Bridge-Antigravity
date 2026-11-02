@@ -66,11 +66,11 @@ function groupIds(name: string): string[] {
 describe('frontier fixtures and matchModels', () => {
   it('accepts both files while the stored exclusion_reason matches the in-code sentence', () => {
     const message = [
-      'These fixtures store the exclusion_reason from before a reword of EXTROVERSION_EXCLUSION_REASON.',
-      'matchModels compares that field exactly.',
-      'If this fails, the in-code sentence changed and scores-frontier-a.json and scores-frontier-b.json are rejected.',
-      'Do not edit the fixture text or EXTROVERSION_EXCLUSION_REASON to force a pass.',
-      'A new benchmark has to write the current sentence into the file.',
+      'These fixtures store the current EXTROVERSION_EXCLUSION_REASON on extroversion rows.',
+      'Only that field was re-stamped. Scores are the stand-in runs.',
+      'matchModels accepts the current sentence and one legacy sentence, and rejects any other.',
+      'If this fails, the in-code sentence changed again. Re-stamp this field, or the fixtures are rejected.',
+      'Do not change scores, and do not edit EXTROVERSION_EXCLUSION_REASON to force a pass.',
     ].join(' ');
     expect(storedExtroversionReason(frontierA), message).toBe(EXTROVERSION_EXCLUSION_REASON);
     expect(storedExtroversionReason(frontierB), message).toBe(EXTROVERSION_EXCLUSION_REASON);
