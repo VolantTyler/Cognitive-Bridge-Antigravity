@@ -15,6 +15,7 @@ import OceanCards from '../../components/OceanCards';
 import type { ModelMatchState } from '../loadRuns';
 import { agreeablenessTieView, sampleEntry, sampleView } from '../__fixtures__/joinSamples';
 import { balancedView, lowConfidenceView, relativeRankView } from './extraViews';
+import { FRONTIER_PROFILES, frontierFixtureState, type FrontierProfileKey } from './frontierView';
 
 const STATES = ['normal', 'tie', 'poor', 'extroversion', 'neuroticism', 'wide', 'balanced', 'low-confidence', 'relative-rank', 'loading', 'error'] as const;
 type StateName = (typeof STATES)[number];
@@ -62,7 +63,13 @@ function Preview() {
   const [name, setName] = useState<StateName>(initial);
   const [page, setPage] = useState<'section' | string>('section');
   const hideChrome = params.get('chrome') === '0';
-  const state = viewFor(name);
+  const fixtureParam = params.get('fixture');
+  const fixture = fixtureParam === 'frontier-a' || fixtureParam === 'frontier-b' || fixtureParam === 'shipped'
+    ? fixtureParam
+    : null;
+  const profileKey = (params.get('profile') ?? 'A').toUpperCase();
+  const profile = (profileKey in FRONTIER_PROFILES ? profileKey : 'A') as FrontierProfileKey;
+  const state = fixture ? frontierFixtureState(fixture, FRONTIER_PROFILES[profile]) : viewFor(name);
   const focus = params.get('focus');
 
   useEffect(() => {
@@ -80,7 +87,7 @@ function Preview() {
 
   return (
     <div className="min-h-screen bg-bg-primary px-4 py-6 text-text-primary">
-      {!hideChrome && (
+      {!hideChrome && !fixture && (
         <div className="mx-auto mb-4 max-w-5xl flex flex-wrap gap-2">
           {STATES.map((item) => (
             <button
@@ -97,15 +104,18 @@ function Preview() {
           ))}
         </div>
       )}
+      {!hideChrome && (
       <div className="mx-auto mb-6 max-w-5xl">
         <p className="inline-block rounded border border-current px-2 py-1 text-xs font-semibold">
-          EXAMPLE DATA. Not shown to app users.
+          {fixture ? 'FIXTURE. Not the shipped run.' : 'EXAMPLE DATA. Not shown to app users.'}
         </p>
         <p className="mt-2 max-w-3xl text-sm text-text-secondary">
-          Match tiers are from match-samples.json. Ranges, run counts, and dates are from scores-10run-2026-10-29.json.
-          matchModels rejects that file. {NOTES[name]}
+          {fixture
+            ? `Loaded ${fixture} through matchModels for profile ${profile}. This page is not the production bundle.`
+            : `Match tiers are from match-samples.json. Ranges, run counts, and dates are from scores-10run-2026-10-29.json. matchModels rejects that file. ${NOTES[name]}`}
         </p>
       </div>
+      )}
       <div className="mx-auto max-w-5xl">
         {params.get('context') === '1' && page === 'section' && SAMPLE_FOR_STATE[name] && (
           <div className="mb-8">

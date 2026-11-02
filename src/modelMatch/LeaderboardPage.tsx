@@ -4,7 +4,7 @@
  */
 
 import { useEffect, useRef } from 'react';
-import { LOAD_ERROR, RETRY_LABEL } from './copy';
+import { LOAD_ERROR, MATCH_REJECTED_DETAIL, RETRY_LABEL } from './copy';
 import { displayRunLabel, formatPoint, formatTestedOn, repeatCountLabel, traitLabel, type ModelMatchView } from './derive';
 import type { ModelMatchState } from './loadRuns';
 import { OCEAN_TRAITS } from '../../scripts/benchmark/types';
@@ -56,6 +56,9 @@ export default function LeaderboardPage({ state, onBack, onRetry, focusModelId, 
       {state.status === 'error' && (
         <div className="mt-6 rounded-lg border border-border-primary bg-bg-secondary p-4" role="alert" data-failure={state.failure}>
           <p className="text-sm font-medium text-text-primary">{LOAD_ERROR}</p>
+          {state.failure === 'match-rejected' && (
+            <p className="mt-2 text-sm leading-relaxed text-text-secondary">{MATCH_REJECTED_DETAIL}</p>
+          )}
           <button type="button" onClick={onRetry} className="mt-3 rounded-lg bg-button-brand px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white">
             {RETRY_LABEL}
           </button>

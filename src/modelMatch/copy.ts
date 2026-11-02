@@ -43,6 +43,13 @@ export const MODEL_SCORES_LINK = 'See all scores for this model';
 
 export const LOAD_ERROR = "We couldn't load benchmark scores.";
 
+/**
+ * Shown with LOAD_ERROR when matchModels rejects the file. The stored
+ * exclusion sentence is not quoted here.
+ */
+export const MATCH_REJECTED_DETAIL =
+  "This file's strategy table does not match the current table, including a changed exclusion sentence. Matching stays off so the cards are not scored against a different hypothesis.";
+
 export const RETRY_LABEL = 'Retry';
 
 export const LOADING_LABEL = 'Loading benchmark scores';
@@ -96,6 +103,14 @@ export const TIER_LABEL = {
   decent: 'Decent fit',
   poor: 'Poor fit',
 } as const;
+
+/** Decent card sentence. A run that only touches 50 has not crossed the midpoint. */
+export const DECENT_SENTENCE =
+  'In at least one test run, this model scored at or below the midpoint on a trait you care about.';
+
+/** Secondary line under the Decent chip when every blocking low is exactly 50. */
+export const CLOSE_CALL_NOTE =
+  'Close call: one or more test runs landed exactly on the midpoint.';
 
 export const LEGEND_ZONE = 'Where we want the model';
 
