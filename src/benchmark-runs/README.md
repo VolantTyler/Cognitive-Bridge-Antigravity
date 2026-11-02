@@ -2,7 +2,7 @@
 
 The Bridge reads this folder. `index.json` lists the runs. Each run is one score file. The app shows the newest `tested_at` and does not merge files. Tiers are computed for that run only.
 
-The shipped run is still `2026-10-30-original-four.json`, copied byte for byte from Tyler's original-four benchmark on 2026-10-30 (`generated_at` `2026-10-30T20:31:25.661Z`, schema 4, 10 repeats, `run_label` `default`). That file plus its index entry is what turns the section on. The score file's `run_label` is still `default`, so the cards show the date and repeat count and no label chip. Do not edit the file to add a chip.
+The shipped run is `2026-11-02-frontier.json`, copied byte for byte from Tyler's frontier benchmark (`generated_at` `2026-11-02T16:03:28.019Z`, schema 4, 10 repeats, `run_label` `frontier`). That file plus its index entry is what the Bridge shows. The score file's `run_label` is `frontier`, so the cards show that chip. Do not edit the file.
 
 An empty `runs` array turns the section off. The Bridge draws no heading until a score file and an index entry are both added.
 
@@ -54,7 +54,7 @@ One index entry is the replacement. A second entry does not merge. The newest `t
 
 Tests and fixtures:
 
-- `src/modelMatch/__tests__/shippedRun.test.tsx` reads whichever file `index.json` lists. It expects schema 4, four models, and a file `matchModels` accepts. It does not expect the original-four ids or a `default` label. It does expect every model in that file to have finished every configured repeat, because the current original-four file is 10 of 10 and the header then says "10 repeats" with no "N of 10 runs" tag. A replacement file where a model has `fewer_runs` needs that assertion pointed at a complete model, or dropped. The frontier fixtures cover the short-run header.
+- `src/modelMatch/__tests__/shippedRun.test.tsx` reads whichever file `index.json` lists. It expects schema 4, four models, and a file `matchModels` accepts. It does not expect particular model ids. A complete model shows the configured repeat count in the header and no "N of M runs" tag. A model with `fewer_runs` shows that tag and not a second count in the header. The shipped frontier file stores the current extroversion exclusion sentence, not the legacy one.
 - Do not retarget tests at `gpt-5-nano`, `gemini-2.5-flash-lite`, `claude-haiku-4.5`, or `grok-4.3` inside the shipped file. Those ids stay in `src/modelMatch/__fixtures__/scores-10run-2026-10-29.json` and `match-samples.json`, which are fixtures.
 - Do not replace `src/modelMatch/__fixtures__/scores-frontier-a.json` or `scores-frontier-b.json`. Those stand-ins document fewer-runs tags, close calls, and the exact `exclusion_reason` check. They are not the shipped run.
 - If `matchModels` throws `strategy_table does not match the in-code STRATEGY_TABLE, including a changed exclusion_reason`, the file was written with a different extroversion exclusion sentence than the one in code. The section shows "We couldn't load benchmark scores" plus the sentence about a changed exclusion sentence. Re-run the benchmark so the file stores the current sentence. Do not edit the sentence in the JSON, and do not edit `EXTROVERSION_EXCLUSION_REASON` to match the file.

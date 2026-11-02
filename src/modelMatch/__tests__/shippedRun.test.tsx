@@ -3,9 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  *
  * The shipped file is whichever schema-4 score file index.json lists.
- * These assertions do not name the original-four model ids.
- * That file still stores the legacy extroversion exclusion sentence, and
- * matchModels accepts it on read. New files stamp the current sentence.
+ * These assertions do not name model ids except where the real frontier
+ * file's known cases are checked: Grok's fewer runs, Opus's wide range,
+ * and one provider per model.
  */
 
 import { fireEvent, render, screen, within } from '@testing-library/react';
@@ -13,7 +13,6 @@ import { describe, expect, it } from 'vitest';
 import { EXTROVERSION_EXCLUSION_REASON, LEGACY_EXTROVERSION_EXCLUSION_REASONS, matchModels } from '../../../scripts/benchmark/match';
 import { SCORE_FILE_SCHEMA_VERSION, type ScoreFile, type StrategyRow } from '../../../scripts/benchmark/types';
 import indexJson from '../../benchmark-runs/index.json';
-import shipped from '../../benchmark-runs/2026-10-30-original-four.json';
 import {
   EXTROVERSION_SHORT,
   EXTROVERSION_WHY_BODY,
@@ -31,6 +30,16 @@ import {
 } from '../loadRuns';
 
 const bundled = import.meta.glob('../../benchmark-runs/*.json', { eager: true, import: 'default' });
+
+function indexedFile(): ScoreFile {
+  const index = parseRunIndex(indexJson);
+  if (!index) throw new Error('unreadable run index');
+  const entry = selectNewestEntry(index);
+  if (!entry) throw new Error('empty run index');
+  const read = readScoreFile(entry, filesByBasename(bundled));
+  if (read.ok === true) return read.file;
+  throw new Error(read.failure);
+}
 
 /** High openness, so a file with trait stats still produces one card per model. */
 const openness = {
@@ -105,7 +114,8 @@ describe('shipped run', () => {
     const complete = read.file.models.filter(
       (model) => model.fewer_runs !== true && model.scored_runs === read.file.repeats,
     );
-    expect(complete.length).toBe(read.file.models.length);
+    const short = read.file.models.filter((model) => model.fewer_runs === true);
+    expect(complete.length).toBeGreaterThan(0);
 
     const state = loadBundledModelMatch(openness);
     expect(state.status).toBe('ready');
@@ -122,20 +132,31 @@ describe('shipped run', () => {
       expect(within(card).getByText(headerCount)).toBeInTheDocument();
       expect(within(card).queryByText(new RegExp(`of ${read.file.repeats} runs`))).toBeNull();
     }
+    for (const model of short) {
+      const heading = screen.getByRole('heading', { level: 4, name: model.id });
+      const card = heading.closest('article');
+      expect(card).toBeTruthy();
+      if (!card) return;
+      expect(within(card).getByText(`${model.scored_runs} of ${read.file.repeats} runs`)).toBeInTheDocument();
+      expect(within(card).queryByText(headerCount)).toBeNull();
+    }
   });
 
-  it('loads the shipped file through the legacy extroversion sentence and does not print it', () => {
+  it('stores the current extroversion sentence, not the legacy one, and does not print it', () => {
+    const file = indexedFile();
     const legacy = LEGACY_EXTROVERSION_EXCLUSION_REASONS[0];
-    expect(JSON.stringify(shipped.strategy_table)).toContain(legacy);
-    expect(JSON.stringify(shipped)).not.toContain(EXTROVERSION_EXCLUSION_REASON);
+    const reasons = file.strategy_table.filter((row) => row.trait === 'extroversion').map((row) => row.exclusion_reason);
+    expect(reasons.length).toBeGreaterThan(0);
+    expect(reasons.every((reason) => reason === EXTROVERSION_EXCLUSION_REASON)).toBe(true);
+    expect(JSON.stringify(file)).not.toContain(legacy);
 
-    const direct = matchModels(highExtroversion, shipped as ScoreFile);
+    const direct = matchModels(highExtroversion, file);
     const state = loadBundledModelMatch(highExtroversion);
     expect(state.status).toBe('ready');
     if (state.status !== 'ready') return;
     expect(direct.models).toHaveLength(4);
     expect(state.view.match.models).toHaveLength(4);
-    expect(state.view.context.runLabel).toBe('default');
+    expect(state.view.context.runLabel).toBe('frontier');
     expect(state.view.context.repeats).toBe(10);
 
     render(
@@ -154,12 +175,12 @@ describe('shipped run', () => {
         id: 'fresh',
         file: 'fresh.json',
         run_label: 'frontier',
-        tested_at: '2026-10-31T00:00:00.000Z',
+        tested_at: '2026-11-02T16:03:28.019Z',
         repeats: 10,
       }],
     };
     const withReason = (reason: string) => {
-      const file = structuredClone(shipped) as ScoreFile;
+      const file = structuredClone(indexedFile());
       for (const row of file.strategy_table as StrategyRow[]) {
         if (row.trait === 'extroversion') row.exclusion_reason = reason;
       }
@@ -175,5 +196,60 @@ describe('shipped run', () => {
     const rejected = withReason(other);
     expect(resolveModelMatch(highExtroversion, index, { 'fresh.json': rejected })).toEqual({ status: 'error', failure: 'match-rejected' });
     expect(() => matchModels(highExtroversion, rejected)).toThrow(/Any other exclusion wording fails this check/);
+  });
+
+  it('renders Grok fewer-runs, Opus wide range, and one provider on the real file', () => {
+    const file = indexedFile();
+    const grok = file.models.find((model) => model.id === 'x-ai/grok-4.7');
+    const opus = file.models.find((model) => model.id === 'anthropic/claude-opus-5.5');
+    expect(grok?.fewer_runs).toBe(true);
+    expect(grok?.scored_runs).toBe(7);
+    expect(opus?.wide_range).toBe(true);
+    expect(opus?.traits.conscientiousness.wide_range).toBe(true);
+    expect(opus?.fewer_runs).not.toBe(true);
+
+    const profile = {
+      openness: 85,
+      conscientiousness: 85,
+      extroversion: 50,
+      agreeableness: 70,
+      neuroticism: 40,
+    };
+    const state = loadBundledModelMatch(profile);
+    expect(state.status).toBe('ready');
+    if (state.status !== 'ready') return;
+    render(
+      <ModelMatchSection state={state} onRetry={() => undefined} onOpenLeaderboard={() => undefined} timeZone="America/New_York" />,
+    );
+
+    const grokCard = screen.getByRole('heading', { level: 4, name: 'x-ai/grok-4.7' }).closest('article');
+    expect(grokCard).toBeTruthy();
+    if (!grokCard) return;
+    expect(within(grokCard).getByText('7 of 10 runs')).toBeInTheDocument();
+    expect(within(grokCard).queryByText('10 repeats')).toBeNull();
+    expect(within(grokCard).queryByText('7 repeats')).toBeNull();
+    expect(grokCard.querySelector('[data-dashed="true"]')).toBeTruthy();
+    expect(within(grokCard).getByText('frontier')).toBeInTheDocument();
+
+    const opusCard = screen.getByRole('heading', { level: 4, name: 'anthropic/claude-opus-5.5' }).closest('article');
+    expect(opusCard).toBeTruthy();
+    if (!opusCard) return;
+    expect(within(opusCard).getByText('Wide range')).toBeInTheDocument();
+    expect(opusCard.querySelector('[data-trait="conscientiousness"] [data-hatched="true"]')).toBeTruthy();
+    expect(within(opusCard).getByText('10 repeats')).toBeInTheDocument();
+    expect(within(opusCard).queryByText(/of 10 runs/)).toBeNull();
+    expect(within(opusCard).queryByText('Close call: one or more test runs landed exactly on the midpoint.')).toBeNull();
+
+    for (const model of file.models) {
+      expect(model.providers_seen).toHaveLength(1);
+      const card = screen.getByRole('heading', { level: 4, name: model.id }).closest('article');
+      expect(card).toBeTruthy();
+      if (!card) return;
+      expect(card.textContent).not.toMatch(/Served by/);
+      fireEvent.click(within(card).getByRole('button', { name: 'Details' }));
+      const seen = model.providers_seen?.[0];
+      expect(card.textContent).toContain(`Served by ${seen?.provider} (${seen?.count}).`);
+      expect(card.textContent).not.toMatch(/more than one provider/);
+    }
   });
 });
