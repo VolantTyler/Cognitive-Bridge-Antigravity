@@ -132,12 +132,13 @@ function inputCharCount(messages, systemInstruction) {
 /**
  * Cap unit is one chatProxy request, not one user message.
  *
- * One Bridge send starts two requests (playground-aligned and
- * playground-unaligned), so a cap of 50 is about 25 turns. Each of those
- * can POST again when the browser hits a transport failure before the
- * proxy returns fallbacksExhausted. The server model chain stays inside
- * one request and does not increment again. Mirror (feature "mirror") is
- * not in this counter.
+ * Each Bridge turn makes two requests (playground-aligned and
+ * playground-unaligned). BRIDGE_CHAT_DAILY_CAP defaults to 100 requests,
+ * about 50 turns. User-facing copy still says "50 messages".
+ *
+ * A transport failure before the proxy returns fallbacksExhausted can POST
+ * again. The server model chain stays inside one request and does not
+ * increment again. Mirror (feature "mirror") is not in this counter.
  *
  * A client message id is not used to collapse those calls. Reusing one id
  * would skip the cap and spend Vertex on unlimited requests.
@@ -146,7 +147,7 @@ function nextBridgeUsage(existing, day, cap) {
     const sameDay = existing?.day === day && typeof existing.count === "number" && Number.isFinite(existing.count);
     const count = sameDay ? Math.max(0, Math.floor(existing.count)) : 0;
     if (count >= cap) {
-        throw new GateError(429, "rate_limited", (0, accessCopy_1.dailyCapMessage)(cap));
+        throw new GateError(429, "rate_limited", (0, accessCopy_1.dailyCapMessage)());
     }
     return { day, count: count + 1 };
 }

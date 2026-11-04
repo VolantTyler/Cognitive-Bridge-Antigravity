@@ -20,9 +20,11 @@ const interviewsPaused = (0, params_1.defineString)("INTERVIEWS_PAUSED", {
     default: "false",
     description: "When true, interview features (mirror) return 503 interviews_paused.",
 });
+// Request count is two per Bridge turn (aligned + unaligned).
+// Default 100 requests is about 50 turns. Copy still says "50 messages".
 const bridgeDailyCap = (0, params_1.defineInt)("BRIDGE_CHAT_DAILY_CAP", {
     default: accessCopy_1.DEFAULT_BRIDGE_CHAT_DAILY_CAP,
-    description: "Max bridge chat requests per uid per US Eastern day.",
+    description: "Max bridge chatProxy requests per uid per US Eastern day. Default 100 is about 50 turns (two requests per turn: aligned and unaligned).",
 });
 const maxInputChars = (0, params_1.defineInt)("MAX_INPUT_CHARS", {
     default: accessCopy_1.DEFAULT_MAX_INPUT_CHARS,

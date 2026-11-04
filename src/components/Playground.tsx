@@ -225,8 +225,8 @@ export default function Playground({ scores, messages, setMessages, setScores, o
     let alignedText = '';
     let unalignedText = '';
 
-    // One user send is two chatProxy requests (aligned and unaligned).
-    // usage/{uid}.bridgeChat counts each request. See nextBridgeUsage.
+    // One turn is two chatProxy requests (aligned and unaligned).
+    // The default cap is 100 requests, about 50 turns. See nextBridgeUsage.
     const generationPromise = (async () => {
       const alignedPromise = (async () => {
         const stream = chatWithGeminiStream(

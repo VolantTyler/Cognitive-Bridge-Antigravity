@@ -10,11 +10,17 @@
  * CHAT_CAP_RESET_TIME_ZONE (US Eastern calendar day, midnight).
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.SERVER_CODE_TO_CLIENT = exports.SERVER_ACCESS_CODES = exports.AI_ACCESS_MESSAGES = exports.AI_ACCESS_CODES = exports.DEFAULT_MAX_INPUT_CHARS = exports.DEFAULT_BRIDGE_CHAT_DAILY_CAP = exports.CHAT_CAP_RESET_LABEL = exports.CHAT_CAP_RESET_TIME_ZONE = void 0;
+exports.SERVER_CODE_TO_CLIENT = exports.SERVER_ACCESS_CODES = exports.AI_ACCESS_MESSAGES = exports.AI_ACCESS_CODES = exports.DEFAULT_MAX_INPUT_CHARS = exports.DEFAULT_BRIDGE_CHAT_DAILY_CAP = exports.BRIDGE_CHAT_DAILY_MESSAGE_COPY = exports.CHAT_CAP_RESET_LABEL = exports.CHAT_CAP_RESET_TIME_ZONE = void 0;
 exports.dailyCapMessage = dailyCapMessage;
 exports.CHAT_CAP_RESET_TIME_ZONE = "America/New_York";
 exports.CHAT_CAP_RESET_LABEL = "midnight US Eastern";
-exports.DEFAULT_BRIDGE_CHAT_DAILY_CAP = 50;
+/**
+ * User-facing sentence stays "50 messages". The server counts requests.
+ * Default is 100 requests, about 50 turns, because each Bridge turn makes
+ * two chatProxy calls (aligned and unaligned).
+ */
+exports.BRIDGE_CHAT_DAILY_MESSAGE_COPY = 50;
+exports.DEFAULT_BRIDGE_CHAT_DAILY_CAP = 100;
 exports.DEFAULT_MAX_INPUT_CHARS = 8000;
 exports.AI_ACCESS_CODES = {
     signedOut: "signed_out",
@@ -25,8 +31,9 @@ exports.AI_ACCESS_CODES = {
     interviewsPaused: "interviews_paused",
     appCheck: "app_check",
 };
-function dailyCapMessage(cap = exports.DEFAULT_BRIDGE_CHAT_DAILY_CAP) {
-    return `You've used today's ${cap} chat messages. Chat opens again at ${exports.CHAT_CAP_RESET_LABEL}. Your results are still here.`;
+/** Fixed copy. Does not print the request cap (default 100). */
+function dailyCapMessage() {
+    return `You've used today's ${exports.BRIDGE_CHAT_DAILY_MESSAGE_COPY} chat messages. Chat opens again at ${exports.CHAT_CAP_RESET_LABEL}. Your results are still here.`;
 }
 exports.AI_ACCESS_MESSAGES = {
     signed_out: "Sign in to save your progress.",
