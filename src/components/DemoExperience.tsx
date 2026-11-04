@@ -84,7 +84,7 @@ export default function DemoExperience({
         ))}
       </div>
       <div className="mt-6 grid grid-cols-1 gap-4 min-[720px]:[grid-template-columns:repeat(auto-fit,minmax(280px,1fr))]">
-        <section aria-labelledby={`${titleId}-traits`} className="rounded-xl border border-border-primary bg-bg-secondary p-4">
+        <section aria-labelledby={`${titleId}-traits`} className="min-w-0 w-full col-span-full rounded-xl border border-border-primary bg-bg-secondary px-3 py-4">
           <p className="text-xs font-semibold text-status-warning">{DEMO_BADGE}</p>
           <h2 id={`${titleId}-traits`} className="mt-2 text-base font-semibold text-text-primary">Trait cards</h2>
           <p className="mt-2 text-xs leading-relaxed text-text-secondary">{DEMO_PROFILE_LABEL}</p>

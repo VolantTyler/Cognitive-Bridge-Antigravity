@@ -4,6 +4,7 @@
  */
 
 import { useEffect, useRef, type ReactNode } from "react";
+import { SUPPORT_EMAIL_PLACEHOLDER } from "../constants/checkoutCopy";
 import SiteFooter from "./SiteFooter";
 
 function LegalLayout({ title, children }: { title: string; children: ReactNode }) {
@@ -71,6 +72,9 @@ export function TermsPage() {
           <li>A side-by-side chat to try those instructions: up to 50 messages a day, resets at midnight US Eastern.</li>
           <li>An untested model suggestion.</li>
         </ul>
+        <p id="interviews">
+          Each purchase includes two interviews (one interview and one retake). An interview counts as used when you accept its results (Keep, accept corrections, or choose a preset), or 6 hours after the AI's first reply if you don't finish. A started interview with no AI reply expires after 6 hours and does not count.
+        </p>
         <p>There is no downloadable report. Your results are shown in the app.</p>
       </Section>
       <Section heading="All sales are final">
@@ -113,7 +117,7 @@ export function TermsPage() {
         <p>New interviews may sometimes be paused. If that happens, your results are still available if you're signed in.</p>
       </Section>
       <Section heading="Contact">
-        <p>Questions, or a payment problem? Contact us at [SUPPORT EMAIL, pending Tyler].</p>
+        <p>Questions, or a payment problem? Contact us at {SUPPORT_EMAIL_PLACEHOLDER}.</p>
       </Section>
       <Section heading="Governing law">
         <p>[GOVERNING LAW / LEGAL CHECK, pending Tyler] New Jersey law governs these terms.</p>
@@ -198,16 +202,16 @@ export function PrivacyPage() {
         <p>
           The app uses Google Analytics (through Firebase). It starts when a page loads, before you sign in or click anything.
           There is no consent step. It sets cookies in your browser (`_ga` and a session cookie) and sends usage data to Google,
-          such as which section you open, signing in or out, sending feedback, and changing AI settings.
+          such as which section you open, signing in or out, starting checkout, starting or finishing an interview, hitting the chat limit, sending feedback, and changing AI settings. We've set the app not to send your email, name, or chat messages in these events.
         </p>
       </Section>
       <Section heading="Requesting deletion">
         <p>
-          To ask us to delete your account data, email [SUPPORT EMAIL, pending Tyler]. We'll review and process your request. We may keep payment records.
+          To ask us to delete your account data, email {SUPPORT_EMAIL_PLACEHOLDER}. We'll review and process your request. We may keep payment records.
         </p>
       </Section>
       <Section heading="Contact">
-        <p>Questions about this page: [SUPPORT EMAIL, pending Tyler].</p>
+        <p>Questions about this page: {SUPPORT_EMAIL_PLACEHOLDER}.</p>
       </Section>
     </LegalLayout>
   );

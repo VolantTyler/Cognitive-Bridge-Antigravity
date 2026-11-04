@@ -22,12 +22,12 @@ import { CheckoutStartError, loadCheckoutStatus, requestRestorePurchase, startCh
 import { completeInterview, loadAccessStatus, readStoredReservation, reserveInterview, AccessSnapshot } from './services/accessClient';
 import { canUseLiveChat, canUseLiveInterview, interpretCheckoutResponse, phaseAfterUnlock, resolveSurface, ProductSurface } from './access/productAccess';
 import AccessFlow from './components/AccessFlow';
+import InterviewsUsedNotice from './components/InterviewsUsedNotice';
 import { logProductEvent } from './services/productAnalytics';
 import {
   CONTINUE_RESULTS,
   ENTITLEMENT_FAILED,
   INTERVIEWS_LEFT,
-  INTERVIEWS_USED,
   LEGACY_BANNER,
   PAYWALL_BUTTON,
   START_RETAKE,
@@ -641,7 +641,7 @@ export default function App() {
           {access.interviewsCompleted > 0 && access.interviewsRemaining > 0 && (
             <button type="button" className="min-h-11 underline" onClick={() => { void beginInterview(); }}>{START_RETAKE}</button>
           )}
-          {access.interviewsRemaining === 0 && !access.inProgress && <span>{INTERVIEWS_USED}</span>}
+          {access.interviewsRemaining === 0 && !access.inProgress && <InterviewsUsedNotice />}
         </div>
       )}
       {flowAlert && surface === 'app' && (
@@ -694,8 +694,10 @@ export default function App() {
                     onComplete={handleMirrorComplete}
                     onSaveSession={handleMirrorSave}
                   />
+                ) : access?.paid ? (
+                  <InterviewsUsedNotice />
                 ) : (
-                  <p role="status" className="text-sm text-text-secondary">{access?.paid ? INTERVIEWS_USED : LEGACY_BANNER}</p>
+                  <p role="status" className="text-sm text-text-secondary">{LEGACY_BANNER}</p>
                 )}
               </div>
             </motion.div>

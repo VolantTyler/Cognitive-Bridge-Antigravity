@@ -43,9 +43,13 @@ export function dailyCapMessage(): string {
   return `You've reached today's chat limit (up to ${BRIDGE_CHAT_DAILY_MESSAGE_COPY} messages a day). Chat opens again at ${CHAT_CAP_RESET_LABEL}. Your results are still here.`;
 }
 
-/** Dollar cap. No amounts, and no talk of cost. Same Eastern-day reset as the message cap. */
+/**
+ * Dollar cap. Checked on every guarded chatProxy and judgeProxy call, including
+ * Mirror and scoring, so the wording is a usage limit. The 50-message line
+ * stays on the bridge request cap only.
+ */
 export function costCapMessage(): string {
-  return `You've reached today's chat limit. It resets at ${CHAT_CAP_RESET_LABEL}.`;
+  return `You've reached today's usage limit. It resets at ${CHAT_CAP_RESET_LABEL}. Your results are still here.`;
 }
 
 export const AI_ACCESS_MESSAGES: Record<AiAccessCode, string> = {

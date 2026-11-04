@@ -31,6 +31,9 @@ describe("paywall", () => {
     expect(screen.getByText(PAYWALL_PRICE)).toBeInTheDocument();
     expect(screen.getByText(PAYWALL_US)).toBeInTheDocument();
     expect(screen.getByText(/up to 50 messages a day \(resets at midnight US Eastern\)/)).toBeInTheDocument();
+    expect(screen.getByText("Two interviews: your first, plus one retake.")).toBeInTheDocument();
+    expect(screen.getByText(/An interview counts once you accept your results/)).toBeInTheDocument();
+    expect(screen.queryByText(/Both sets of results stay saved/)).not.toBeInTheDocument();
     const sale = document.getElementById("final-sale");
     expect(sale?.textContent).toContain(FINAL_SALE);
     expect(sale?.textContent).toContain("Terms");

@@ -21,6 +21,7 @@ import {
   PAYWALL_BUTTON_BUSY,
   PAYWALL_CAPTION,
   PAYWALL_FRAMING,
+  INTERVIEW_COUNT_LINE,
   PAYWALL_INCLUSIONS,
   PAYWALL_PRICE,
   PAYWALL_TITLE,
@@ -134,6 +135,7 @@ export default function AccessFlow({
           <li key={item}>{item}</li>
         ))}
       </ul>
+      <p className="mt-4 text-sm leading-relaxed text-text-secondary">{INTERVIEW_COUNT_LINE}</p>
       <p className="mt-4 text-sm text-text-secondary">{PAYWALL_US}</p>
       <p className="mt-3 text-sm text-text-secondary">{PAYWALL_VARIES}</p>
       <p className="mt-3 text-sm leading-relaxed text-text-secondary">{AI_DISCLOSURE}</p>

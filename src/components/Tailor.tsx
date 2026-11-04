@@ -20,7 +20,7 @@ interface TailorProps {
 const TRAIT_CONFIG = {
   openness: { label: 'Openness', color: 'text-accent-purple' },
   conscientiousness: { label: 'Conscientiousness', color: 'text-accent-blue' },
-  extroversion: { label: 'Extroversion', color: 'text-accent-yellow' },
+  extroversion: { label: 'Extraversion', color: 'text-accent-yellow' },
   agreeableness: { label: 'Agreeableness', color: 'text-accent-green' },
   neuroticism: { label: 'Neuroticism', color: 'text-accent-red' },
 };
