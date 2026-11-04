@@ -59,7 +59,7 @@ export const PAYWALL_PRICE = "$6 one-time, no subscription";
 export const RETAKE_REPLACES_RESULTS = "A retake replaces your saved results once you accept the new ones.";
 
 export const RETAKE_START_WARNING =
-  "Your current results are replaced when you accept the new ones. After that, you can't get the old ones back.";
+  "Your current results are replaced when you accept the new ones. After that, you can't get the old ones back. If you leave after the AI has replied but before you accept, your current results stay, and the retake counts as used after 6 hours.";
 
 export const TERMS_RETAKE_REPLACES =
   "If you retake the interview, your new results replace your saved results when you accept them. We don't keep the earlier set for you.";

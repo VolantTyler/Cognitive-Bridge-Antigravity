@@ -58,6 +58,9 @@ describe("retake replaces results copy", () => {
     const notice = within(retake.container).getByRole("status");
     const button = within(retake.container).getByRole("button", { name: "Start retake" });
     expect(notice).toHaveTextContent(RETAKE_START_WARNING);
+    expect(notice).toHaveTextContent(
+      "If you leave after the AI has replied but before you accept, your current results stay, and the retake counts as used after 6 hours."
+    );
     expect(button).toHaveAttribute("aria-describedby", notice.id);
     expect(notice.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     retake.unmount();
