@@ -3,9 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { Message } from "../types";
-import { db, auth } from "./firebase";
 import { AiAccessError, aiAccessErrorFromResponse, authorizedAiHeaders, getAiSessionId } from "./aiAccess";
 import {
   DEFAULT_GEMINI_MODEL,
@@ -209,27 +207,19 @@ export function isProjectWideError(error: any): boolean {
   return false;
 }
 
-export async function logTokenUsage(data: {
+/**
+ * Display-only. Firestore rules deny client creates, updates, and deletes.
+ * usage_server, written by the Cloud Functions, is the authoritative log.
+ * The collection stays until v2.4.1. This function does not write.
+ */
+export async function logTokenUsage(_data: {
   modelName: string;
   promptTokens: number;
   completionTokens: number;
   totalTokens: number;
   feature?: string;
-}) {
-  try {
-    const userId = auth.currentUser?.uid || "guest";
-    await addDoc(collection(db, "token_usage"), {
-      userId,
-      model: data.modelName,
-      promptTokens: data.promptTokens,
-      completionTokens: data.completionTokens,
-      totalTokens: data.totalTokens,
-      feature: data.feature || "unknown",
-      timestamp: serverTimestamp(),
-    });
-  } catch (error) {
-    console.error("Failed to log token usage to Firestore:", error);
-  }
+}): Promise<void> {
+  return;
 }
 
 export interface OllamaConfig {

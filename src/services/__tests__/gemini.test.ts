@@ -26,6 +26,7 @@ import {
   getDynamicModelFallbacks,
   isTransientError,
   chatWithGemini,
+  logTokenUsage,
   chatWithGeminiStream,
   activeModelsCache
 } from '../gemini';
@@ -323,5 +324,14 @@ describe('Gemini Service Unit Tests', () => {
       expect(response).toBe('I encountered an error connecting to the intelligence bridge.');
       expect(mockFetch).toHaveBeenCalledTimes(1);
     });
+  });
+
+  it('does not write token_usage from the client', async () => {
+    await expect(logTokenUsage({
+      modelName: 'gemini',
+      promptTokens: 1,
+      completionTokens: 1,
+      totalTokens: 2,
+    })).resolves.toBeUndefined();
   });
 });
