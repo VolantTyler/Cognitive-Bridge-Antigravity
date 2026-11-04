@@ -1,3 +1,4 @@
+import { EMAIL_NOT_VERIFIED_CODE, EMAIL_NOT_VERIFIED_MESSAGE } from "./accountCopy";
 import { GateError, VerifiedUser, bearerToken, unauthenticatedError } from "./gate";
 
 export interface DecodedToken {
@@ -26,8 +27,24 @@ export async function verifyBearerToken(
   return {
     uid: decoded.uid,
     email: typeof decoded.email === "string" ? decoded.email : null,
-    email_verified: decoded.email_verified === true,
+    email_verified: emailVerifiedFromToken(decoded),
   };
+}
+
+/**
+ * True only when the verified ID token's email_verified claim is true.
+ * A missing claim is unverified. Checkout calls requireEmailVerified.
+ * chatProxy and judgeProxy do not.
+ */
+export function emailVerifiedFromToken(decoded: { email_verified?: boolean }): boolean {
+  return decoded.email_verified === true;
+}
+
+export function requireEmailVerified(user: VerifiedUser): VerifiedUser {
+  if (!emailVerifiedFromToken(user)) {
+    throw new GateError(403, EMAIL_NOT_VERIFIED_CODE, EMAIL_NOT_VERIFIED_MESSAGE);
+  }
+  return user;
 }
 
 export async function verifyIdTokenWithAdmin(token: string): Promise<DecodedToken> {
@@ -40,7 +57,7 @@ export async function verifyIdTokenWithAdmin(token: string): Promise<DecodedToke
   return {
     uid: decoded.uid,
     email: decoded.email,
-    email_verified: decoded.email_verified,
+    email_verified: emailVerifiedFromToken(decoded),
   };
 }
 

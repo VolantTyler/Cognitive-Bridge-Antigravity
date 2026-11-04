@@ -17,9 +17,12 @@ import SettingsModal from './components/SettingsModal';
 import ReleaseNotesModal from './components/ReleaseNotesModal';
 import { getOllamaConfig } from './services/gemini';
 
-import { auth, googleProvider, db, logAnalyticsEvent } from './services/firebase';
-import { signInWithPopup, signOut, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
+import { auth, db, logAnalyticsEvent } from './services/firebase';
+import { signOut, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import AccountAuthPanel, { VerifyEmailBanner } from './components/AccountAuthPanel';
+import { ACCOUNT_COPY } from './constants/accountCopy';
+import { adoptGuestSession, sessionFromCloudData } from './services/sessionMigration';
 
 export default function App() {
   const [user, setUser] = useState<FirebaseUser | null>(null);
@@ -30,6 +33,9 @@ export default function App() {
   const [isReleaseNotesOpen, setIsReleaseNotesOpen] = useState(false);
   const [ollamaConfig, setOllamaConfigState] = useState(() => getOllamaConfig());
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isAccountOpen, setIsAccountOpen] = useState(false);
+  const [accountView, setAccountView] = useState<'sign-in' | 'verify'>('sign-in');
+  const [, setAccountRevision] = useState(0);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -119,31 +125,31 @@ export default function App() {
       if (currentUser) {
         setUser(currentUser);
         logAnalyticsEvent('auth_state_changed', { status: 'logged_in' });
-        // Check for existing cloud profile
-        const userDocRef = doc(db, 'users', currentUser.uid);
         try {
-          const userDocSnap = await getDoc(userDocRef);
-          if (userDocSnap.exists()) {
-            const data = userDocSnap.data();
-            setScores(data.scores || null);
-            setMirrorMessages(data.mirrorMessages || []);
-            setPlaygroundMessages(data.playgroundMessages || []);
-            setActiveModule(data.activeModule || 'mirror');
-          } else {
-            // New user: Migrate local guest session to Cloud
-            await setDoc(userDocRef, {
+          const outcome = await adoptGuestSession({
+            uid: currentUser.uid,
+            guest: {
               scores: scoresRef.current,
               mirrorMessages: mirrorMessagesRef.current,
-              playgroundMessages: playgroundMessagesRef.current.map(msg => ({
-                user: msg.user,
-                aligned: msg.aligned,
-                unaligned: msg.unaligned,
-                loading: false
-              })),
+              playgroundMessages: playgroundMessagesRef.current,
               activeModule: activeModuleRef.current,
-              updatedAt: serverTimestamp()
-            });
-          }
+            },
+            read: async (uid) => {
+              const snap = await getDoc(doc(db, 'users', uid));
+              if (!snap.exists()) return null;
+              return sessionFromCloudData(snap.data());
+            },
+            write: async (uid, session) => {
+              await setDoc(doc(db, 'users', uid), {
+                ...session,
+                updatedAt: serverTimestamp(),
+              });
+            },
+          });
+          setScores(outcome.session.scores);
+          setMirrorMessages(outcome.session.mirrorMessages);
+          setPlaygroundMessages(outcome.session.playgroundMessages);
+          setActiveModule(outcome.session.activeModule);
         } catch (error) {
           console.error("Error restoring/migrating session:", error);
         }
@@ -163,12 +169,10 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  const handleLogin = async () => {
-    try {
-      await signInWithPopup(auth, googleProvider);
-    } catch (error) {
-      console.error("Google Sign-In failed:", error);
-    }
+  const openAccount = (view: 'sign-in' | 'verify') => {
+    setAccountView(view);
+    setIsAccountOpen(true);
+    setIsMenuOpen(false);
   };
 
   const handleLogout = async () => {
@@ -189,6 +193,8 @@ export default function App() {
     setMirrorMessages(updatedMirrorMessages);
     saveToCloud(scores, updatedMirrorMessages, playgroundMessages, activeModule);
   };
+
+  const liveUser = user && auth.currentUser?.uid === user.uid ? auth.currentUser : user;
 
   const currentStep = scores ? (activeModule === 'playground' ? 3 : 2) : 1;
 
@@ -228,21 +234,21 @@ export default function App() {
 
           {/* Combined Settings Menu Dropdown Container */}
           <div className="relative" ref={menuRef}>
-            {user ? (
+            {liveUser ? (
               <button
                 onClick={() => setIsMenuOpen(prev => !prev)}
                 className="flex items-center gap-2 bg-bg-tertiary border border-border-primary hover:border-orange-500/30 rounded-xl px-3 py-1.5 select-none shadow-sm cursor-pointer transition-all hover:bg-bg-surface group"
                 title="Open settings menu"
               >
-                {user.photoURL ? (
-                  <img src={user.photoURL} alt="profile" className="w-5 h-5 rounded-md object-cover border border-border-secondary group-hover:border-orange-500/40" />
+                {liveUser.photoURL ? (
+                  <img src={liveUser.photoURL} alt="profile" className="w-5 h-5 rounded-md object-cover border border-border-secondary group-hover:border-orange-500/40" />
                 ) : (
                   <div className="w-5 h-5 rounded-md bg-button-brand flex items-center justify-center text-white text-[10px] font-bold">
-                    {(user.displayName || user.email || '?')[0].toUpperCase()}
+                    {(liveUser.displayName || liveUser.email || '?')[0].toUpperCase()}
                   </div>
                 )}
                 <span className="text-[10px] font-bold text-text-primary group-hover:text-status-brand transition-colors">
-                  {user.displayName || user.email?.split('@')[0]}
+                  {liveUser.displayName || liveUser.email?.split('@')[0]}
                 </span>
                 <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.6)]" />
                 <span className="text-[9px] uppercase tracking-wider text-status-success font-bold hidden md:inline">Synced</span>
@@ -270,29 +276,38 @@ export default function App() {
                   className="absolute right-0 mt-2 w-56 rounded-xl border border-border-primary bg-bg-secondary p-2 shadow-2xl z-50 flex flex-col gap-1 transition-colors duration-300"
                 >
                   {/* Log In / Log Out */}
-                  {user ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        handleLogout();
-                        setIsMenuOpen(false);
-                      }}
-                      className="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-status-danger hover:bg-red-500/10 rounded-lg cursor-pointer transition-all text-left w-full border-0 bg-transparent"
-                    >
-                      <UserIcon className="w-4.5 h-4.5 shrink-0" />
-                      <span>Log Out</span>
-                    </button>
+                  {liveUser ? (
+                    <>
+                      {!liveUser.emailVerified && (
+                        <button
+                          type="button"
+                          onClick={() => openAccount('verify')}
+                          className="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-status-brand hover:bg-orange-500/10 rounded-lg cursor-pointer transition-all text-left w-full border-0 bg-transparent"
+                        >
+                          <UserIcon className="w-4.5 h-4.5 shrink-0" />
+                          <span>{ACCOUNT_COPY.menuVerify}</span>
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleLogout();
+                          setIsMenuOpen(false);
+                        }}
+                        className="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-status-danger hover:bg-red-500/10 rounded-lg cursor-pointer transition-all text-left w-full border-0 bg-transparent"
+                      >
+                        <UserIcon className="w-4.5 h-4.5 shrink-0" />
+                        <span>Log Out</span>
+                      </button>
+                    </>
                   ) : (
                     <button
                       type="button"
-                      onClick={() => {
-                        handleLogin();
-                        setIsMenuOpen(false);
-                      }}
+                      onClick={() => openAccount('sign-in')}
                       className="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-status-brand hover:bg-orange-500/10 rounded-lg cursor-pointer transition-all text-left w-full border-0 bg-transparent"
                     >
                       <Brain className="w-4.5 h-4.5 shrink-0" />
-                      <span>Log In with Google</span>
+                      <span>{ACCOUNT_COPY.menuSignIn}</span>
                     </button>
                   )}
 
@@ -362,6 +377,10 @@ export default function App() {
         </div>
 
       </nav>
+
+      {liveUser && !liveUser.emailVerified && (
+        <VerifyEmailBanner onVerify={() => openAccount('verify')} />
+      )}
 
       {/* Mobile/Tablet Secondary Navigation */}
       <div className="flex md:hidden bg-bg-secondary border-b border-border-primary px-4 py-2.5 justify-around items-center sticky top-16 z-40 transition-colors duration-300">
@@ -496,6 +515,16 @@ export default function App() {
         </div>
       </footer>
 
+      <AccountAuthPanel
+        isOpen={isAccountOpen}
+        initialView={accountView}
+        onClose={() => setIsAccountOpen(false)}
+        onSignedIn={() => {
+          setIsAccountOpen(false);
+          setAccountRevision((revision) => revision + 1);
+        }}
+        onAccountUpdated={() => setAccountRevision((revision) => revision + 1)}
+      />
       <FeedbackModal isOpen={isFeedbackOpen} onClose={() => setIsFeedbackOpen(false)} />
       <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} onConfigChange={(config) => setOllamaConfigState(config)} />
       <ReleaseNotesModal isOpen={isReleaseNotesOpen} onClose={() => setIsReleaseNotesOpen(false)} />
