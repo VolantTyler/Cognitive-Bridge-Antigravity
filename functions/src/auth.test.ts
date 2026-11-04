@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { verifyBearerToken, verifyIdTokenWithAdmin } from "./auth";
+import { emailVerifiedFromToken, requireEmailVerified, verifyBearerToken, verifyIdTokenWithAdmin } from "./auth";
+import { EMAIL_NOT_VERIFIED_CODE, EMAIL_NOT_VERIFIED_MESSAGE } from "./accountCopy";
 import { GateError } from "./gate";
 
 describe("verifyBearerToken", () => {
@@ -41,6 +42,39 @@ describe("verifyBearerToken", () => {
       email: "tyler@example.com",
       email_verified: true,
     });
+  });
+
+  it("treats a missing email_verified claim as unverified", async () => {
+    const user = await verifyBearerToken("Bearer good", async () => ({
+      uid: "uid-2",
+      email: "ada@example.com",
+    }));
+    expect(user.email_verified).toBe(false);
+    expect(emailVerifiedFromToken(user)).toBe(false);
+    expect(() => requireEmailVerified(user)).toThrow(GateError);
+    try {
+      requireEmailVerified(user);
+    } catch (error) {
+      expect(error).toMatchObject({
+        status: 403,
+        code: EMAIL_NOT_VERIFIED_CODE,
+        message: EMAIL_NOT_VERIFIED_MESSAGE,
+      });
+    }
+  });
+});
+
+describe("requireEmailVerified", () => {
+  it("accepts a verified claim and rejects a false one", () => {
+    const verified = requireEmailVerified({
+      uid: "uid-1",
+      email: "ada@example.com",
+      email_verified: true,
+    });
+    expect(verified.uid).toBe("uid-1");
+    expect(() =>
+      requireEmailVerified({ uid: "uid-1", email: "ada@example.com", email_verified: false })
+    ).toThrow(GateError);
   });
 });
 
