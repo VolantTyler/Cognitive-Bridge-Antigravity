@@ -22,6 +22,12 @@ async function logUsage(record) {
     catch {
         console.error("usage_server write failed");
     }
+    try {
+        await (0, adminStore_1.addDailyCostFromUsage)(record);
+    }
+    catch {
+        console.error("daily cost increment failed");
+    }
 }
 function guardDeps() {
     return (0, guard_1.defaultGuardDeps)({ config: () => (0, params_1.loadGateConfig)() });

@@ -20,9 +20,15 @@ const interviewsPaused = (0, params_1.defineString)("INTERVIEWS_PAUSED", {
     default: "false",
     description: "When true, interview features (mirror) return 503 interviews_paused.",
 });
+// Request count is two per Bridge turn (aligned + unaligned).
+// Default 100 requests is about 50 turns. Copy still says "up to 50 messages a day".
 const bridgeDailyCap = (0, params_1.defineInt)("BRIDGE_CHAT_DAILY_CAP", {
     default: accessCopy_1.DEFAULT_BRIDGE_CHAT_DAILY_CAP,
-    description: "Max bridge chat requests per uid per US Eastern day.",
+    description: "Max bridge chatProxy requests per uid per US Eastern day. Default 100 is about 50 turns (two requests per turn: aligned and unaligned).",
+});
+const dailyUserCostCapUsd = (0, params_1.defineString)("DAILY_USER_COST_CAP_USD", {
+    default: String(accessCopy_1.DEFAULT_DAILY_USER_COST_CAP_USD),
+    description: "Max estimated USD per uid per US Eastern day. Default 1.00. Placeholder prices; retune after test interviews. Not shown to users.",
 });
 const maxInputChars = (0, params_1.defineInt)("MAX_INPUT_CHARS", {
     default: accessCopy_1.DEFAULT_MAX_INPUT_CHARS,
@@ -47,6 +53,7 @@ function loadGateConfig(env = process.env) {
         ENFORCE_APP_CHECK: paramOrEnv(env.ENFORCE_APP_CHECK, () => enforceAppCheck.value()),
         INTERVIEWS_PAUSED: paramOrEnv(env.INTERVIEWS_PAUSED, () => interviewsPaused.value()),
         BRIDGE_CHAT_DAILY_CAP: paramOrEnv(env.BRIDGE_CHAT_DAILY_CAP, () => String(bridgeDailyCap.value())),
+        DAILY_USER_COST_CAP_USD: paramOrEnv(env.DAILY_USER_COST_CAP_USD, () => dailyUserCostCapUsd.value()),
         MAX_INPUT_CHARS: paramOrEnv(env.MAX_INPUT_CHARS, () => String(maxInputChars.value())),
     });
 }

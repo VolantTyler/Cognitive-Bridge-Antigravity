@@ -12,10 +12,16 @@ import {
   usEasternDay,
   GateError,
 } from "./gate";
-import { dailyCapMessage } from "./accessCopy";
+import { DEFAULT_BRIDGE_CHAT_DAILY_CAP, dailyCapMessage } from "./accessCopy";
 
 describe("gate config", () => {
   it("defaults to auth and ignores unknown modes", () => {
+    expect(DEFAULT_BRIDGE_CHAT_DAILY_CAP).toBe(100);
+    expect(configFromEnv({}).bridgeDailyCap).toBe(100);
+    expect(dailyCapMessage()).toBe(
+      "You've reached today's chat limit (up to 50 messages a day). Chat opens again at midnight US Eastern. Your results are still here."
+    );
+    expect(configFromEnv({}).dailyUserCostCapUsd).toBe(1);
     expect(parseGateMode(undefined)).toBe("auth");
     expect(parseGateMode("paid")).toBe("paid");
     expect(parseGateMode(" OFF ")).toBe("off");
@@ -56,9 +62,13 @@ describe("bridge usage bucket", () => {
     });
     expect(() => nextBridgeUsage({ day: "2026-11-04", count: 2 }, "2026-11-04", 2)).toThrow(GateError);
     try {
-      nextBridgeUsage({ day: "2026-11-04", count: 50 }, "2026-11-04", 50);
+      nextBridgeUsage({ day: "2026-11-04", count: 100 }, "2026-11-04", 100);
     } catch (error) {
-      expect(error).toMatchObject({ status: 429, code: "rate_limited", message: dailyCapMessage(50) });
+      expect(error).toMatchObject({
+        status: 429,
+        code: "rate_limited",
+        message: dailyCapMessage(),
+      });
     }
   });
 });

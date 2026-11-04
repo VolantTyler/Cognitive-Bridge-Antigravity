@@ -37,8 +37,11 @@ exports.DEFAULT_FIRESTORE_DATABASE_ID = void 0;
 exports.readEntitlementPaid = readEntitlementPaid;
 exports.reserveBridgeChatSlot = reserveBridgeChatSlot;
 exports.writeUsageRecord = writeUsageRecord;
+exports.readDailyCostMicros = readDailyCostMicros;
+exports.addDailyCostFromUsage = addDailyCostFromUsage;
 exports.verifyAppCheckToken = verifyAppCheckToken;
 const gate_1 = require("./gate");
+const pricing_1 = require("./pricing");
 exports.DEFAULT_FIRESTORE_DATABASE_ID = "ai-studio-10d489d8-3b32-488a-9698-e415f2608028";
 async function adminFirestore() {
     const { getApps, initializeApp } = await Promise.resolve().then(() => __importStar(require("firebase-admin/app")));
@@ -91,6 +94,32 @@ async function writeUsageRecord(record) {
         completionTokens: record.completionTokens,
         ts: record.ts ?? FieldValue.serverTimestamp(),
     });
+}
+async function readDailyCostMicros(uid, day) {
+    const db = await adminFirestore();
+    const snap = await db.collection("daily_cost").doc(uid).collection("days").doc(day).get();
+    if (!snap.exists)
+        return 0;
+    const value = snap.get("usdMicros");
+    return typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0;
+}
+/**
+ * Adds this call's priced cost onto daily_cost/{uid}/days/{easternDay}.
+ * Uses FieldValue.increment. A concurrent call can pass the pre-check
+ * before this write lands, so the total can overshoot the cap slightly.
+ */
+async function addDailyCostFromUsage(record, now = new Date()) {
+    const micros = (0, pricing_1.costMicrosForUsage)(record);
+    if (micros <= 0 || !record.uid)
+        return;
+    const { FieldValue } = await Promise.resolve().then(() => __importStar(require("firebase-admin/firestore")));
+    const db = await adminFirestore();
+    const day = (0, gate_1.usEasternDay)(now);
+    await db.collection("daily_cost").doc(record.uid).collection("days").doc(day).set({
+        usdMicros: FieldValue.increment(micros),
+        day,
+        uid: record.uid,
+    }, { merge: true });
 }
 async function verifyAppCheckToken(token) {
     const { getApps, initializeApp } = await Promise.resolve().then(() => __importStar(require("firebase-admin/app")));

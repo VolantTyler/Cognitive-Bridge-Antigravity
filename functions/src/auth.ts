@@ -1,5 +1,5 @@
 import { EMAIL_NOT_VERIFIED_CODE, EMAIL_NOT_VERIFIED_MESSAGE } from "./accountCopy";
-import { GateError, VerifiedUser, bearerToken, unauthenticatedError } from "./gate";
+import { GateError, VerifiedUser, bearerToken, sessionExpiredError, unauthenticatedError } from "./gate";
 
 export interface DecodedToken {
   uid?: string;
@@ -18,7 +18,13 @@ export async function verifyBearerToken(
   let decoded: DecodedToken;
   try {
     decoded = await verify(token);
-  } catch {
+  } catch (error) {
+    const code = typeof error === "object" && error !== null && "code" in error
+      ? String((error as { code?: unknown }).code)
+      : "";
+    if (code === "auth/id-token-expired" || code === "auth/user-token-expired") {
+      throw sessionExpiredError();
+    }
     throw unauthenticatedError();
   }
   if (!decoded || typeof decoded.uid !== "string" || decoded.uid.length === 0) {

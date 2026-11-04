@@ -12,6 +12,7 @@ exports.isInterviewFeature = isInterviewFeature;
 exports.inputCharCount = inputCharCount;
 exports.nextBridgeUsage = nextBridgeUsage;
 exports.unauthenticatedError = unauthenticatedError;
+exports.sessionExpiredError = sessionExpiredError;
 exports.paymentRequiredError = paymentRequiredError;
 exports.inputTooLongError = inputTooLongError;
 exports.interviewsPausedError = interviewsPausedError;
@@ -71,6 +72,14 @@ function parsePositiveInt(raw, fallback) {
         return fallback;
     return Math.floor(parsed);
 }
+function parsePositiveUsd(raw, fallback) {
+    if (raw === undefined || raw.trim() === "")
+        return fallback;
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed) || parsed <= 0)
+        return fallback;
+    return parsed;
+}
 function configFromEnv(env = process.env) {
     return {
         mode: parseGateMode(env.AI_GATE_MODE),
@@ -79,6 +88,7 @@ function configFromEnv(env = process.env) {
         interviewsPaused: parseFlag(env.INTERVIEWS_PAUSED, false),
         bridgeDailyCap: parsePositiveInt(env.BRIDGE_CHAT_DAILY_CAP, accessCopy_1.DEFAULT_BRIDGE_CHAT_DAILY_CAP),
         maxInputChars: parsePositiveInt(env.MAX_INPUT_CHARS, accessCopy_1.DEFAULT_MAX_INPUT_CHARS),
+        dailyUserCostCapUsd: parsePositiveUsd(env.DAILY_USER_COST_CAP_USD, accessCopy_1.DEFAULT_DAILY_USER_COST_CAP_USD),
     };
 }
 function usEasternDay(date, timeZone = accessCopy_1.CHAT_CAP_RESET_TIME_ZONE) {
@@ -128,16 +138,33 @@ function inputCharCount(messages, systemInstruction) {
     }
     return total;
 }
+/**
+ * Cap unit is one chatProxy request, not one user message.
+ *
+ * Each Bridge turn makes two requests (playground-aligned and
+ * playground-unaligned). BRIDGE_CHAT_DAILY_CAP defaults to 100 requests,
+ * about 50 turns. User-facing copy still says "50 messages".
+ *
+ * A transport failure before the proxy returns fallbacksExhausted can POST
+ * again. The server model chain stays inside one request and does not
+ * increment again. Mirror (feature "mirror") is not in this counter.
+ *
+ * A client message id is not used to collapse those calls. Reusing one id
+ * would skip the cap and spend Vertex on unlimited requests.
+ */
 function nextBridgeUsage(existing, day, cap) {
     const sameDay = existing?.day === day && typeof existing.count === "number" && Number.isFinite(existing.count);
     const count = sameDay ? Math.max(0, Math.floor(existing.count)) : 0;
     if (count >= cap) {
-        throw new GateError(429, "rate_limited", (0, accessCopy_1.dailyCapMessage)(cap));
+        throw new GateError(429, "rate_limited", (0, accessCopy_1.dailyCapMessage)());
     }
     return { day, count: count + 1 };
 }
 function unauthenticatedError() {
     return new GateError(401, "unauthenticated", accessCopy_1.AI_ACCESS_MESSAGES.signed_out);
+}
+function sessionExpiredError() {
+    return new GateError(401, "session_expired", accessCopy_1.AI_ACCESS_MESSAGES.session_ended);
 }
 function paymentRequiredError() {
     return new GateError(402, "payment_required", accessCopy_1.AI_ACCESS_MESSAGES.payment_required);

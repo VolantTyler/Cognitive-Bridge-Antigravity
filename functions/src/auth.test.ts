@@ -21,6 +21,14 @@ describe("verifyBearerToken", () => {
       expect(error).toMatchObject({ status: 401, code: "unauthenticated" });
       expect((error as Error).message).not.toContain("super-secret-token");
     }
+
+    const expired = Object.assign(new Error("expired"), { code: "auth/id-token-expired" });
+    verify.mockRejectedValueOnce(expired);
+    await expect(verifyBearerToken("Bearer expired-token", verify)).rejects.toMatchObject({
+      status: 401,
+      code: "session_expired",
+      message: "Your session ended. Sign in to save your progress.",
+    });
   });
 
   it("returns uid, email, and email_verified", async () => {

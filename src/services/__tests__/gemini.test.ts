@@ -138,7 +138,7 @@ describe('Gemini Service Unit Tests', () => {
       authState.currentUser = null;
       await expect(chatWithGemini([{ role: 'user', content: 'Hi' }])).rejects.toMatchObject({
         code: 'signed_out',
-        message: 'Sign in to continue.',
+        message: 'Sign in to save your progress.',
       });
       expect(mockFetch).not.toHaveBeenCalled();
     });
@@ -146,8 +146,10 @@ describe('Gemini Service Unit Tests', () => {
     it('maps 401, 402, 429, and 503 lock codes and does not walk the model chain', async () => {
       const cases: Array<{ status: number; code: string; access: string }> = [
         { status: 401, code: 'unauthenticated', access: 'signed_out' },
+        { status: 401, code: 'session_expired', access: 'session_ended' },
         { status: 402, code: 'payment_required', access: 'payment_required' },
         { status: 429, code: 'rate_limited', access: 'daily_cap' },
+        { status: 429, code: 'cost_cap_reached', access: 'cost_cap' },
         { status: 429, code: 'input_too_long', access: 'input_too_long' },
         { status: 503, code: 'interviews_paused', access: 'interviews_paused' },
       ];

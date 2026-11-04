@@ -1,6 +1,7 @@
 import {
   CHAT_CAP_RESET_TIME_ZONE,
   DEFAULT_BRIDGE_CHAT_DAILY_CAP,
+  DEFAULT_DAILY_USER_COST_CAP_USD,
   DEFAULT_MAX_INPUT_CHARS,
   dailyCapMessage,
   AI_ACCESS_MESSAGES,
@@ -33,6 +34,7 @@ export interface GateConfig {
   interviewsPaused: boolean;
   bridgeDailyCap: number;
   maxInputChars: number;
+  dailyUserCostCapUsd: number;
 }
 
 const BRIDGE_CHAT_FEATURES = new Set([
@@ -75,6 +77,13 @@ function parsePositiveInt(raw: string | undefined, fallback: number): number {
   return Math.floor(parsed);
 }
 
+function parsePositiveUsd(raw: string | undefined, fallback: number): number {
+  if (raw === undefined || raw.trim() === "") return fallback;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+  return parsed;
+}
+
 export function configFromEnv(env: NodeJS.ProcessEnv = process.env): GateConfig {
   return {
     mode: parseGateMode(env.AI_GATE_MODE),
@@ -83,6 +92,7 @@ export function configFromEnv(env: NodeJS.ProcessEnv = process.env): GateConfig 
     interviewsPaused: parseFlag(env.INTERVIEWS_PAUSED, false),
     bridgeDailyCap: parsePositiveInt(env.BRIDGE_CHAT_DAILY_CAP, DEFAULT_BRIDGE_CHAT_DAILY_CAP),
     maxInputChars: parsePositiveInt(env.MAX_INPUT_CHARS, DEFAULT_MAX_INPUT_CHARS),
+    dailyUserCostCapUsd: parsePositiveUsd(env.DAILY_USER_COST_CAP_USD, DEFAULT_DAILY_USER_COST_CAP_USD),
   };
 }
 
@@ -137,6 +147,20 @@ export interface BridgeUsageBucket {
   count?: unknown;
 }
 
+/**
+ * Cap unit is one chatProxy request, not one user message.
+ *
+ * Each Bridge turn makes two requests (playground-aligned and
+ * playground-unaligned). BRIDGE_CHAT_DAILY_CAP defaults to 100 requests,
+ * about 50 turns. User-facing copy still says "50 messages".
+ *
+ * A transport failure before the proxy returns fallbacksExhausted can POST
+ * again. The server model chain stays inside one request and does not
+ * increment again. Mirror (feature "mirror") is not in this counter.
+ *
+ * A client message id is not used to collapse those calls. Reusing one id
+ * would skip the cap and spend Vertex on unlimited requests.
+ */
 export function nextBridgeUsage(
   existing: BridgeUsageBucket | undefined,
   day: string,
@@ -145,13 +169,17 @@ export function nextBridgeUsage(
   const sameDay = existing?.day === day && typeof existing.count === "number" && Number.isFinite(existing.count);
   const count = sameDay ? Math.max(0, Math.floor(existing.count as number)) : 0;
   if (count >= cap) {
-    throw new GateError(429, "rate_limited", dailyCapMessage(cap));
+    throw new GateError(429, "rate_limited", dailyCapMessage());
   }
   return { day, count: count + 1 };
 }
 
 export function unauthenticatedError(): GateError {
   return new GateError(401, "unauthenticated", AI_ACCESS_MESSAGES.signed_out);
+}
+
+export function sessionExpiredError(): GateError {
+  return new GateError(401, "session_expired", AI_ACCESS_MESSAGES.session_ended);
 }
 
 export function paymentRequiredError(): GateError {

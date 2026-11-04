@@ -68,6 +68,11 @@ service cloud.firestore {
     // Server-only token logs: uid, sessionId, feature, model, promptTokens,
     //   completionTokens, ts. No message text and no ID tokens.
     //
+    // Collection: daily_cost
+    // Document path: daily_cost/{uid}/days/{yyyy-mm-dd}
+    // Server-only running total of estimated spend for that US Eastern day
+    // (usdMicros). Clients cannot read or write. Concurrent calls can overshoot slightly.
+    //
     // Collection: stripe_events
     // Document ID: Stripe event id
     // Server-only webhook idempotency. Not readable or writable by clients.
@@ -87,6 +92,9 @@ service cloud.firestore {
       allow read, write: if false;
     }
     match /stripe_events/{document=**} {
+      allow read, write: if false;
+    }
+    match /daily_cost/{document=**} {
       allow read, write: if false;
     }
 

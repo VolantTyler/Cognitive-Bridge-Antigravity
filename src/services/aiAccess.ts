@@ -63,7 +63,13 @@ export async function authorizedAiHeaders(): Promise<Record<string, string>> {
   let token = "";
   try {
     token = await user.getIdToken();
-  } catch {
+  } catch (error) {
+    const code = typeof error === "object" && error !== null && "code" in error
+      ? String((error as { code?: unknown }).code)
+      : "";
+    if (code === "auth/user-token-expired" || code === "auth/id-token-expired") {
+      throw new AiAccessError("session_ended");
+    }
     throw new AiAccessError("signed_out");
   }
   const headers: Record<string, string> = {

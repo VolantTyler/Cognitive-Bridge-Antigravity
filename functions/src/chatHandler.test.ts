@@ -71,14 +71,14 @@ describe("handleChat", () => {
     const res = mockRes();
     await handleChat({ method: "POST", body: { messages: [] } }, res, {
       guard: async () => {
-        throw new GateError(401, "unauthenticated", "Sign in to continue.");
+        throw new GateError(401, "unauthenticated", "Sign in to save your progress.");
       },
       ai: { models: { generateContent, generateContentStream: vi.fn() } },
       logUsage: vi.fn(),
     });
     expect(generateContent).not.toHaveBeenCalled();
     expect(res.snapshot().statusCode).toBe(401);
-    expect(res.snapshot().payload).toEqual({ error: "Sign in to continue.", code: "unauthenticated" });
+    expect(res.snapshot().payload).toEqual({ error: "Sign in to save your progress.", code: "unauthenticated" });
   });
 
   it("logs the model that answered, including a fallback", async () => {
@@ -205,7 +205,7 @@ describe("handleJudge", () => {
     const res = mockRes();
     await handleJudge({ method: "POST", body: { state: "x", questions: {} } }, res, {
       guard: async () => {
-        throw new GateError(401, "unauthenticated", "Sign in to continue.");
+        throw new GateError(401, "unauthenticated", "Sign in to save your progress.");
       },
       fetchImpl: fetchImpl as unknown as typeof fetch,
       apiKey: "typesafe-test-key",

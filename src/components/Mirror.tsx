@@ -166,7 +166,7 @@ export default function Mirror({ messages, setMessages, onComplete, onSaveSessio
         undefined,
         'mirror',
         () => {
-          setLoadingText('Analyzing... changing to a different model');
+          setLoadingText('Still working on it…');
         },
         commitTurn
       );
