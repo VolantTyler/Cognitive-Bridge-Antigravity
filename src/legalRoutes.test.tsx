@@ -29,9 +29,18 @@ describe("legal routes", () => {
     expect(screen.getByRole("heading", { name: "Terms" })).toBeInTheDocument();
     expect(screen.getByText(/you must be 18 or older to buy/i)).toBeInTheDocument();
     expect(screen.getByText("[SUPPORT EMAIL, pending Tyler]", { exact: false })).toBeInTheDocument();
-    expect(screen.getByText("[GOVERNING LAW: New Jersey recommended, pending Tyler]")).toBeInTheDocument();
-    expect(screen.getByText("[SALES FINAL / REFUND WORDING, pending legal check]")).toBeInTheDocument();
-    expect(screen.getByText(/All sales are final, except duplicate charges/)).toBeInTheDocument();
+    expect(screen.getByText(
+      "[GOVERNING LAW / LEGAL CHECK, pending Tyler] New Jersey law governs these terms."
+    )).toBeInTheDocument();
+    expect(screen.getByText(
+      "[SALES FINAL / REFUND WORDING, pending legal check] All sales are final, except duplicate charges, charges where you didn't get access, purchases with a billing address outside the US (these are refunded automatically), or where the law requires a refund."
+    )).toBeInTheDocument();
+    expect(screen.getByText(
+      "Your billing address must be in the 50 US states or Washington, D.C. Purchases with a billing address anywhere else, including US territories such as Puerto Rico or Guam, are refunded and access is not turned on."
+    )).toBeInTheDocument();
+    expect(screen.getByText(
+      /basic usage events \(for example, which section you open or when you sign in\)/
+    )).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "The Mirror" })).not.toBeInTheDocument();
     expect(screen.getByRole("navigation", { name: "Legal" })).toHaveTextContent(
       `${APP_VERSION_LABEL} · Terms · Privacy`
@@ -52,10 +61,18 @@ describe("legal routes", () => {
     expect(screen.getByText(
       "If you try to create an account with an email that already has one, we tell you that address is already registered so you can sign in and keep a single account. We do not say whether an email is registered when you sign in or reset a password."
     )).toBeInTheDocument();
-    expect(screen.getByText(/We do not promise a timeframe/)).toBeInTheDocument();
+    expect(screen.getByText(
+      "Stripe hosts checkout. We do not receive or store your card details. We store whether your account paid, the amount and currency, your billing country, whether you accepted the Terms, Stripe payment and checkout IDs, and any refund or dispute status."
+    )).toBeInTheDocument();
+    expect(screen.getByText(
+      /Stripe receives your account email \(we fill it in for you\), and the name, billing address and card details you enter there, and emails your receipt\./
+    )).toBeInTheDocument();
     expect(screen.getAllByText(/\[SUPPORT EMAIL, pending Tyler\]/).length).toBeGreaterThan(1);
     const deletion = screen.getByRole("heading", { name: "Requesting deletion" }).closest("section");
-    expect(deletion?.textContent ?? "").not.toMatch(/within \d+/i);
+    expect(deletion?.textContent ?? "").toContain(
+      "To ask us to delete your account data, email [SUPPORT EMAIL, pending Tyler]. We'll review and process your request. We may keep payment records."
+    );
+    expect(deletion?.textContent ?? "").not.toMatch(/within \d+|by hand/i);
     expect(screen.queryByText(/team only/i)).not.toBeInTheDocument();
   });
 

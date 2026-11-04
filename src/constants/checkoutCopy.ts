@@ -14,7 +14,7 @@ export const NON_US_REFUNDED_BODY =
 export const NON_US_REFUND_FAILED_BODY =
   "Cognitive Bridge is only available in the US right now, so access wasn't turned on. A refund has not been confirmed. Contact [SUPPORT EMAIL, pending Tyler] so we can look up the payment.";
 
-export const BACK_TO_DEMO = "Back to the demo";
+export const BACK_TO_COGNITIVE_BRIDGE = "Back to Cognitive Bridge";
 
 export const CHECKOUT_CANCELED = "Checkout canceled. You weren't charged.";
 
