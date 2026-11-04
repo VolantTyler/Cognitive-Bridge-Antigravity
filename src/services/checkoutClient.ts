@@ -47,6 +47,38 @@ export async function loadCheckoutStatus(sessionId: string): Promise<CheckoutVie
   return "pending";
 }
 
+export class CheckoutStartError extends Error {
+  readonly status: number;
+  readonly code: string | null;
+
+  constructor(status: number, code: string | null) {
+    super(code ?? "checkout_failed");
+    this.name = "CheckoutStartError";
+    this.status = status;
+    this.code = code;
+  }
+}
+
+export async function startCheckout(): Promise<string> {
+  let headers: Record<string, string>;
+  try {
+    headers = await authorizedAiHeaders();
+  } catch (error) {
+    if (error instanceof AiAccessError) throw new CheckoutStartError(401, "signed_out");
+    throw new CheckoutStartError(401, "signed_out");
+  }
+  const response = await fetch(endpoint("/api/checkout", "createCheckout"), {
+    method: "POST",
+    headers,
+  });
+  const body = await response.json().catch(() => ({})) as { url?: unknown; code?: unknown };
+  const code = typeof body.code === "string" ? body.code : null;
+  if (!response.ok || typeof body.url !== "string") {
+    throw new CheckoutStartError(response.status, code);
+  }
+  return body.url;
+}
+
 export async function requestRestorePurchase(): Promise<boolean> {
   let headers: Record<string, string>;
   try {

@@ -56,7 +56,9 @@ service cloud.firestore {
     //
     // Collection: usage
     // Document ID: Firebase Auth uid
-    // Server-only daily counters, for example bridgeChat { day, count }.
+    // Server-only counters. bridgeChat { day, count } is the chat cap.
+    // interviews { completedIds, active } is the 2-interview purchase counter.
+    // Clients cannot write either field. A users/{uid} document is not a counter.
     //
     // Collection: usage_server
     // Document ID: auto-generated

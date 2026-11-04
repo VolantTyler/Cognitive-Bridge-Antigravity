@@ -4,7 +4,20 @@ import { GoogleGenAI } from "@google/genai";
 import { allowedCorsOrigins } from "./cors";
 import { handleChat, GeminiClient } from "./chatHandler";
 import { handleJudge } from "./judgeHandler";
+import { isInterviewFeature } from "./gate";
 import { defaultGuardDeps, guardChat, guardJudge } from "./guard";
+import {
+  completeInterviewSlot,
+  markInterviewStarted,
+  readAccessView,
+  reserveInterviewSlot as reserveInterviewInStore,
+} from "./interviewStore";
+import {
+  handleAccessStatus,
+  handleCompleteInterview,
+  handleReserveInterview,
+  InterviewHttpDeps,
+} from "./interviewHttp";
 import { loadGateConfig } from "./params";
 import { verifyAppCheckToken, writeUsageRecord, addDailyCostFromUsage } from "./adminStore";
 import { UsageRecord } from "./usageLog";
@@ -51,6 +64,10 @@ export const chatProxy = onRequest({ cors, timeoutSeconds: 120 }, async (req, re
     guard: (incoming) => guardChat(incoming, deps),
     ai: ai as unknown as GeminiClient,
     logUsage,
+    markInterviewStarted: async (ctx) => {
+      if (!ctx.uid || !isInterviewFeature(ctx.feature)) return;
+      await markInterviewStarted(ctx.uid);
+    },
   });
 });
 
@@ -104,3 +121,27 @@ export const stripeWebhook = onRequest({
   secrets: [stripeSecretKey, stripeWebhookSecret],
   timeoutSeconds: 60,
 }, (req, res) => handleStripeWebhook(req, res, checkoutHttpDeps()));
+
+function interviewHttpDeps(): InterviewHttpDeps {
+  return {
+    verifyIdToken: verifyIdTokenWithAdmin,
+    verifyAppCheck: verifyAppCheckToken,
+    enforceAppCheck: () => loadGateConfig().enforceAppCheck,
+    now: () => Date.now(),
+    readAccess: (uid) => readAccessView(uid),
+    reserve: (uid, now) => reserveInterviewInStore(uid, now),
+    complete: (uid, reservationId, now) => completeInterviewSlot(uid, reservationId, now),
+  };
+}
+
+export const accessStatus = onRequest({ cors, timeoutSeconds: 15 }, (req, res) => {
+  return handleAccessStatus(req, res, interviewHttpDeps());
+});
+
+export const reserveInterviewSlot = onRequest({ cors, timeoutSeconds: 15 }, (req, res) => {
+  return handleReserveInterview(req, res, interviewHttpDeps());
+});
+
+export const completeInterview = onRequest({ cors, timeoutSeconds: 15 }, (req, res) => {
+  return handleCompleteInterview(req, res, interviewHttpDeps());
+});

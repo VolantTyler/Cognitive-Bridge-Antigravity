@@ -21,6 +21,19 @@ import {
   NON_US_REFUNDED_BODY,
   RESTORE_PURCHASE,
 } from "../constants/checkoutCopy";
+import {
+  APP_HOME,
+  CHECKOUT_TIMEOUT_NEXT,
+  DEMO_HOME,
+  START_INTERVIEW,
+  SUCCESS_CHAT,
+  SUCCESS_ESTIMATE,
+  SUCCESS_INTERVIEWS,
+  SUCCESS_PRODUCT,
+  SUCCESS_READY,
+  SUCCESS_RECEIPT,
+  AI_DISCLOSURE,
+} from "../constants/paywallCopy";
 import SiteFooter from "./SiteFooter";
 
 const POLL_MS = 30_000;
@@ -136,6 +149,23 @@ export function CheckoutReturn({
           <p role="alert" className="mt-4 text-sm leading-relaxed">{CHECKOUT_RESTORE_FAILED}</p>
         )}
         {phase === "timeout" && (
+          <p className="mt-4 text-sm leading-relaxed text-text-secondary">{CHECKOUT_TIMEOUT_NEXT}</p>
+        )}
+        {phase === "paid" && (
+          <div className="mt-4 space-y-3 text-sm leading-relaxed text-text-secondary">
+            <h2 className="text-lg font-semibold text-text-primary">{SUCCESS_READY}</h2>
+            <p>{SUCCESS_INTERVIEWS}</p>
+            <p>{SUCCESS_CHAT}</p>
+            <p>{SUCCESS_ESTIMATE}</p>
+            <p>{SUCCESS_PRODUCT}</p>
+            <p>{SUCCESS_RECEIPT}</p>
+            <p>{AI_DISCLOSURE}</p>
+            <a href={APP_HOME} className="inline-flex min-h-11 items-center justify-center rounded-lg bg-button-brand px-4 text-sm font-semibold text-white">
+              {START_INTERVIEW}
+            </a>
+          </div>
+        )}
+        {phase === "timeout" && (
           <button
             type="button"
             className="mt-6 min-h-11 px-4 rounded-lg border border-border-primary text-sm text-text-primary"
@@ -155,7 +185,7 @@ export function CheckoutReturn({
         )}
         {nonUs && (
           <a
-            href="/"
+            href={DEMO_HOME}
             className="mt-6 inline-flex items-center justify-center min-h-11 px-4 rounded-lg border border-border-primary bg-bg-secondary text-sm text-text-primary"
           >
             {BACK_TO_DEMO}

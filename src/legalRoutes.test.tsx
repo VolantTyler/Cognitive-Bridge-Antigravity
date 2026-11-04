@@ -68,6 +68,9 @@ describe("legal routes", () => {
       "/api/checkout/restore",
       "/api/checkout/status",
       "/api/stripe/webhook",
+      "/api/access",
+      "/api/interview/reserve",
+      "/api/interview/complete",
     ]));
   });
 

@@ -269,6 +269,9 @@ describe("stripe webhook", () => {
       interviewsAllowed: 2,
     });
     expect(logs.info).toHaveBeenCalledWith("duplicate ignored");
+    expect(logs.info).toHaveBeenCalledWith("analytics checkout_completed");
+    const analytics = logs.info.mock.calls.map((call) => String(call[0])).filter((line) => line.startsWith("analytics "));
+    expect(analytics.join(" ")).not.toMatch(/uid|@|uid-1/);
   });
 
   it("does not grant access when terms were not accepted", async () => {
@@ -373,6 +376,9 @@ describe("stripe webhook", () => {
     expect(store.entitlements.get("uid-1")?.paid).toBe(true);
     expect(store.entitlements.get("uid-1")?.disputeStatus).toBe("open");
     expect(logs.error).toHaveBeenCalledWith("dispute_opened dispute=dp_1 uid=uid-1");
+    expect(logs.info).toHaveBeenCalledWith("analytics dispute_opened");
+    const analytics = logs.info.mock.calls.map((call) => String(call[0])).filter((line) => line.startsWith("analytics "));
+    expect(analytics.join(" ")).not.toMatch(/uid=|@|uid-1/);
 
     await deliver(store, "charge.dispute.closed", {
       id: "dp_1",

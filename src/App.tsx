@@ -18,7 +18,22 @@ import ReleaseNotesModal from './components/ReleaseNotesModal';
 import SiteFooter from './components/SiteFooter';
 import { StandaloneRoutes } from './components/StandaloneRoutes';
 import { parseLocation } from './routes';
-import { loadCheckoutStatus, requestRestorePurchase } from './services/checkoutClient';
+import { CheckoutStartError, loadCheckoutStatus, requestRestorePurchase, startCheckout } from './services/checkoutClient';
+import { completeInterview, loadAccessStatus, readStoredReservation, reserveInterview, AccessSnapshot } from './services/accessClient';
+import { canUseLiveChat, canUseLiveInterview, interpretCheckoutResponse, phaseAfterUnlock, resolveSurface, ProductSurface } from './access/productAccess';
+import AccessFlow from './components/AccessFlow';
+import { logProductEvent } from './services/productAnalytics';
+import {
+  CONTINUE_RESULTS,
+  ENTITLEMENT_FAILED,
+  INTERVIEWS_LEFT,
+  INTERVIEWS_USED,
+  LEGACY_BANNER,
+  PAYWALL_BUTTON,
+  START_RETAKE,
+  VIEW_RESULTS,
+} from './constants/paywallCopy';
+import { AiAccessError } from './services/aiAccess';
 import { getOllamaConfig } from './services/gemini';
 
 import { auth, db, logAnalyticsEvent } from './services/firebase';
@@ -30,6 +45,13 @@ import { adoptGuestSession, sessionFromCloudData } from './services/sessionMigra
 
 export default function App() {
   const [user, setUser] = useState<FirebaseUser | null>(null);
+  const [authReady, setAuthReady] = useState(false);
+  const [access, setAccess] = useState<AccessSnapshot | null>(null);
+  const [flowOverride, setFlowOverride] = useState<ProductSurface | null>(null);
+  const [flowAlert, setFlowAlert] = useState<string | null>(null);
+  const [checkoutBusy, setCheckoutBusy] = useState(false);
+  const purchaseIntent = useRef(false);
+  const loggedEvents = useRef(new Set<string>());
   const [activeModule, setActiveModule] = useState<ModuleId>('mirror');
   const [scores, setScores] = useState<OceanScores | null>(null);
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
@@ -170,8 +192,14 @@ export default function App() {
         } catch (error) {
           console.error("Error restoring/migrating session:", error);
         }
+        try {
+          setAccess(await loadAccessStatus());
+        } catch {
+          setAccess(null);
+        }
       } else {
         setUser(null);
+        setAccess(null);
         logAnalyticsEvent('auth_state_changed', { status: 'logged_out' });
         // Clean slate on disconnect / local guest mode
         setScores(null);
@@ -181,6 +209,7 @@ export default function App() {
         setPlaygroundMessages([]);
         setActiveModule('mirror');
       }
+      setAuthReady(true);
     });
 
     return () => unsubscribe();
@@ -200,7 +229,23 @@ export default function App() {
     }
   };
 
-  const handleMirrorComplete = (newScores: OceanScores) => {
+  const handleMirrorComplete = async (newScores: OceanScores) => {
+    if (access?.paid) {
+      try {
+        const result = await completeInterview(readStoredReservation());
+        if (result.newlyCompleted) logProductEvent('interview_completed');
+        setAccess((prev) => prev ? {
+          ...prev,
+          interviewsCompleted: result.completed,
+          interviewsRemaining: result.remaining,
+          inProgress: false,
+        } : prev);
+      } catch (error) {
+        console.error('Interview complete failed:', error);
+        setFlowAlert(ENTITLEMENT_FAILED);
+        return;
+      }
+    }
     setScores(newScores);
     setActiveModule('tailor');
     saveToCloud(newScores, mirrorMessages, playgroundMessages, 'tailor');
@@ -212,10 +257,113 @@ export default function App() {
   };
 
   const liveUser = user && auth.currentUser?.uid === user.uid ? auth.currentUser : user;
+  const searchParams = new URLSearchParams(href.search);
+  const canceledCheckout = searchParams.get('checkout') === 'cancel';
+  const baseSurface = resolveSurface({
+    authReady,
+    signedIn: !!liveUser,
+    paid: access?.paid === true,
+    legacy: access?.legacy === true,
+    hasSavedResults: scores !== null,
+    view: searchParams.get('view'),
+    canceled: canceledCheckout,
+  });
+  const surface = flowOverride ?? baseSurface;
+  const liveInterview = canUseLiveInterview({
+    paid: access?.paid === true,
+    remaining: access?.interviewsRemaining ?? 0,
+    inProgress: access?.inProgress === true,
+  });
+
+  const navigate = (query: string) => {
+    const search = query ? `?${query.replace(/^\?/, '')}` : '';
+    window.history.pushState({}, '', `/${search}`);
+    setHref({ pathname: window.location.pathname, search: window.location.search });
+    setFlowOverride(null);
+  };
+
+  const runCheckout = async () => {
+    setCheckoutBusy(true);
+    setFlowAlert(null);
+    setFlowOverride('redirect');
+    try {
+      const url = await startCheckout();
+      logProductEvent('checkout_started');
+      window.location.assign(url);
+    } catch (error) {
+      const status = error instanceof CheckoutStartError ? error.status : 500;
+      const code = error instanceof CheckoutStartError ? error.code : null;
+      const intent = interpretCheckoutResponse(status, code);
+      if (intent.phase === 'app') {
+        navigate('view=app');
+        return;
+      }
+      if (intent.phase === 'verify') {
+        setFlowOverride('verify');
+        return;
+      }
+      if (intent.phase === 'paywall') {
+        setFlowAlert(intent.alert);
+        setFlowOverride(null);
+        navigate('view=paywall');
+      }
+    } finally {
+      setCheckoutBusy(false);
+    }
+  };
+
+  const beginInterview = async () => {
+    try {
+      const reserved = await reserveInterview();
+      if (reserved.created) {
+        logProductEvent(reserved.retake ? 'retake_started' : 'interview_started');
+      }
+      setAccess((prev) => prev ? {
+        ...prev,
+        interviewsRemaining: reserved.remaining,
+        interviewsCompleted: reserved.completed,
+        inProgress: true,
+      } : prev);
+      setActiveModule('mirror');
+      navigate('view=app');
+    } catch (error) {
+      if (error instanceof AiAccessError && error.code === 'interviews_exhausted') {
+        setFlowAlert(null);
+        navigate('view=app');
+        return;
+      }
+      setFlowAlert(ENTITLEMENT_FAILED);
+      navigate('view=paywall');
+    }
+  };
+
+  useEffect(() => {
+    if (!authReady) return;
+    const key = `surface:${surface}`;
+    if (loggedEvents.current.has(key)) return;
+    loggedEvents.current.add(key);
+    if (surface === 'demo') logProductEvent('demo_started');
+    if (surface === 'paywall') logProductEvent('paywall_viewed');
+  }, [authReady, surface]);
+
+  useEffect(() => {
+    if (!canceledCheckout || loggedEvents.current.has('checkout_canceled')) return;
+    loggedEvents.current.add('checkout_canceled');
+    logProductEvent('checkout_canceled');
+  }, [canceledCheckout]);
+
+  useEffect(() => {
+    if (surface !== 'app') return;
+    if (activeModule !== 'tailor' && activeModule !== 'playground') return;
+    const key = `report:${activeModule}`;
+    if (loggedEvents.current.has(key)) return;
+    loggedEvents.current.add(key);
+    logProductEvent('report_viewed');
+  }, [surface, activeModule]);
 
   const currentStep = scores ? (activeModule === 'playground' ? 3 : 2) : 1;
   const route = parseLocation(href.pathname, href.search);
-  if (route.name !== 'app') {
+  if (route.name !== 'app' && !canceledCheckout) {
     return (
       <StandaloneRoutes
         pathname={href.pathname}
@@ -224,6 +372,72 @@ export default function App() {
         restore={requestRestorePurchase}
         app={null}
       />
+    );
+  }
+
+  if (surface !== 'app') {
+    return (
+      <div className="min-h-screen bg-bg-primary text-text-secondary flex flex-col font-sans">
+        <AccessFlow
+          phase={surface}
+          email={liveUser?.email}
+          canceled={canceledCheckout}
+          alertMessage={flowAlert}
+          busy={checkoutBusy}
+          onStartInterview={() => {
+            logProductEvent('demo_completed');
+            if (!liveUser) {
+              navigate('view=paywall');
+              return;
+            }
+            if (access?.paid && liveInterview) {
+              void beginInterview();
+              return;
+            }
+            if (access?.paid || (access?.legacy && scores)) {
+              navigate('view=app');
+              return;
+            }
+            navigate('view=paywall');
+          }}
+          onUnlock={() => {
+            purchaseIntent.current = true;
+            const step = phaseAfterUnlock({
+              signedIn: !!liveUser,
+              emailVerified: !!liveUser?.emailVerified,
+            });
+            if (step === 'signin') setFlowOverride('signin');
+            else if (step === 'verify') setFlowOverride('verify');
+            else void runCheckout();
+          }}
+          onBackToDemo={() => navigate('view=demo')}
+          onRestore={() => {
+            void requestRestorePurchase().then((ok) => {
+              if (ok) navigate('view=app');
+              else setFlowAlert(ENTITLEMENT_FAILED);
+            });
+          }}
+          onSignedIn={(accountUser) => {
+            if (!purchaseIntent.current) {
+              setFlowOverride(null);
+              return;
+            }
+            if (!accountUser.emailVerified) {
+              setFlowOverride('verify');
+              return;
+            }
+            void runCheckout();
+          }}
+          onCloseAuth={() => {
+            purchaseIntent.current = false;
+            setFlowOverride(null);
+          }}
+          onRetryCheckout={() => {
+            void runCheckout();
+          }}
+        />
+        <SiteFooter />
+      </div>
     );
   }
 
@@ -411,6 +625,27 @@ export default function App() {
         <VerifyEmailBanner onVerify={() => openAccount('verify')} />
       )}
 
+      {access?.legacy && !access.paid && (
+        <div role="status" className="border-b border-border-primary bg-bg-secondary px-6 py-3 text-sm text-text-secondary flex flex-wrap items-center gap-3">
+          <span>{LEGACY_BANNER}</span>
+          <button type="button" className="min-h-11 underline" onClick={() => setActiveModule(scores ? 'tailor' : 'mirror')}>{VIEW_RESULTS}</button>
+          <button type="button" className="min-h-11 underline" onClick={() => navigate('view=paywall')}>{PAYWALL_BUTTON}</button>
+        </div>
+      )}
+      {access?.paid && (
+        <div role="status" className="border-b border-border-primary bg-bg-secondary px-6 py-3 text-sm text-text-secondary flex flex-wrap items-center gap-3">
+          <span>{INTERVIEWS_LEFT} {access.interviewsRemaining} of 2.</span>
+          {scores && <button type="button" className="min-h-11 underline" onClick={() => setActiveModule('tailor')}>{CONTINUE_RESULTS}</button>}
+          {access.interviewsCompleted > 0 && access.interviewsRemaining > 0 && (
+            <button type="button" className="min-h-11 underline" onClick={() => { void beginInterview(); }}>{START_RETAKE}</button>
+          )}
+          {access.interviewsRemaining === 0 && !access.inProgress && <span>{INTERVIEWS_USED}</span>}
+        </div>
+      )}
+      {flowAlert && surface === 'app' && (
+        <p role="alert" className="px-6 py-2 text-sm text-status-danger">{flowAlert}</p>
+      )}
+
       {/* Mobile/Tablet Secondary Navigation */}
       <div className="flex md:hidden bg-bg-secondary border-b border-border-primary px-4 py-2.5 justify-around items-center sticky top-16 z-40 transition-colors duration-300">
         {[
@@ -450,12 +685,16 @@ export default function App() {
                 <p className="text-text-muted text-lg leading-relaxed max-w-2xl">You get along with certain people better than others. It's the same with your AI assistants. Answer a few questions and we'll map your OCEAN personality traits to make your AI fit YOU. (Or, pick one of the examples below to skip ahead!)</p>
               </div>
               <div className="flex-1 min-h-[500px]">
-                <Mirror
-                  messages={mirrorMessages}
-                  setMessages={setMirrorMessages}
-                  onComplete={handleMirrorComplete}
-                  onSaveSession={handleMirrorSave}
-                />
+                {liveInterview ? (
+                  <Mirror
+                    messages={mirrorMessages}
+                    setMessages={setMirrorMessages}
+                    onComplete={handleMirrorComplete}
+                    onSaveSession={handleMirrorSave}
+                  />
+                ) : (
+                  <p role="status" className="text-sm text-text-secondary">{access?.paid ? INTERVIEWS_USED : LEGACY_BANNER}</p>
+                )}
               </div>
             </motion.div>
           )}
@@ -494,6 +733,7 @@ export default function App() {
                   messages={playgroundMessages}
                   setMessages={setPlaygroundMessages}
                   setScores={setScores}
+                  liveChat={canUseLiveChat(access?.paid === true)}
                   onSaveSession={(updatedPlayground, updatedScores) => {
                     const finalScores = updatedScores || scores;
                     if (updatedScores) {

@@ -29,6 +29,16 @@ function sendGate(res, error) {
     console.warn(`chatProxy denied code=${error.code}`);
     res.status(error.status).json({ error: error.message, code: error.code });
 }
+async function noteInterviewStarted(deps, ctx) {
+    if (!deps.markInterviewStarted || !ctx.uid)
+        return;
+    try {
+        await deps.markInterviewStarted(ctx);
+    }
+    catch {
+        console.error("interview start mark failed");
+    }
+}
 async function safeLog(deps, ctx, model, promptTokens, completionTokens) {
     if (!ctx.uid)
         return;
@@ -91,6 +101,7 @@ async function handleChat(req, res, deps) {
                 sendTerminalError(res, failures, new Error("No Gemini model accepted the stream."));
                 return;
             }
+            await noteInterviewStarted(deps, ctx);
             res.writeHead(200, {
                 "Content-Type": "text/event-stream",
                 "Cache-Control": "no-cache",
@@ -166,6 +177,7 @@ async function handleChat(req, res, deps) {
             sendTerminalError(res, failures, new Error("No Gemini model accepted the request."));
             return;
         }
+        await noteInterviewStarted(deps, ctx);
         await safeLog(deps, ctx, activeModel, promptTokens, completionTokens);
         res.status(200).json({
             text: responseText,

@@ -3,6 +3,7 @@ import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 import { getAnalytics, isSupported, logEvent, Analytics } from "firebase/analytics";
+import { sanitizeAnalyticsParams } from "./analyticsSanitize";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyCTz_uaqfVLf5kgVm26_S-tkg3J_Iafy3Y",
@@ -40,10 +41,10 @@ isSupported().then((supported) => {
 });
 
 // Helper to log analytics events safely
-const logAnalyticsEvent = (eventName: string, eventParams?: Record<string, any>) => {
+const logAnalyticsEvent = (eventName: string, eventParams?: Record<string, unknown>) => {
   try {
     if (analytics) {
-      logEvent(analytics, eventName, eventParams);
+      logEvent(analytics, eventName, sanitizeAnalyticsParams(eventParams));
     }
   } catch (err) {
     console.warn("Failed to log analytics event:", err);

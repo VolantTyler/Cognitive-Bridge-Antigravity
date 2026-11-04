@@ -24,7 +24,7 @@ describe("checkout return", () => {
     expect(status).toHaveTextContent(NON_US_REFUNDED_BODY);
     expect(status).not.toHaveTextContent(/minutes|business days|5-10/i);
     const back = screen.getByRole("link", { name: BACK_TO_DEMO });
-    expect(back).toHaveAttribute("href", "/");
+    expect(back).toHaveAttribute("href", "/?view=demo");
     expect(back.className).not.toMatch(/red|status-danger/);
     expect(screen.queryByText(/payment confirmed/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/The Mirror/)).not.toBeInTheDocument();
