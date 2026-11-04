@@ -9,11 +9,13 @@ import { Send, Sparkles, User, Shield, Info, Loader2, AlertTriangle, Zap, Split,
 import { OceanScores, Message, ComparisonMessage } from '../types';
 import { generateAlignmentPrompt, generateInverseAlignmentPrompt, RESEARCH_FRAMING } from '../constants';
 import { chatWithGeminiStream, DEFAULT_GEMINI_MODEL } from '../services/gemini';
+import { AiAccessError } from '../services/aiAccess';
 import { AlignmentJudgment } from '../jev/questions';
 import { judgeAlignment } from '../services/jev';
 import OceanCards from './OceanCards';
 import JevAlignmentCheck from './JevAlignmentCheck';
 import { isStreamErrorText } from './playgroundUtils';
+import AiAccessNotice from './AiAccessNotice';
 import ModelMatchSection from '../modelMatch/ModelMatchSection';
 import LeaderboardPage from '../modelMatch/LeaderboardPage';
 import { useModelMatch } from '../modelMatch/useModelMatch';
@@ -90,6 +92,7 @@ export default function Playground({ scores, messages, setMessages, setScores, o
   const loadedMatch = useModelMatch(scores);
   const match = modelMatch ?? loadedMatch;
   const [leaderboardModel, setLeaderboardModel] = useState<string | undefined | null>(null);
+  const [accessError, setAccessError] = useState<AiAccessError | null>(null);
   const leaderboardOpen = leaderboardModel !== null;
 
   const activateAnalysis = useCallback((analysis: ActiveAnalysis, sourceEl?: HTMLElement | null) => {
@@ -184,7 +187,7 @@ export default function Playground({ scores, messages, setMessages, setScores, o
   const runGeneration = useCallback(async (
     messageIndex: number,
     userPrompt: string,
-    options?: { scoresOverride?: OceanScores }
+    options?: { scoresOverride?: OceanScores; onAccepted?: () => void; onReject?: () => void }
   ) => {
     const attemptId = (generationAttemptsRef.current.get(messageIndex) ?? 0) + 1;
     generationAttemptsRef.current.set(messageIndex, attemptId);
@@ -197,13 +200,19 @@ export default function Playground({ scores, messages, setMessages, setScores, o
     updateMessage(messageIndex, {
       loading: true,
       error: false,
-      aligned: '',
-      unaligned: '',
     });
     setAlignmentCheck(null);
     setAlignmentStatus('idle');
     setGenerationStatus('Generating Aligned and Unaligned responses...');
     setIsLoading(true);
+
+    let accepted = false;
+    const markAccepted = () => {
+      if (accepted) return;
+      accepted = true;
+      updateMessage(messageIndex, { aligned: '', unaligned: '' });
+      options?.onAccepted?.();
+    };
 
     const conversationHistory: Message[] = messages
       .filter((_, idx) => idx !== messageIndex)
@@ -216,6 +225,8 @@ export default function Playground({ scores, messages, setMessages, setScores, o
     let alignedText = '';
     let unalignedText = '';
 
+    // One turn is two chatProxy requests (aligned and unaligned).
+    // The default cap is 100 requests, about 50 turns. See nextBridgeUsage.
     const generationPromise = (async () => {
       const alignedPromise = (async () => {
         const stream = chatWithGeminiStream(
@@ -226,6 +237,7 @@ export default function Playground({ scores, messages, setMessages, setScores, o
           (_failed, next) => setGenerationStatus(`Switching to ${next} after a model capacity error...`)
         );
         for await (const chunk of stream) {
+          markAccepted();
           alignedText += chunk;
         }
       })();
@@ -239,6 +251,7 @@ export default function Playground({ scores, messages, setMessages, setScores, o
           (_failed, next) => setGenerationStatus(`Switching to ${next} after a model capacity error...`)
         );
         for await (const chunk of stream) {
+          markAccepted();
           unalignedText += chunk;
         }
       })();
@@ -276,21 +289,36 @@ export default function Playground({ scores, messages, setMessages, setScores, o
       });
       selectFirstHighlight(finalAligned, finalUnaligned);
       setAlignmentStatus('loading');
-      const judgment = await judgeAlignment({
-        scores: activeScores,
-        userQuery: userPrompt,
-        alignedReply: finalAligned,
-        unalignedReply: finalUnaligned,
-      });
-      if (isStaleAttempt()) return;
-      if (judgment) {
-        setAlignmentCheck(judgment);
-        setAlignmentStatus('ready');
-      } else {
+      try {
+        const judgment = await judgeAlignment({
+          scores: activeScores,
+          userQuery: userPrompt,
+          alignedReply: finalAligned,
+          unalignedReply: finalUnaligned,
+        });
+        if (isStaleAttempt()) return;
+        if (judgment) {
+          setAlignmentCheck(judgment);
+          setAlignmentStatus('ready');
+        } else {
+          setAlignmentStatus('idle');
+        }
+      } catch (judgeError) {
+        if (isStaleAttempt()) return;
+        if (judgeError instanceof AiAccessError) setAccessError(judgeError);
         setAlignmentStatus('idle');
       }
     } catch (err) {
       if (isStaleAttempt()) return;
+      if (err instanceof AiAccessError) {
+        setAccessError(err);
+        if (options?.onReject && !accepted) {
+          options.onReject();
+          return;
+        }
+        updateMessage(messageIndex, { loading: false });
+        return;
+      }
       console.error('Bridge generation failed:', err);
       updateMessage(messageIndex, { loading: false, error: true });
     } finally {
@@ -300,9 +328,12 @@ export default function Playground({ scores, messages, setMessages, setScores, o
     }
   }, [messages, scores, updateMessage, selectFirstHighlight, onSaveSession, setMessages]);
 
-  const submitPrompt = async (rawPrompt: string) => {
+  const submitPrompt = async (rawPrompt: string, options?: { scoresOverride?: OceanScores }) => {
     const userPrompt = rawPrompt.trim();
     if (!userPrompt || isLoading) return;
+
+    const snapshot = input;
+    setAccessError(null);
 
     const newMessage: ComparisonMessage = {
       user: userPrompt,
@@ -311,12 +342,21 @@ export default function Playground({ scores, messages, setMessages, setScores, o
       loading: true,
     };
 
-    const newIndex = messages.length;
-    setExpandedIndices({ [newIndex]: true });
-    setMessages(prev => [...prev, newMessage]);
-    setInput('');
+    let newIndex = messages.length;
+    setExpandedIndices(prev => ({ ...prev, [newIndex]: true }));
+    setMessages(prev => {
+      newIndex = prev.length;
+      return [...prev, newMessage];
+    });
 
-    await runGeneration(newIndex, userPrompt);
+    await runGeneration(newIndex, userPrompt, {
+      scoresOverride: options?.scoresOverride,
+      onAccepted: () => setInput(''),
+      onReject: () => {
+        setMessages(prev => prev.filter((_, idx) => idx !== newIndex));
+        setInput(snapshot);
+      },
+    });
   };
 
   const handleSend = async () => {
@@ -332,25 +372,10 @@ export default function Playground({ scores, messages, setMessages, setScores, o
 
   const handlePresetSubmit = async (presetScores: OceanScores, presetPrompt: string) => {
     if (isLoading) return;
-
     if (setScores) {
       setScores(presetScores);
     }
-
-    setInput('');
-
-    const newMessage: ComparisonMessage = {
-      user: presetPrompt,
-      aligned: '',
-      unaligned: '',
-      loading: true,
-    };
-
-    const newIndex = messages.length;
-    setExpandedIndices({ [newIndex]: true });
-    setMessages(prev => [...prev, newMessage]);
-
-    await runGeneration(newIndex, presetPrompt, { scoresOverride: presetScores });
+    await submitPrompt(presetPrompt, { scoresOverride: presetScores });
   };
 
   const focusQuestionInput = () => {
@@ -481,6 +506,7 @@ export default function Playground({ scores, messages, setMessages, setScores, o
           </div>
 
           <div className="p-4 bg-bg-surface border-b border-border-primary transition-colors duration-300">
+            <AiAccessNotice error={accessError} />
             <div className="relative">
               <textarea
                 ref={inputRef}

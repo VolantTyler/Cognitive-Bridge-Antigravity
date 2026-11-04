@@ -6,6 +6,7 @@
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { Message } from "../types";
 import { db, auth } from "./firebase";
+import { AiAccessError, aiAccessErrorFromResponse, authorizedAiHeaders, getAiSessionId } from "./aiAccess";
 import {
   DEFAULT_GEMINI_MODEL,
   LIVE_GEMINI_MODELS,
@@ -442,15 +443,18 @@ function isTransportBlip(error: unknown): boolean {
 
 async function readProxyError(response: Response): Promise<ProxyRequestError> {
   const errorText = await response.text();
-  let payload: { error?: string; fallbacksExhausted?: boolean; code?: number } | null = null;
+  let payload: { error?: string; fallbacksExhausted?: boolean; code?: number | string } | null = null;
   try {
     payload = JSON.parse(errorText);
   } catch {
     payload = null;
   }
+  const accessError = aiAccessErrorFromResponse(response.status, payload);
+  if (accessError) throw accessError;
+  const numericCode = typeof payload?.code === "number" ? payload.code : response.status;
   const message = payload?.error || errorText || `HTTP ${response.status}`;
   const wrapped = `HTTP error! status: ${response.status}, message: ${message}`;
-  const kind = classifyModelError({ status: payload?.code || response.status, message: wrapped });
+  const kind = classifyModelError({ status: numericCode, message: wrapped });
   return new ProxyRequestError(wrapped, kind, Boolean(payload?.fallbacksExhausted));
 }
 
@@ -458,18 +462,19 @@ async function postChat(
   messages: Message[],
   systemInstruction: string | undefined,
   modelName: string,
-  stream: boolean
+  stream: boolean,
+  feature: string | undefined
 ): Promise<Response> {
   return fetch(getProxyUrl(), {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
+    headers: await authorizedAiHeaders(),
     body: JSON.stringify({
       messages,
       systemInstruction,
       modelName,
-      stream
+      stream,
+      feature: feature || "chat",
+      sessionId: getAiSessionId(),
     }),
     signal: typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function"
       ? AbortSignal.timeout(ATTEMPT_TIMEOUT_MS)
@@ -494,7 +499,7 @@ export async function chatWithGemini(
   for (let index = 0; index < models.length; index++) {
     const model = models[index];
     try {
-      const response = await postChat(messages, systemInstruction, model, false);
+      const response = await postChat(messages, systemInstruction, model, false, _feature);
       if (!response.ok) {
         throw await readProxyError(response);
       }
@@ -505,6 +510,7 @@ export async function chatWithGemini(
       }
       return data.text || "";
     } catch (error) {
+      if (error instanceof AiAccessError) throw error;
       lastError = error;
       const nextModel = models[index + 1];
       if (nextModel && shouldSwitchModel(error)) {
@@ -524,7 +530,8 @@ export async function* chatWithGeminiStream(
   systemInstruction?: string,
   modelName: string = DEFAULT_GEMINI_MODEL,
   _feature?: string,
-  onFallback?: (failedModel: string, nextModel: string) => void
+  onFallback?: (failedModel: string, nextModel: string) => void,
+  onAccepted?: () => void
 ): AsyncGenerator<string, void, unknown> {
   const ollamaConfig = getOllamaConfig();
   if (ollamaConfig.enabled) {
@@ -535,17 +542,20 @@ export async function* chatWithGeminiStream(
   const models = getDynamicModelFallbacks(modelName);
   let lastError: unknown;
 
+  // A transport failure before the proxy answers can POST again for the next
+  // model. That is another chatProxy request. See nextBridgeUsage.
   for (let index = 0; index < models.length; index++) {
     const model = models[index];
     let yielded = false;
     try {
-      const response = await postChat(messages, systemInstruction, model, true);
+      const response = await postChat(messages, systemInstruction, model, true, _feature);
       if (!response.ok) {
         throw await readProxyError(response);
       }
       if (!response.body) {
         throw new ProxyRequestError("Response body is not readable.", "other");
       }
+      onAccepted?.();
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder("utf-8");
@@ -595,6 +605,7 @@ export async function* chatWithGeminiStream(
       }
       return;
     } catch (error) {
+      if (error instanceof AiAccessError) throw error;
       lastError = error;
       if (yielded) {
         console.error("Gemini Streaming Error (via Proxy):", error);

@@ -9,10 +9,12 @@ import { Send, User, Bot, Sparkles, Brain, Loader2, ListTodo, ArrowRight } from 
 import { Message, OceanScores } from '../types';
 import { MIRROR_SYSTEM_PROMPT } from '../constants';
 import { chatWithGeminiStream } from '../services/gemini';
+import { AiAccessError } from '../services/aiAccess';
 import { OceanJudgment } from '../jev/questions';
 import { judgeOcean } from '../services/jev';
 import OceanCards from './OceanCards';
 import OceanJudgmentPanel from './OceanJudgmentPanel';
+import AiAccessNotice from './AiAccessNotice';
 
 interface MirrorProps {
   messages: Message[];
@@ -73,6 +75,7 @@ export default function Mirror({ messages, setMessages, onComplete, onSaveSessio
   const [judgment, setJudgment] = useState<OceanJudgment | null>(null);
   const [judgeStatus, setJudgeStatus] = useState<'idle' | 'loading' | 'ready' | 'unavailable'>('idle');
   const [loadingText, setLoadingText] = useState('Analyzing...');
+  const [accessError, setAccessError] = useState<AiAccessError | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const messagesRef = useRef(messages);
   messagesRef.current = messages;
@@ -115,6 +118,10 @@ export default function Mirror({ messages, setMessages, onComplete, onSaveSessio
       }
       setJudgment(result);
       setJudgeStatus('ready');
+    }).catch((error: unknown) => {
+      if (cancelled) return;
+      if (error instanceof AiAccessError) setAccessError(error);
+      setJudgeStatus('unavailable');
     });
     return () => {
       cancelled = true;
@@ -134,55 +141,71 @@ export default function Mirror({ messages, setMessages, onComplete, onSaveSessio
   }, [messages]);
 
   const handleSend = async () => {
-    if (!input.trim() || isLoading) return;
+    const draft = input;
+    if (!draft.trim() || isLoading) return;
 
-    const userMessage: Message = { role: 'user', content: input };
-    setMessages(prev => [...prev, userMessage]);
-    setInput('');
+    setAccessError(null);
     setIsLoading(true);
     setLoadingText('Analyzing...');
 
+    const userMessage: Message = { role: 'user', content: draft };
     let modelResponse = '';
-    setMessages(prev => [...prev, { role: 'model', content: '' }]);
+    let committed = false;
 
-    const stream = chatWithGeminiStream(
-      [...messages, userMessage],
-      MIRROR_SYSTEM_PROMPT,
-      undefined,
-      'mirror',
-      (failedModel, nextModel) => {
-        setLoadingText('Analyzing... changing to a different model');
-      }
-    );
+    const commitTurn = () => {
+      if (committed) return;
+      committed = true;
+      setInput('');
+      setMessages(prev => [...prev, userMessage, { role: 'model', content: '' }]);
+    };
 
-    for await (const chunk of stream) {
-      modelResponse += chunk;
-      setMessages(prev => {
-        const last = prev[prev.length - 1];
-        return [...prev.slice(0, -1), { ...last, content: modelResponse }];
-      });
+    try {
+      const stream = chatWithGeminiStream(
+        [...messages, userMessage],
+        MIRROR_SYSTEM_PROMPT,
+        undefined,
+        'mirror',
+        () => {
+          setLoadingText('Still working on it…');
+        },
+        commitTurn
+      );
 
-      // Check for JSON scores in the stream
-      if (modelResponse.includes('JSON_SCORES:')) {
-        const jsonMatch = modelResponse.match(/JSON_SCORES:\s*(?:```json)?\s*({[\s\S]*?})\s*(?:```)?/);
-        if (jsonMatch) {
-          try {
-            const scoresStr = jsonMatch[1].trim();
-            const scores = JSON.parse(scoresStr);
-            setCompletedScores(scores);
-            setScoreOrigin('dialogue');
-            break;
-          } catch (e) {
-            console.error("Failed to parse scores:", e);
+      for await (const chunk of stream) {
+        commitTurn();
+        modelResponse += chunk;
+        setMessages(prev => {
+          const last = prev[prev.length - 1];
+          return [...prev.slice(0, -1), { ...last, content: modelResponse }];
+        });
+
+        if (modelResponse.includes('JSON_SCORES:')) {
+          const jsonMatch = modelResponse.match(/JSON_SCORES:\s*(?:```json)?\s*({[\s\S]*?})\s*(?:```)?/);
+          if (jsonMatch) {
+            try {
+              const scoresStr = jsonMatch[1].trim();
+              const scores = JSON.parse(scoresStr);
+              setCompletedScores(scores);
+              setScoreOrigin('dialogue');
+              break;
+            } catch (e) {
+              console.error("Failed to parse scores:", e);
+            }
           }
         }
       }
-    }
 
-    setIsLoading(false);
-
-    if (onSaveSession) {
-      onSaveSession([...messages, userMessage, { role: 'model', content: modelResponse }]);
+      if (committed && onSaveSession) {
+        onSaveSession([...messages, userMessage, { role: 'model', content: modelResponse }]);
+      }
+    } catch (error) {
+      if (error instanceof AiAccessError) {
+        setAccessError(error);
+        return;
+      }
+      console.error("Mirror request failed:", error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -288,6 +311,7 @@ export default function Mirror({ messages, setMessages, onComplete, onSaveSessio
             </div>
           ) : (
             <>
+              <AiAccessNotice error={accessError} />
               <div className="relative flex items-center">
                 <input
                   type="text"

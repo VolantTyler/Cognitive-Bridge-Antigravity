@@ -17,6 +17,7 @@ import {
   oceanQuestions,
 } from '../jev/questions';
 import { OceanScores } from '../types';
+import { AiAccessError, aiAccessErrorFromResponse, authorizedAiHeaders, getAiSessionId } from './aiAccess';
 
 const JUDGE_TIMEOUT_MS = 12000;
 
@@ -35,22 +36,39 @@ function getJudgeUrl(): string {
 
 export async function requestJudgment(
   state: string,
-  questions: Record<string, JevQuestion>
+  questions: Record<string, JevQuestion>,
+  feature = 'judge'
 ): Promise<JevAnswers | null> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), JUDGE_TIMEOUT_MS);
   try {
     const response = await fetch(getJudgeUrl(), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ state, questions }),
+      headers: await authorizedAiHeaders(),
+      body: JSON.stringify({
+        state,
+        questions,
+        feature,
+        sessionId: getAiSessionId(),
+      }),
       signal: controller.signal,
     });
-    if (!response.ok) return null;
+    if (!response.ok) {
+      let payload: { code?: unknown } | null = null;
+      try {
+        payload = await response.json() as { code?: unknown };
+      } catch {
+        payload = null;
+      }
+      const accessError = aiAccessErrorFromResponse(response.status, payload);
+      if (accessError) throw accessError;
+      return null;
+    }
     const data = await response.json() as { unavailable?: boolean; answers?: JevAnswers };
     if (data.unavailable || !data.answers) return null;
     return data.answers;
   } catch (error) {
+    if (error instanceof AiAccessError) throw error;
     console.warn('Jev judge unavailable:', error instanceof Error ? error.message : String(error));
     return null;
   } finally {
@@ -62,7 +80,7 @@ export async function judgeOcean(
   messages: DialogueTurn[],
   scores: OceanScores
 ): Promise<OceanJudgment | null> {
-  const answers = await requestJudgment(buildOceanState(messages, scores), oceanQuestions(scores));
+  const answers = await requestJudgment(buildOceanState(messages, scores), oceanQuestions(scores), 'mirror');
   if (!answers) return null;
   return interpretOceanAnswers(scores, answers);
 }
@@ -73,7 +91,7 @@ export async function judgeAlignment(input: {
   alignedReply: string;
   unalignedReply: string;
 }): Promise<AlignmentJudgment | null> {
-  const answers = await requestJudgment(buildAlignmentState(input), alignmentQuestions());
+  const answers = await requestJudgment(buildAlignmentState(input), alignmentQuestions(), 'bridge');
   if (!answers) return null;
   return interpretAlignmentAnswers(answers);
 }
