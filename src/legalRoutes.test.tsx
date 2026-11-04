@@ -42,8 +42,9 @@ describe("legal routes", () => {
     expect(screen.getByText(
       /basic usage events \(for example, which section you open or when you sign in\)/
     )).toBeInTheDocument();
-    const interviews = document.getElementById("interviews");
-    expect(interviews?.textContent).toContain(
+    const interviews = screen.getByRole("heading", { name: "Interviews" });
+    expect(interviews).toHaveAttribute("id", "interviews");
+    expect(interviews.parentElement?.textContent).toContain(
       "Each purchase includes two interviews (one interview and one retake). An interview counts as used when you accept its results (Keep, accept corrections, or choose a preset), or 6 hours after the AI's first reply if you don't finish. A started interview with no AI reply expires after 6 hours and does not count."
     );
     expect(screen.queryByRole("heading", { name: "The Mirror" })).not.toBeInTheDocument();

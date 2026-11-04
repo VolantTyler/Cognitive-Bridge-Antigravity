@@ -8,7 +8,8 @@ import { TermsPage } from "../LegalPages";
 import {
   INTERVIEW_COUNT_LINE,
   RETAKE_REPLACES_RESULTS,
-  RETAKE_START_WARNING,
+  RETAKE_START_ACCEPT,
+  RETAKE_START_LEAVE,
   TERMS_RETAKE_REPLACES,
 } from "../../constants/paywallCopy";
 
@@ -51,16 +52,19 @@ describe("retake replaces results copy", () => {
     success.unmount();
 
     render(<TermsPage />);
-    const interviews = document.getElementById("interviews");
-    expect(interviews?.textContent).toContain(TERMS_RETAKE_REPLACES);
+    const interviewsHeading = screen.getByRole("heading", { name: "Interviews" });
+    expect(interviewsHeading).toHaveAttribute("id", "interviews");
+    const interviewParagraphs = interviewsHeading.parentElement?.querySelectorAll("p");
+    expect(interviewParagraphs?.length).toBe(2);
+    expect(interviewParagraphs?.[1].textContent).toBe(TERMS_RETAKE_REPLACES);
 
     const retake = render(<RetakeStartControl onRetake={vi.fn()} />);
     const notice = within(retake.container).getByRole("status");
     const button = within(retake.container).getByRole("button", { name: "Start retake" });
-    expect(notice).toHaveTextContent(RETAKE_START_WARNING);
-    expect(notice).toHaveTextContent(
-      "If you leave after the AI has replied but before you accept, your current results stay, and the retake counts as used after 6 hours."
-    );
+    const paragraphs = notice.querySelectorAll("p");
+    expect(paragraphs).toHaveLength(2);
+    expect(paragraphs[0]).toHaveTextContent(RETAKE_START_ACCEPT);
+    expect(paragraphs[1]).toHaveTextContent(RETAKE_START_LEAVE);
     expect(button).toHaveAttribute("aria-describedby", notice.id);
     expect(notice.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     retake.unmount();

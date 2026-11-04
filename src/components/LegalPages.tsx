@@ -73,12 +73,13 @@ export function TermsPage() {
           <li>A side-by-side chat to try those instructions: up to 50 messages a day, resets at midnight US Eastern.</li>
           <li>An untested model suggestion.</li>
         </ul>
-        <div id="interviews">
+        <section className="space-y-3">
+          <h2 id="interviews" className="text-base font-semibold text-text-primary pt-4">Interviews</h2>
           <p>
             Each purchase includes two interviews (one interview and one retake). An interview counts as used when you accept its results (Keep, accept corrections, or choose a preset), or 6 hours after the AI's first reply if you don't finish. A started interview with no AI reply expires after 6 hours and does not count.
           </p>
           <p>{TERMS_RETAKE_REPLACES}</p>
-        </div>
+        </section>
         <p>There is no downloadable report. Your results are shown in the app.</p>
       </Section>
       <Section heading="All sales are final">
