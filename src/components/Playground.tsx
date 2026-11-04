@@ -225,6 +225,8 @@ export default function Playground({ scores, messages, setMessages, setScores, o
     let alignedText = '';
     let unalignedText = '';
 
+    // One user send is two chatProxy requests (aligned and unaligned).
+    // usage/{uid}.bridgeChat counts each request. See nextBridgeUsage.
     const generationPromise = (async () => {
       const alignedPromise = (async () => {
         const stream = chatWithGeminiStream(

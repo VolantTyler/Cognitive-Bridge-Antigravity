@@ -542,6 +542,8 @@ export async function* chatWithGeminiStream(
   const models = getDynamicModelFallbacks(modelName);
   let lastError: unknown;
 
+  // A transport failure before the proxy answers can POST again for the next
+  // model. That is another chatProxy request. See nextBridgeUsage.
   for (let index = 0; index < models.length; index++) {
     const model = models[index];
     let yielded = false;

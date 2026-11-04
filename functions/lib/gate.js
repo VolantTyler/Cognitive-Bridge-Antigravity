@@ -12,6 +12,7 @@ exports.isInterviewFeature = isInterviewFeature;
 exports.inputCharCount = inputCharCount;
 exports.nextBridgeUsage = nextBridgeUsage;
 exports.unauthenticatedError = unauthenticatedError;
+exports.sessionExpiredError = sessionExpiredError;
 exports.paymentRequiredError = paymentRequiredError;
 exports.inputTooLongError = inputTooLongError;
 exports.interviewsPausedError = interviewsPausedError;
@@ -128,6 +129,19 @@ function inputCharCount(messages, systemInstruction) {
     }
     return total;
 }
+/**
+ * Cap unit is one chatProxy request, not one user message.
+ *
+ * One Bridge send starts two requests (playground-aligned and
+ * playground-unaligned), so a cap of 50 is about 25 turns. Each of those
+ * can POST again when the browser hits a transport failure before the
+ * proxy returns fallbacksExhausted. The server model chain stays inside
+ * one request and does not increment again. Mirror (feature "mirror") is
+ * not in this counter.
+ *
+ * A client message id is not used to collapse those calls. Reusing one id
+ * would skip the cap and spend Vertex on unlimited requests.
+ */
 function nextBridgeUsage(existing, day, cap) {
     const sameDay = existing?.day === day && typeof existing.count === "number" && Number.isFinite(existing.count);
     const count = sameDay ? Math.max(0, Math.floor(existing.count)) : 0;
@@ -138,6 +152,9 @@ function nextBridgeUsage(existing, day, cap) {
 }
 function unauthenticatedError() {
     return new GateError(401, "unauthenticated", accessCopy_1.AI_ACCESS_MESSAGES.signed_out);
+}
+function sessionExpiredError() {
+    return new GateError(401, "session_expired", accessCopy_1.AI_ACCESS_MESSAGES.session_ended);
 }
 function paymentRequiredError() {
     return new GateError(402, "payment_required", accessCopy_1.AI_ACCESS_MESSAGES.payment_required);

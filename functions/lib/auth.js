@@ -45,7 +45,13 @@ async function verifyBearerToken(authorizationHeader, verify) {
     try {
         decoded = await verify(token);
     }
-    catch {
+    catch (error) {
+        const code = typeof error === "object" && error !== null && "code" in error
+            ? String(error.code)
+            : "";
+        if (code === "auth/id-token-expired" || code === "auth/user-token-expired") {
+            throw (0, gate_1.sessionExpiredError)();
+        }
         throw (0, gate_1.unauthenticatedError)();
     }
     if (!decoded || typeof decoded.uid !== "string" || decoded.uid.length === 0) {

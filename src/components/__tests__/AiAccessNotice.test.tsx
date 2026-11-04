@@ -55,9 +55,10 @@ describe('locked AI responses', () => {
     fireEvent.change(input, { target: { value: 'I would wait.' } });
     fireEvent.click(screen.getByRole('button', { name: 'Send response' }));
 
-    const alert = await screen.findByRole('alert');
-    expect(alert).toHaveAttribute('data-ai-access', 'signed_out');
-    expect(alert).toHaveTextContent(AI_ACCESS_MESSAGES.signed_out);
+    const notice = await screen.findByRole('status');
+    expect(notice).toHaveAttribute('data-ai-access', 'signed_out');
+    expect(notice).toHaveTextContent(AI_ACCESS_MESSAGES.signed_out);
+    expect(notice).not.toHaveClass('text-status-danger');
     expect(input).toHaveValue('I would wait.');
     expect(setMessages).not.toHaveBeenCalled();
   });
@@ -68,8 +69,9 @@ describe('locked AI responses', () => {
     fireEvent.change(input, { target: { value: 'Where should we go?' } });
     fireEvent.click(screen.getByRole('button', { name: 'Send prompt' }));
 
-    const alert = await screen.findByRole('alert');
-    expect(alert).toHaveAttribute('data-ai-access', 'signed_out');
+    const notice = await screen.findByRole('status');
+    expect(notice).toHaveAttribute('data-ai-access', 'signed_out');
+    expect(notice).not.toHaveClass('text-status-danger');
     await waitFor(() => {
       expect(input).toHaveValue('Where should we go?');
       expect(screen.getByRole('button', { name: /Ask your first question/i })).toBeInTheDocument();

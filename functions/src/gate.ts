@@ -137,6 +137,19 @@ export interface BridgeUsageBucket {
   count?: unknown;
 }
 
+/**
+ * Cap unit is one chatProxy request, not one user message.
+ *
+ * One Bridge send starts two requests (playground-aligned and
+ * playground-unaligned), so a cap of 50 is about 25 turns. Each of those
+ * can POST again when the browser hits a transport failure before the
+ * proxy returns fallbacksExhausted. The server model chain stays inside
+ * one request and does not increment again. Mirror (feature "mirror") is
+ * not in this counter.
+ *
+ * A client message id is not used to collapse those calls. Reusing one id
+ * would skip the cap and spend Vertex on unlimited requests.
+ */
 export function nextBridgeUsage(
   existing: BridgeUsageBucket | undefined,
   day: string,
@@ -152,6 +165,10 @@ export function nextBridgeUsage(
 
 export function unauthenticatedError(): GateError {
   return new GateError(401, "unauthenticated", AI_ACCESS_MESSAGES.signed_out);
+}
+
+export function sessionExpiredError(): GateError {
+  return new GateError(401, "session_expired", AI_ACCESS_MESSAGES.session_ended);
 }
 
 export function paymentRequiredError(): GateError {
