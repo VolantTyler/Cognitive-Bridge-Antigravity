@@ -212,6 +212,7 @@ describe('AccountAuthPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: ACCOUNT_COPY.signInButton }));
     expect(await screen.findByRole('alert')).toHaveTextContent(ACCOUNT_COPY.unverified);
     expect(screen.getByRole('dialog')).toHaveAttribute('data-account-view', 'verify');
+    expect(screen.queryByText(/Your progress so far moves to your account when you sign in/)).not.toBeInTheDocument();
   });
 
   it('uses the existing Google provider', async () => {
@@ -220,6 +221,7 @@ describe('AccountAuthPanel', () => {
       user: makeUser({ uid: 'google-uid', emailVerified: true, providerData: [{ providerId: 'google.com' }] }),
     });
     render(<AccountAuthPanel isOpen onClose={vi.fn()} onSignedIn={onSignedIn} />);
+    expect(screen.getByText(/Your progress so far moves to your account when you sign in/)).toBeInTheDocument();
     expect(screen.queryByLabelText(ACCOUNT_COPY.displayNameLabel)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: ACCOUNT_COPY.googleButton }));
     await waitFor(() => expect(onSignedIn).toHaveBeenCalledWith(expect.objectContaining({ uid: 'google-uid' })));
@@ -230,6 +232,7 @@ describe('AccountAuthPanel', () => {
   it('shows one reset confirmation when the email exists and when it does not', async () => {
     const first = render(<AccountAuthPanel isOpen onClose={vi.fn()} />);
     fireEvent.click(screen.getByRole('button', { name: ACCOUNT_COPY.forgot }));
+    expect(screen.queryByText(/Your progress so far moves to your account when you sign in/)).not.toBeInTheDocument();
     typeEmail('ada@example.com');
     fireEvent.click(screen.getByRole('button', { name: ACCOUNT_COPY.resetButton }));
     expect(await screen.findByRole('status')).toHaveTextContent(ACCOUNT_COPY.resetSent);

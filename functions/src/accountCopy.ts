@@ -28,7 +28,7 @@ export function verificationSentBody(email: string): string {
 
 export const ACCOUNT_COPY = {
   title: "Sign in to continue",
-  sub: "You need an account to buy and keep your results. Signing in doesn't change the price.",
+  sub: "You need an account to buy and keep your results. Signing in doesn't change the price. Your progress so far moves to your account when you sign in.",
   googleButton: "Continue with Google",
   googleBusy: "Signing in…",
   orEmail: "or use email",
@@ -60,7 +60,7 @@ export const ACCOUNT_COPY = {
   verifyBanner: "Verify your email to continue to payment.",
   verifyBannerAction: "Verify email",
   passwordTooShort: "Use at least 8 characters.",
-  invalidEmail: "Enter an email address.",
+  invalidEmail: "Enter a valid email address.",
   displayNameTooLong: "Use 40 characters or fewer.",
   wrongCredentials: "That email and password don't match.",
   tooManyAttempts: "Too many tries. Wait a few minutes and try again.",
@@ -73,13 +73,13 @@ export const ACCOUNT_COPY = {
   linkUsePassword: "This email already has an account. Sign in with your password.",
   linkSubmit: "Sign in and link",
   signInWithPassword: "Sign in with your password",
-  linkFailed: "We couldn't link the accounts. Sign in with the existing account so this stays one account.",
+  linkFailed: "We couldn't connect these sign-in methods. Sign in the way you used before to keep one account.",
   emailMismatch: "That Google account uses a different email. Use the Google account for this address.",
   sendFailed: "Couldn't send the verification email. Use resend to try again.",
   generic: "Something went wrong. Try again.",
   close: "Close sign in",
   differentEmail: "Use a different email",
-  menuSignIn: "Log In",
+  menuSignIn: "Sign in",
   menuVerify: "Verify email",
   verifyBody: verificationSentBody,
 } as const;

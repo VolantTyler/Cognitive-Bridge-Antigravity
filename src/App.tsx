@@ -257,11 +257,11 @@ export default function App() {
               <button
                 onClick={() => setIsMenuOpen(prev => !prev)}
                 className="flex items-center justify-center gap-2 p-2 sm:px-3.5 sm:py-1.5 rounded-xl bg-button-brand hover:bg-button-brand-hover text-white text-[10px] font-bold uppercase tracking-wider transition-all shadow-lg shadow-orange-600/10 cursor-pointer border border-orange-500/20"
-                title="Open menu / Login"
+                title="Open menu"
               >
                 <UserIcon className="w-3.5 h-3.5 text-white sm:hidden" />
                 <Brain className="w-3.5 h-3.5 text-white hidden sm:inline" />
-                <span className="hidden sm:inline">Login</span>
+                <span className="hidden sm:inline">Sign in</span>
               </button>
             )}
 
@@ -297,7 +297,7 @@ export default function App() {
                         className="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-status-danger hover:bg-red-500/10 rounded-lg cursor-pointer transition-all text-left w-full border-0 bg-transparent"
                       >
                         <UserIcon className="w-4.5 h-4.5 shrink-0" />
-                        <span>Log Out</span>
+                        <span>Sign out</span>
                       </button>
                     </>
                   ) : (
