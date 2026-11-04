@@ -5,13 +5,22 @@
 
 import { RETAKE_START_WARNING, START_RETAKE } from "../constants/paywallCopy";
 
+const NOTICE_ID = "retake-replaces-notice";
+
 export default function RetakeStartControl({ onRetake }: { onRetake: () => void }) {
   return (
-    <div className="flex flex-wrap items-center gap-3">
-      <button type="button" className="min-h-11 underline text-sm" onClick={onRetake}>
+    <div className="flex w-full max-w-full flex-col items-start gap-2">
+      <p id={NOTICE_ID} role="status" className="text-sm text-text-secondary">
+        {RETAKE_START_WARNING}
+      </p>
+      <button
+        type="button"
+        className="min-h-11 underline text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-600"
+        aria-describedby={NOTICE_ID}
+        onClick={onRetake}
+      >
         {START_RETAKE}
       </button>
-      <p className="text-sm text-text-secondary">{RETAKE_START_WARNING}</p>
     </div>
   );
 }

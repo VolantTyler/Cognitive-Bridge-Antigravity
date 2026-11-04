@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import AccessFlow from "../AccessFlow";
 import { CheckoutReturn } from "../CheckoutReturn";
@@ -30,7 +30,9 @@ describe("retake replaces results copy", () => {
         onRetryCheckout={vi.fn()}
       />
     );
-    expect(screen.getByText("Two interviews: your first, plus one retake. A retake replaces your saved results.")).toBeInTheDocument();
+    expect(screen.getByText(
+      "Two interviews: your first, plus one retake. A retake replaces your saved results once you accept the new ones."
+    )).toBeInTheDocument();
     expect(screen.getByText(INTERVIEW_COUNT_LINE)).toBeInTheDocument();
     expect(screen.queryByText(/both sets of results stay saved/i)).not.toBeInTheDocument();
   });
@@ -53,8 +55,11 @@ describe("retake replaces results copy", () => {
     expect(interviews?.textContent).toContain(TERMS_RETAKE_REPLACES);
 
     const retake = render(<RetakeStartControl onRetake={vi.fn()} />);
-    expect(screen.getByRole("button", { name: "Start retake" })).toBeInTheDocument();
-    expect(screen.getByText(RETAKE_START_WARNING)).toBeInTheDocument();
+    const notice = within(retake.container).getByRole("status");
+    const button = within(retake.container).getByRole("button", { name: "Start retake" });
+    expect(notice).toHaveTextContent(RETAKE_START_WARNING);
+    expect(button).toHaveAttribute("aria-describedby", notice.id);
+    expect(notice.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     retake.unmount();
 
     render(<InterviewsUsedNotice />);

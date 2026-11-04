@@ -5,6 +5,7 @@
 
 import { useEffect, useRef, type ReactNode } from "react";
 import { SUPPORT_EMAIL_PLACEHOLDER } from "../constants/checkoutCopy";
+import { TERMS_RETAKE_REPLACES } from "../constants/paywallCopy";
 import SiteFooter from "./SiteFooter";
 
 function LegalLayout({ title, children }: { title: string; children: ReactNode }) {
@@ -76,9 +77,7 @@ export function TermsPage() {
           <p>
             Each purchase includes two interviews (one interview and one retake). An interview counts as used when you accept its results (Keep, accept corrections, or choose a preset), or 6 hours after the AI's first reply if you don't finish. A started interview with no AI reply expires after 6 hours and does not count.
           </p>
-          <p>
-            If you retake the interview, your new results replace your saved results. We don't keep the earlier set for you.
-          </p>
+          <p>{TERMS_RETAKE_REPLACES}</p>
         </div>
         <p>There is no downloadable report. Your results are shown in the app.</p>
       </Section>
