@@ -54,3 +54,12 @@ export function canUseLiveInterview(input: { paid: boolean; remaining: number; i
 export function canUseLiveChat(paid: boolean): boolean {
   return paid;
 }
+
+/** Paid accounts with no interviews left should not see the start-interview pitch. */
+export function showMirrorInvite(input: {
+  paid: boolean;
+  interviewsRemaining: number;
+  inProgress: boolean;
+}): boolean {
+  return !(input.paid && input.interviewsRemaining <= 0 && !input.inProgress);
+}

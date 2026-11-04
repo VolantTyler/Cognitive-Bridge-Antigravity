@@ -23,7 +23,8 @@ import { CheckoutStartError, loadCheckoutStatus, requestRestorePurchase, startCh
 import { completeInterview, loadAccessStatus, readStoredReservation, reserveInterview, AccessSnapshot } from './services/accessClient';
 import { canUseLiveChat, canUseLiveInterview, interpretCheckoutResponse, phaseAfterUnlock, resolveSurface, ProductSurface } from './access/productAccess';
 import AccessFlow from './components/AccessFlow';
-import InterviewsUsedNotice from './components/InterviewsUsedNotice';
+import InterviewsExhausted, { MIRROR_INVITE } from './components/InterviewsExhausted';
+import { showMirrorInvite } from './access/productAccess';
 import RetakeStartControl from './components/RetakeStartControl';
 import { logProductEvent } from './services/productAnalytics';
 import {
@@ -281,6 +282,12 @@ export default function App() {
     remaining: access?.interviewsRemaining ?? 0,
     inProgress: access?.inProgress === true,
   });
+  const mirrorInvite = showMirrorInvite({
+    paid: access?.paid === true,
+    interviewsRemaining: access?.interviewsRemaining ?? 0,
+    inProgress: access?.inProgress === true,
+  });
+  const interviewsExhausted = access?.paid === true && !mirrorInvite;
 
   const navigate = (query: string) => {
     const search = query ? `?${query.replace(/^\?/, '')}` : '';
@@ -662,16 +669,6 @@ export default function App() {
           {access.interviewsCompleted > 0 && access.interviewsRemaining > 0 && (
             <RetakeStartControl onRetake={() => { void beginInterview(); }} />
           )}
-          {access.interviewsRemaining === 0 && !access.inProgress && scores && (
-            <button
-              type="button"
-              className="inline-flex min-h-11 items-center rounded-lg bg-button-brand px-4 text-sm font-semibold text-white"
-              onClick={() => setActiveModule('tailor')}
-            >
-              {VIEW_RESULTS}
-            </button>
-          )}
-          {access.interviewsRemaining === 0 && !access.inProgress && <InterviewsUsedNotice />}
         </div>
       )}
       {flowAlert && surface === 'app' && (
@@ -714,9 +711,11 @@ export default function App() {
             >
               <div className="mb-8">
                 <h1 className="text-4xl font-bold tracking-tighter mb-2">Make Your AI Fit You</h1>
-                <p className="text-text-muted text-lg leading-relaxed max-w-2xl">You get along with certain people better than others. It's the same with your AI assistants. Answer a few questions and we'll map your OCEAN personality traits to make your AI fit YOU. (Or, pick one of the examples below to skip ahead!)</p>
+                {mirrorInvite && (
+                  <p className="text-text-muted text-lg leading-relaxed max-w-2xl">{MIRROR_INVITE}</p>
+                )}
               </div>
-              <div className="flex-1 min-h-[500px]">
+              <div className={interviewsExhausted ? "flex-1" : "flex-1 min-h-[500px]"}>
                 {liveInterview ? (
                   <Mirror
                     messages={mirrorMessages}
@@ -724,8 +723,8 @@ export default function App() {
                     onComplete={handleMirrorComplete}
                     onSaveSession={handleMirrorSave}
                   />
-                ) : access?.paid ? (
-                  <InterviewsUsedNotice />
+                ) : interviewsExhausted ? (
+                  <InterviewsExhausted onViewResults={() => setActiveModule(scores ? 'tailor' : 'mirror')} />
                 ) : (
                   <p role="status" className="text-sm text-text-secondary">{LEGACY_BANNER}</p>
                 )}

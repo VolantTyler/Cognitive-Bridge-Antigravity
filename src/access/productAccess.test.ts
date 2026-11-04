@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   canUseLiveChat,
   canUseLiveInterview,
+  showMirrorInvite,
   interpretCheckoutResponse,
   phaseAfterUnlock,
   resolveSurface,
@@ -56,5 +57,7 @@ describe("product surface", () => {
     expect(canUseLiveInterview({ paid: true, remaining: 1, inProgress: false })).toBe(true);
     expect(canUseLiveChat(false)).toBe(false);
     expect(canUseLiveChat(true)).toBe(true);
+    expect(showMirrorInvite({ paid: true, interviewsRemaining: 0, inProgress: false })).toBe(false);
+    expect(showMirrorInvite({ paid: true, interviewsRemaining: 0, inProgress: true })).toBe(true);
   });
 });
