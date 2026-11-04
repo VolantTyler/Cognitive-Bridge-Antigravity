@@ -1,0 +1,13 @@
+{
+  "placeholder": true,
+  "comment": "PLACEHOLDER prices in USD per 1,000,000 tokens. Verify against the current Vertex AI / Gemini price card before any cost go/no-go. These numbers are not authoritative.",
+  "models": {
+    "gemini-2.5-flash": { "inputPerMillionUsd": 0.15, "outputPerMillionUsd": 0.6 },
+    "gemini-2.5-flash-lite": { "inputPerMillionUsd": 0.1, "outputPerMillionUsd": 0.4 },
+    "gemini-3.5-flash": { "inputPerMillionUsd": 0.15, "outputPerMillionUsd": 0.6 },
+    "gemini-3.1-pro-preview": { "inputPerMillionUsd": 1.25, "outputPerMillionUsd": 10 },
+    "gemini-3.8-flash": { "inputPerMillionUsd": 0.15, "outputPerMillionUsd": 0.6 },
+    "jev-latest": { "inputPerMillionUsd": 0, "outputPerMillionUsd": 0, "perCallUsd": 0 }
+  },
+  "default": { "inputPerMillionUsd": 0.15, "outputPerMillionUsd": 0.6 }
+}

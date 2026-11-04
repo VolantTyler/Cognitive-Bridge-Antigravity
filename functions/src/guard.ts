@@ -1,0 +1,158 @@
+import { verifyBearerToken, TokenVerifier } from "./auth";
+import { isRequestableModel, normalizeModelName } from "./modelRouter";
+import {
+  GateConfig,
+  GateError,
+  HeaderSource,
+  VerifiedUser,
+  appCheckError,
+  configFromEnv,
+  inputCharCount,
+  inputTooLongError,
+  interviewsPausedError,
+  isBridgeChatFeature,
+  isInterviewFeature,
+  paymentRequiredError,
+  readHeader,
+  reserveInterviewSlot,
+  sanitizeFeature,
+  sanitizeSessionId,
+  usEasternDay,
+} from "./gate";
+
+export interface GuardDeps {
+  config: () => GateConfig;
+  verifyIdToken: TokenVerifier;
+  readPaid: (uid: string) => Promise<boolean>;
+  reserveBridgeChat: (uid: string, day: string, cap: number) => Promise<void>;
+  reserveInterview: (uid: string, feature: string) => Promise<void>;
+  verifyAppCheck: (token: string) => Promise<void>;
+  now: () => Date;
+}
+
+export interface GuardContext {
+  uid: string | null;
+  email: string | null;
+  email_verified: boolean;
+  feature: string;
+  sessionId: string | null;
+}
+
+export interface GuardRequest extends HeaderSource {
+  method?: string;
+  body?: unknown;
+}
+
+function asRecord(body: unknown): Record<string, unknown> {
+  if (!body || typeof body !== "object" || Array.isArray(body)) return {};
+  return body as Record<string, unknown>;
+}
+
+async function enforceAppCheck(req: GuardRequest, config: GateConfig, deps: GuardDeps): Promise<void> {
+  if (!config.enforceAppCheck) return;
+  const token = readHeader(req, "x-firebase-appcheck") ?? readHeader(req, "X-Firebase-AppCheck");
+  if (!token) throw appCheckError();
+  try {
+    await deps.verifyAppCheck(token);
+  } catch {
+    throw appCheckError();
+  }
+}
+
+async function enforceIdentity(req: GuardRequest, config: GateConfig, deps: GuardDeps): Promise<VerifiedUser | null> {
+  if (config.mode === "off") return null;
+  const user = await verifyBearerToken(readHeader(req, "authorization"), deps.verifyIdToken);
+  if (config.mode === "paid" && !config.allowlist.has(user.uid)) {
+    const paid = await deps.readPaid(user.uid);
+    if (!paid) throw paymentRequiredError();
+  }
+  return user;
+}
+
+export async function guardChat(req: GuardRequest, deps: GuardDeps): Promise<GuardContext> {
+  if (req.method && req.method.toUpperCase() !== "POST") {
+    throw new GateError(405, "method_not_allowed", "POST required.");
+  }
+  const config = deps.config();
+  await enforceAppCheck(req, config, deps);
+  const user = await enforceIdentity(req, config, deps);
+  const body = asRecord(req.body);
+  const feature = sanitizeFeature(body.feature);
+  const sessionId = sanitizeSessionId(body.sessionId);
+
+  if (config.interviewsPaused && isInterviewFeature(feature)) {
+    throw interviewsPausedError();
+  }
+
+  if (!Array.isArray(body.messages)) {
+    throw new GateError(400, "bad_request", "Bad Request: 'messages' array is required.");
+  }
+  const requestedModel = normalizeModelName(typeof body.modelName === "string" ? body.modelName : undefined);
+  if (!isRequestableModel(requestedModel)) {
+    throw new GateError(400, "bad_request", `Bad Request: Model '${requestedModel}' is not allowed.`);
+  }
+  if (inputCharCount(body.messages, body.systemInstruction) > config.maxInputChars) {
+    throw inputTooLongError();
+  }
+
+  if (user && isBridgeChatFeature(feature)) {
+    await deps.reserveBridgeChat(user.uid, usEasternDay(deps.now()), config.bridgeDailyCap);
+  }
+  if (user && isInterviewFeature(feature)) {
+    await deps.reserveInterview(user.uid, feature);
+  }
+
+  return {
+    uid: user?.uid ?? null,
+    email: user?.email ?? null,
+    email_verified: user?.email_verified ?? false,
+    feature,
+    sessionId,
+  };
+}
+
+export async function guardJudge(req: GuardRequest, deps: GuardDeps): Promise<GuardContext> {
+  if (req.method && req.method.toUpperCase() !== "POST") {
+    throw new GateError(405, "method_not_allowed", "POST required.");
+  }
+  const config = deps.config();
+  await enforceAppCheck(req, config, deps);
+  const user = await enforceIdentity(req, config, deps);
+  const body = asRecord(req.body);
+  const feature = sanitizeFeature(body.feature);
+  if (config.interviewsPaused && isInterviewFeature(feature)) {
+    throw interviewsPausedError();
+  }
+  return {
+    uid: user?.uid ?? null,
+    email: user?.email ?? null,
+    email_verified: user?.email_verified ?? false,
+    feature,
+    sessionId: sanitizeSessionId(body.sessionId),
+  };
+}
+
+export function defaultGuardDeps(overrides: Partial<GuardDeps> = {}): GuardDeps {
+  return {
+    config: () => configFromEnv(),
+    verifyIdToken: async (token: string) => {
+      const { verifyIdTokenWithAdmin } = await import("./auth");
+      return verifyIdTokenWithAdmin(token);
+    },
+    readPaid: async (uid: string) => {
+      const { readEntitlementPaid } = await import("./adminStore");
+      return readEntitlementPaid(uid);
+    },
+    reserveBridgeChat: async (uid: string, day: string, cap: number) => {
+      const { reserveBridgeChatSlot } = await import("./adminStore");
+      return reserveBridgeChatSlot(uid, day, cap);
+    },
+    reserveInterview: reserveInterviewSlot,
+    verifyAppCheck: async (token: string) => {
+      const { verifyAppCheckToken } = await import("./adminStore");
+      return verifyAppCheckToken(token);
+    },
+    now: () => new Date(),
+    ...overrides,
+  };
+}

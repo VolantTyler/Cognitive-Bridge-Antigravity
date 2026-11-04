@@ -1,0 +1,61 @@
+/**
+ * User-facing lock messages shared by the Cloud Functions responses and the
+ * web client (re-exported from src/constants/aiAccess.ts).
+ *
+ * Plain stand-in copy. Miranda and Charlie replace these after sign-off.
+ * Do not put bracketed placeholder tokens in these strings.
+ *
+ * CHAT_CAP_RESET_LABEL is the single reset phrase. The counter itself uses
+ * CHAT_CAP_RESET_TIME_ZONE (US Eastern calendar day, midnight).
+ */
+
+export const CHAT_CAP_RESET_TIME_ZONE = "America/New_York";
+export const CHAT_CAP_RESET_LABEL = "midnight US Eastern";
+
+export const DEFAULT_BRIDGE_CHAT_DAILY_CAP = 50;
+export const DEFAULT_MAX_INPUT_CHARS = 8000;
+
+export const AI_ACCESS_CODES = {
+  signedOut: "signed_out",
+  paymentRequired: "payment_required",
+  dailyCap: "daily_cap",
+  inputTooLong: "input_too_long",
+  interviewsPaused: "interviews_paused",
+  appCheck: "app_check",
+} as const;
+
+export type AiAccessCode = (typeof AI_ACCESS_CODES)[keyof typeof AI_ACCESS_CODES];
+
+export function dailyCapMessage(cap: number = DEFAULT_BRIDGE_CHAT_DAILY_CAP): string {
+  return `You've used today's ${cap} chat messages. Chat opens again at ${CHAT_CAP_RESET_LABEL}. Your results are still here.`;
+}
+
+export const AI_ACCESS_MESSAGES: Record<AiAccessCode, string> = {
+  signed_out: "Sign in to continue.",
+  payment_required: "This part needs a purchase. If you've paid, try Restore purchase.",
+  daily_cap: dailyCapMessage(),
+  input_too_long: "That message is too long. Try a shorter one.",
+  interviews_paused: "New interviews are paused for now. Your saved results are still available.",
+  app_check: "This browser could not be verified. Refresh the page and try again.",
+};
+
+/** Server `code` values on /api/chat and /api/judge. */
+export const SERVER_ACCESS_CODES = {
+  unauthenticated: "unauthenticated",
+  paymentRequired: "payment_required",
+  rateLimited: "rate_limited",
+  inputTooLong: "input_too_long",
+  interviewsPaused: "interviews_paused",
+  appCheck: "app_check",
+} as const;
+
+export type ServerAccessCode = (typeof SERVER_ACCESS_CODES)[keyof typeof SERVER_ACCESS_CODES];
+
+export const SERVER_CODE_TO_CLIENT: Record<ServerAccessCode, AiAccessCode> = {
+  unauthenticated: "signed_out",
+  payment_required: "payment_required",
+  rate_limited: "daily_cap",
+  input_too_long: "input_too_long",
+  interviews_paused: "interviews_paused",
+  app_check: "app_check",
+};

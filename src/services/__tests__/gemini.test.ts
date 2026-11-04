@@ -3,6 +3,23 @@ import { vi, describe, it, expect, beforeEach } from 'vitest';
 const mockFetch = vi.fn();
 globalThis.fetch = mockFetch;
 
+const authState = vi.hoisted(() => ({
+  currentUser: {
+    uid: 'user-1',
+    getIdToken: vi.fn(async () => 'id-token-test'),
+  } as null | { uid: string; getIdToken: () => Promise<string> },
+}));
+
+vi.mock('../firebase', () => ({
+  auth: {
+    get currentUser() {
+      return authState.currentUser;
+    },
+  },
+  db: {},
+  getAppCheckToken: async () => null,
+}));
+
 // Import the module after mocking
 import {
   parseModelName,
@@ -18,6 +35,10 @@ describe('Gemini Service Unit Tests', () => {
     vi.clearAllMocks();
     mockFetch.mockReset();
     activeModelsCache.length = 0;
+    authState.currentUser = {
+      uid: 'user-1',
+      getIdToken: vi.fn(async () => 'id-token-test'),
+    };
   });
 
   describe('parseModelName', () => {
@@ -93,6 +114,12 @@ describe('Gemini Service Unit Tests', () => {
       const response = await chatWithGemini([{ role: 'user', content: 'Hi' }]);
       expect(response).toBe('Hello!');
       expect(mockFetch).toHaveBeenCalledTimes(1);
+      const init = mockFetch.mock.calls[0][1];
+      expect(init.headers.Authorization).toBe('Bearer id-token-test');
+      const body = JSON.parse(String(init.body));
+      expect(body.feature).toBe('chat');
+      expect(body.sessionId).toMatch(/^[A-Za-z0-9_-]{1,128}$/);
+      expect(JSON.stringify(init.headers)).not.toContain('id-token-test-logged');
     });
 
     it('handles HTTP error gracefully', async () => {
@@ -105,6 +132,42 @@ describe('Gemini Service Unit Tests', () => {
       const response = await chatWithGemini([{ role: 'user', content: 'Hi' }]);
       expect(response).toBe('I encountered an error connecting to the intelligence bridge.');
       expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not call the proxy for a signed-out guest', async () => {
+      authState.currentUser = null;
+      await expect(chatWithGemini([{ role: 'user', content: 'Hi' }])).rejects.toMatchObject({
+        code: 'signed_out',
+        message: 'Sign in to continue.',
+      });
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('maps 401, 402, 429, and 503 lock codes and does not walk the model chain', async () => {
+      const cases: Array<{ status: number; code: string; access: string }> = [
+        { status: 401, code: 'unauthenticated', access: 'signed_out' },
+        { status: 402, code: 'payment_required', access: 'payment_required' },
+        { status: 429, code: 'rate_limited', access: 'daily_cap' },
+        { status: 429, code: 'input_too_long', access: 'input_too_long' },
+        { status: 503, code: 'interviews_paused', access: 'interviews_paused' },
+      ];
+      for (const item of cases) {
+        mockFetch.mockReset();
+        authState.currentUser = {
+          uid: 'user-1',
+          getIdToken: vi.fn(async () => 'id-token-test'),
+        };
+        mockFetch.mockResolvedValue({
+          ok: false,
+          status: item.status,
+          text: async () => JSON.stringify({ error: 'locked', code: item.code }),
+        });
+        await expect(chatWithGemini([{ role: 'user', content: 'Hi' }])).rejects.toMatchObject({
+          name: 'AiAccessError',
+          code: item.access,
+        });
+        expect(mockFetch).toHaveBeenCalledTimes(1);
+      }
     });
   });
 

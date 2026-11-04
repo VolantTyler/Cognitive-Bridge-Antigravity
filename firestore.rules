@@ -53,7 +53,42 @@ service cloud.firestore {
     //   - message: string (required, 1 to 5000 characters) - the feedback message
     //   - createdAt: timestamp (required) - time of submission
     //
+    // Collection: entitlements
+    // Document ID: Firebase Auth uid
+    // Written only by the Admin SDK (Cloud Functions). Clients cannot read or write.
+    // Fields (FR-9): paid, provider, sessionId, paymentIntentId, amount, currency,
+    //   paidAt, interviewsAllowed. A users/{uid} profile is not an entitlement.
+    //
+    // Collection: usage
+    // Document ID: Firebase Auth uid
+    // Server-only daily counters, for example bridgeChat { day, count }.
+    //
+    // Collection: usage_server
+    // Document ID: auto-generated
+    // Server-only token logs: uid, sessionId, feature, model, promptTokens,
+    //   completionTokens, ts. No message text and no ID tokens.
+    //
+    // Collection: stripe_events
+    // Document ID: Stripe event id
+    // Server-only webhook idempotency. Not readable or writable by clients.
+    //
     // ===============================================================
+
+    // Server-only billing, quota, and cost records.
+    // The Admin SDK bypasses these rules. A signed-in client must not be able
+    // to grant paid=true, reset a cap, or forge token logs.
+    match /entitlements/{document=**} {
+      allow read, write: if false;
+    }
+    match /usage/{document=**} {
+      allow read, write: if false;
+    }
+    match /usage_server/{document=**} {
+      allow read, write: if false;
+    }
+    match /stripe_events/{document=**} {
+      allow read, write: if false;
+    }
 
     // Default deny for all documents
     match /{document=**} {
