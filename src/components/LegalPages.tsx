@@ -72,9 +72,14 @@ export function TermsPage() {
           <li>A side-by-side chat to try those instructions: up to 50 messages a day, resets at midnight US Eastern.</li>
           <li>An untested model suggestion.</li>
         </ul>
-        <p id="interviews">
-          Each purchase includes two interviews (one interview and one retake). An interview counts as used when you accept its results (Keep, accept corrections, or choose a preset), or 6 hours after the AI's first reply if you don't finish. A started interview with no AI reply expires after 6 hours and does not count.
-        </p>
+        <div id="interviews">
+          <p>
+            Each purchase includes two interviews (one interview and one retake). An interview counts as used when you accept its results (Keep, accept corrections, or choose a preset), or 6 hours after the AI's first reply if you don't finish. A started interview with no AI reply expires after 6 hours and does not count.
+          </p>
+          <p>
+            If you retake the interview, your new results replace your saved results. We don't keep the earlier set for you.
+          </p>
+        </div>
         <p>There is no downloadable report. Your results are shown in the app.</p>
       </Section>
       <Section heading="All sales are final">

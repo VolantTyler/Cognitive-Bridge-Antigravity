@@ -9,6 +9,7 @@ import { Brain, User as UserIcon, Cpu } from 'lucide-react';
 import { ModuleId, OceanScores, Message, ComparisonMessage } from './types';
 import { APP_VERSION_LABEL } from './appVersion';
 import { INITIAL_OCEAN, INITIAL_MIRROR_MESSAGE } from './constants';
+import { shouldPersistInterviewDraft } from './access/interviewDraft';
 import Mirror from './components/Mirror';
 import Tailor from './components/Tailor';
 import Playground from './components/Playground';
@@ -23,6 +24,7 @@ import { completeInterview, loadAccessStatus, readStoredReservation, reserveInte
 import { canUseLiveChat, canUseLiveInterview, interpretCheckoutResponse, phaseAfterUnlock, resolveSurface, ProductSurface } from './access/productAccess';
 import AccessFlow from './components/AccessFlow';
 import InterviewsUsedNotice from './components/InterviewsUsedNotice';
+import RetakeStartControl from './components/RetakeStartControl';
 import { logProductEvent } from './services/productAnalytics';
 import {
   CONTINUE_RESULTS,
@@ -30,7 +32,6 @@ import {
   INTERVIEWS_LEFT,
   LEGACY_BANNER,
   PAYWALL_BUTTON,
-  START_RETAKE,
   VIEW_RESULTS,
 } from './constants/paywallCopy';
 import { AiAccessError } from './services/aiAccess';
@@ -251,8 +252,14 @@ export default function App() {
     saveToCloud(newScores, mirrorMessages, playgroundMessages, 'tailor');
   };
 
+  const retakeDraftOpen = !shouldPersistInterviewDraft({
+    inProgress: access?.inProgress === true,
+    interviewsCompleted: access?.interviewsCompleted ?? 0,
+  });
+
   const handleMirrorSave = (updatedMirrorMessages: Message[]) => {
     setMirrorMessages(updatedMirrorMessages);
+    if (retakeDraftOpen) return;
     saveToCloud(scores, updatedMirrorMessages, playgroundMessages, activeModule);
   };
 
@@ -336,6 +343,18 @@ export default function App() {
       navigate('view=paywall');
     }
   };
+
+  const draftedRetake = useRef(false);
+  useEffect(() => {
+    const holding = access?.inProgress === true && (access?.interviewsCompleted ?? 0) > 0;
+    if (!holding) {
+      draftedRetake.current = false;
+      return;
+    }
+    if (draftedRetake.current) return;
+    draftedRetake.current = true;
+    setMirrorMessages([{ role: 'model', content: INITIAL_MIRROR_MESSAGE }]);
+  }, [access?.inProgress, access?.interviewsCompleted]);
 
   useEffect(() => {
     if (!authReady) return;
@@ -637,9 +656,20 @@ export default function App() {
       {access?.paid && (
         <div role="status" className="border-b border-border-primary bg-bg-secondary px-6 py-3 text-sm text-text-secondary flex flex-wrap items-center gap-3">
           <span>{INTERVIEWS_LEFT} {access.interviewsRemaining} of 2.</span>
-          {scores && <button type="button" className="min-h-11 underline" onClick={() => setActiveModule('tailor')}>{CONTINUE_RESULTS}</button>}
+          {access.interviewsRemaining > 0 && scores && (
+            <button type="button" className="min-h-11 underline" onClick={() => setActiveModule('tailor')}>{CONTINUE_RESULTS}</button>
+          )}
           {access.interviewsCompleted > 0 && access.interviewsRemaining > 0 && (
-            <button type="button" className="min-h-11 underline" onClick={() => { void beginInterview(); }}>{START_RETAKE}</button>
+            <RetakeStartControl onRetake={() => { void beginInterview(); }} />
+          )}
+          {access.interviewsRemaining === 0 && !access.inProgress && scores && (
+            <button
+              type="button"
+              className="inline-flex min-h-11 items-center rounded-lg bg-button-brand px-4 text-sm font-semibold text-white"
+              onClick={() => setActiveModule('tailor')}
+            >
+              {VIEW_RESULTS}
+            </button>
           )}
           {access.interviewsRemaining === 0 && !access.inProgress && <InterviewsUsedNotice />}
         </div>

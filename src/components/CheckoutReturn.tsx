@@ -34,6 +34,7 @@ import {
   SUCCESS_RECEIPT,
   AI_DISCLOSURE,
   INTERVIEW_COUNT_LINE,
+  RETAKE_REPLACES_RESULTS,
 } from "../constants/paywallCopy";
 import SiteFooter from "./SiteFooter";
 
@@ -157,6 +158,7 @@ export function CheckoutReturn({
             <h2 className="text-lg font-semibold text-text-primary">{SUCCESS_READY}</h2>
             <p>{SUCCESS_INTERVIEWS}</p>
             <p>{INTERVIEW_COUNT_LINE}</p>
+            <p>{RETAKE_REPLACES_RESULTS}</p>
             <p>{SUCCESS_CHAT}</p>
             <p>{SUCCESS_ESTIMATE}</p>
             <p>{SUCCESS_PRODUCT}</p>

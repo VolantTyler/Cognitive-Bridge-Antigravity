@@ -56,8 +56,15 @@ export const PAYWALL_TITLE = "Unlock your personal interview";
 
 export const PAYWALL_PRICE = "$6 one-time, no subscription";
 
+export const RETAKE_REPLACES_RESULTS = "A retake replaces your saved results.";
+
+export const RETAKE_START_WARNING = "Retaking replaces your current results. You can't get them back.";
+
+export const TERMS_RETAKE_REPLACES =
+  "If you retake the interview, your new results replace your saved results. We don't keep the earlier set for you.";
+
 export const PAYWALL_INCLUSIONS = [
-  "Two interviews: your first, plus one retake.",
+  "Two interviews: your first, plus one retake. A retake replaces your saved results.",
   "Estimated scores on five broad personality traits, and AI instructions written from them",
   "A side-by-side chat to try them, up to 50 messages a day (resets at midnight US Eastern)",
   "An untested model suggestion",
@@ -66,7 +73,7 @@ export const PAYWALL_INCLUSIONS = [
 export const INTERVIEW_COUNT_LINE =
   "An interview counts once you accept your results, or 6 hours after the AI first replies if you leave it unfinished. If the AI never replies, it doesn't count.";
 
-export const INTERVIEW_COUNT_LINK = "See what counts as an interview";
+export const INTERVIEW_COUNT_LINK = "What counts as an interview";
 
 export const INTERVIEW_COUNT_HREF = "/terms#interviews";
 
