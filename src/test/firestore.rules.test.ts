@@ -27,10 +27,10 @@ afterAll(async () => {
   await testEnv?.cleanup();
 });
 
-const locked = ["entitlements", "usage", "usage_server", "stripe_events"] as const;
+const locked = ["entitlements", "usage", "usage_server", "stripe_events", "daily_cost"] as const;
 
 describe("server-only Firestore collections", () => {
-  test("a signed-in client cannot read or write entitlements, usage, usage_server, or stripe_events", async () => {
+  test("a signed-in client cannot read or write entitlements, usage, usage_server, stripe_events, or daily_cost", async () => {
     await testEnv.withSecurityRulesDisabled(async (context) => {
       const db = context.firestore();
       for (const name of locked) {

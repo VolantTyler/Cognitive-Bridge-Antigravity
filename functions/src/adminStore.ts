@@ -1,6 +1,7 @@
 import type { Firestore } from "firebase-admin/firestore";
-import { GateError, nextBridgeUsage } from "./gate";
+import { GateError, nextBridgeUsage, usEasternDay } from "./gate";
 import { UsageRecord } from "./usageLog";
+import { costMicrosForUsage } from "./pricing";
 
 export const DEFAULT_FIRESTORE_DATABASE_ID =
   "ai-studio-10d489d8-3b32-488a-9698-e415f2608028";
@@ -57,6 +58,32 @@ export async function writeUsageRecord(record: UsageRecord): Promise<void> {
     completionTokens: record.completionTokens,
     ts: record.ts ?? FieldValue.serverTimestamp(),
   });
+}
+
+export async function readDailyCostMicros(uid: string, day: string): Promise<number> {
+  const db = await adminFirestore();
+  const snap = await db.collection("daily_cost").doc(uid).collection("days").doc(day).get();
+  if (!snap.exists) return 0;
+  const value = snap.get("usdMicros");
+  return typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0;
+}
+
+/**
+ * Adds this call's priced cost onto daily_cost/{uid}/days/{easternDay}.
+ * Uses FieldValue.increment. A concurrent call can pass the pre-check
+ * before this write lands, so the total can overshoot the cap slightly.
+ */
+export async function addDailyCostFromUsage(record: UsageRecord, now: Date = new Date()): Promise<void> {
+  const micros = costMicrosForUsage(record);
+  if (micros <= 0 || !record.uid) return;
+  const { FieldValue } = await import("firebase-admin/firestore");
+  const db = await adminFirestore();
+  const day = usEasternDay(now);
+  await db.collection("daily_cost").doc(record.uid).collection("days").doc(day).set({
+    usdMicros: FieldValue.increment(micros),
+    day,
+    uid: record.uid,
+  }, { merge: true });
 }
 
 export async function verifyAppCheckToken(token: string): Promise<void> {

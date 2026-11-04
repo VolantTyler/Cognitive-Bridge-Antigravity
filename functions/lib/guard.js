@@ -91,6 +91,10 @@ async function guardChat(req, deps) {
     if ((0, gate_1.inputCharCount)(body.messages, body.systemInstruction) > config.maxInputChars) {
         throw (0, gate_1.inputTooLongError)();
     }
+    // Allowlist skips entitlements only. The dollar cap applies to every signed-in uid.
+    if (user) {
+        await deps.assertUnderCostCap(user.uid, (0, gate_1.usEasternDay)(deps.now()), config.dailyUserCostCapUsd);
+    }
     if (user && (0, gate_1.isBridgeChatFeature)(feature)) {
         await deps.reserveBridgeChat(user.uid, (0, gate_1.usEasternDay)(deps.now()), config.bridgeDailyCap);
     }
@@ -117,6 +121,9 @@ async function guardJudge(req, deps) {
     if (config.interviewsPaused && (0, gate_1.isInterviewFeature)(feature)) {
         throw (0, gate_1.interviewsPausedError)();
     }
+    if (user) {
+        await deps.assertUnderCostCap(user.uid, (0, gate_1.usEasternDay)(deps.now()), config.dailyUserCostCapUsd);
+    }
     return {
         uid: user?.uid ?? null,
         email: user?.email ?? null,
@@ -139,6 +146,12 @@ function defaultGuardDeps(overrides = {}) {
         reserveBridgeChat: async (uid, day, cap) => {
             const { reserveBridgeChatSlot } = await Promise.resolve().then(() => __importStar(require("./adminStore")));
             return reserveBridgeChatSlot(uid, day, cap);
+        },
+        assertUnderCostCap: async (uid, day, capUsd) => {
+            const { readDailyCostMicros } = await Promise.resolve().then(() => __importStar(require("./adminStore")));
+            const { assertUnderDailyCostCap } = await Promise.resolve().then(() => __importStar(require("./dailyCost")));
+            const spentMicros = await readDailyCostMicros(uid, day);
+            await assertUnderDailyCostCap({ spentMicros, capUsd });
         },
         reserveInterview: gate_1.reserveInterviewSlot,
         verifyAppCheck: async (token) => {

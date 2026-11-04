@@ -5,7 +5,7 @@ import { handleChat, GeminiClient } from "./chatHandler";
 import { handleJudge } from "./judgeHandler";
 import { defaultGuardDeps, guardChat, guardJudge } from "./guard";
 import { loadGateConfig } from "./params";
-import { writeUsageRecord } from "./adminStore";
+import { writeUsageRecord, addDailyCostFromUsage } from "./adminStore";
 import { UsageRecord } from "./usageLog";
 
 const ai = new GoogleGenAI({
@@ -21,6 +21,11 @@ async function logUsage(record: UsageRecord): Promise<void> {
     await writeUsageRecord(record);
   } catch {
     console.error("usage_server write failed");
+  }
+  try {
+    await addDailyCostFromUsage(record);
+  } catch {
+    console.error("daily cost increment failed");
   }
 }
 

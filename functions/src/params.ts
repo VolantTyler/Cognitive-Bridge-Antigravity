@@ -1,6 +1,7 @@
 import { defineInt, defineString } from "firebase-functions/params";
 import {
   DEFAULT_BRIDGE_CHAT_DAILY_CAP,
+  DEFAULT_DAILY_USER_COST_CAP_USD,
   DEFAULT_MAX_INPUT_CHARS,
 } from "./accessCopy";
 import { GateConfig, configFromEnv } from "./gate";
@@ -26,10 +27,15 @@ const interviewsPaused = defineString("INTERVIEWS_PAUSED", {
 });
 
 // Request count is two per Bridge turn (aligned + unaligned).
-// Default 100 requests is about 50 turns. Copy still says "50 messages".
+// Default 100 requests is about 50 turns. Copy still says "up to 50 messages a day".
 const bridgeDailyCap = defineInt("BRIDGE_CHAT_DAILY_CAP", {
   default: DEFAULT_BRIDGE_CHAT_DAILY_CAP,
   description: "Max bridge chatProxy requests per uid per US Eastern day. Default 100 is about 50 turns (two requests per turn: aligned and unaligned).",
+});
+
+const dailyUserCostCapUsd = defineString("DAILY_USER_COST_CAP_USD", {
+  default: String(DEFAULT_DAILY_USER_COST_CAP_USD),
+  description: "Max estimated USD per uid per US Eastern day. Default 1.00. Placeholder prices; retune after test interviews. Not shown to users.",
 });
 
 const maxInputChars = defineInt("MAX_INPUT_CHARS", {
@@ -57,6 +63,10 @@ export function loadGateConfig(env: NodeJS.ProcessEnv = process.env): GateConfig
     BRIDGE_CHAT_DAILY_CAP: paramOrEnv(
       env.BRIDGE_CHAT_DAILY_CAP,
       () => String(bridgeDailyCap.value())
+    ),
+    DAILY_USER_COST_CAP_USD: paramOrEnv(
+      env.DAILY_USER_COST_CAP_USD,
+      () => dailyUserCostCapUsd.value()
     ),
     MAX_INPUT_CHARS: paramOrEnv(env.MAX_INPUT_CHARS, () => String(maxInputChars.value())),
   });

@@ -25,6 +25,7 @@ export interface GuardDeps {
   verifyIdToken: TokenVerifier;
   readPaid: (uid: string) => Promise<boolean>;
   reserveBridgeChat: (uid: string, day: string, cap: number) => Promise<void>;
+  assertUnderCostCap: (uid: string, day: string, capUsd: number) => Promise<void>;
   reserveInterview: (uid: string, feature: string) => Promise<void>;
   verifyAppCheck: (token: string) => Promise<void>;
   now: () => Date;
@@ -95,6 +96,10 @@ export async function guardChat(req: GuardRequest, deps: GuardDeps): Promise<Gua
     throw inputTooLongError();
   }
 
+  // Allowlist skips entitlements only. The dollar cap applies to every signed-in uid.
+  if (user) {
+    await deps.assertUnderCostCap(user.uid, usEasternDay(deps.now()), config.dailyUserCostCapUsd);
+  }
   if (user && isBridgeChatFeature(feature)) {
     await deps.reserveBridgeChat(user.uid, usEasternDay(deps.now()), config.bridgeDailyCap);
   }
@@ -123,6 +128,9 @@ export async function guardJudge(req: GuardRequest, deps: GuardDeps): Promise<Gu
   if (config.interviewsPaused && isInterviewFeature(feature)) {
     throw interviewsPausedError();
   }
+  if (user) {
+    await deps.assertUnderCostCap(user.uid, usEasternDay(deps.now()), config.dailyUserCostCapUsd);
+  }
   return {
     uid: user?.uid ?? null,
     email: user?.email ?? null,
@@ -146,6 +154,12 @@ export function defaultGuardDeps(overrides: Partial<GuardDeps> = {}): GuardDeps 
     reserveBridgeChat: async (uid: string, day: string, cap: number) => {
       const { reserveBridgeChatSlot } = await import("./adminStore");
       return reserveBridgeChatSlot(uid, day, cap);
+    },
+    assertUnderCostCap: async (uid: string, day: string, capUsd: number) => {
+      const { readDailyCostMicros } = await import("./adminStore");
+      const { assertUnderDailyCostCap } = await import("./dailyCost");
+      const spentMicros = await readDailyCostMicros(uid, day);
+      await assertUnderDailyCostCap({ spentMicros, capUsd });
     },
     reserveInterview: reserveInterviewSlot,
     verifyAppCheck: async (token: string) => {

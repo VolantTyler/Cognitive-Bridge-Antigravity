@@ -72,6 +72,7 @@ function deps(env: NodeJS.ProcessEnv, overrides: Partial<GuardDeps> = {}): Guard
       await reserveBridgeChatSlot(uid, day, cap);
     }),
     reserveInterview: vi.fn(async () => {}),
+    assertUnderCostCap: vi.fn(async () => {}),
     verifyAppCheck: vi.fn(async () => {}),
     now: () => new Date("2026-11-05T15:00:00.000Z"),
     ...overrides,
@@ -139,6 +140,20 @@ describe("guard modes", () => {
     }, allowlisted);
     expect(skipped.uid).toBe("user-1");
     expect(allowlisted.readPaid).not.toHaveBeenCalled();
+  });
+
+  it("applies the dollar cap to allowlisted uids and does not spend a bridge slot when blocked", async () => {
+    const assertUnderCostCap = vi.fn(async () => {
+      throw new GateError(429, "cost_cap_reached", "You've reached today's chat limit. It resets at midnight US Eastern.");
+    });
+    const gate = deps({ AI_GATE_MODE: "paid", AI_ALLOWLIST_UIDS: "user-1" }, { assertUnderCostCap });
+    await expect(guardChat({
+      method: "POST",
+      headers: { authorization: "Bearer token" },
+      body: chatBody,
+    }, gate)).rejects.toMatchObject({ status: 429, code: "cost_cap_reached" });
+    expect(gate.reserveBridgeChat).not.toHaveBeenCalled();
+    expect(gate.readPaid).not.toHaveBeenCalled();
   });
 
   it("off mode skips auth and the daily cap", async () => {

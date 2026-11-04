@@ -72,6 +72,14 @@ function parsePositiveInt(raw, fallback) {
         return fallback;
     return Math.floor(parsed);
 }
+function parsePositiveUsd(raw, fallback) {
+    if (raw === undefined || raw.trim() === "")
+        return fallback;
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed) || parsed <= 0)
+        return fallback;
+    return parsed;
+}
 function configFromEnv(env = process.env) {
     return {
         mode: parseGateMode(env.AI_GATE_MODE),
@@ -80,6 +88,7 @@ function configFromEnv(env = process.env) {
         interviewsPaused: parseFlag(env.INTERVIEWS_PAUSED, false),
         bridgeDailyCap: parsePositiveInt(env.BRIDGE_CHAT_DAILY_CAP, accessCopy_1.DEFAULT_BRIDGE_CHAT_DAILY_CAP),
         maxInputChars: parsePositiveInt(env.MAX_INPUT_CHARS, accessCopy_1.DEFAULT_MAX_INPUT_CHARS),
+        dailyUserCostCapUsd: parsePositiveUsd(env.DAILY_USER_COST_CAP_USD, accessCopy_1.DEFAULT_DAILY_USER_COST_CAP_USD),
     };
 }
 function usEasternDay(date, timeZone = accessCopy_1.CHAT_CAP_RESET_TIME_ZONE) {

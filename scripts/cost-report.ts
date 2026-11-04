@@ -7,26 +7,13 @@
  *
  *   npx tsx scripts/cost-report.ts
  *
- * Prices in scripts/pricing.json are placeholders. Verify them before a go/no-go.
+ * Prices live in functions/src/pricing.ts (placeholders). Verify them before a go/no-go.
  */
 
 import { createRequire } from "node:module";
-import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-
-export interface PriceRow {
-  inputPerMillionUsd: number;
-  outputPerMillionUsd: number;
-  perCallUsd?: number;
-}
-
-export interface PricingTable {
-  placeholder?: boolean;
-  comment?: string;
-  models: Record<string, PriceRow>;
-  default: PriceRow;
-}
+import { PRICING, costUsdForUsage, type PricingTable } from "../functions/src/pricing";
 
 export interface UsageRow {
   sessionId?: string | null;
@@ -47,8 +34,12 @@ export interface SessionCostSummary {
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
-export function loadPricing(filePath = path.join(HERE, "pricing.json")): PricingTable {
-  return JSON.parse(readFileSync(filePath, "utf8")) as PricingTable;
+export function loadPricing(): PricingTable {
+  return PRICING;
+}
+
+export function costForRow(row: UsageRow, table: PricingTable = PRICING): number {
+  return costUsdForUsage(row, table);
 }
 
 export function percentile(sorted: number[], p: number): number {
@@ -58,15 +49,6 @@ export function percentile(sorted: number[], p: number): number {
   const high = Math.ceil(rank);
   if (low === high) return sorted[low];
   return sorted[low] * (high - rank) + sorted[high] * (rank - low);
-}
-
-export function costForRow(row: UsageRow, table: PricingTable): number {
-  const price = (row.model && table.models[row.model]) || table.default;
-  const prompt = finite(row.promptTokens);
-  const completion = finite(row.completionTokens);
-  return (prompt / 1_000_000) * price.inputPerMillionUsd
-    + (completion / 1_000_000) * price.outputPerMillionUsd
-    + (price.perCallUsd ?? 0);
 }
 
 export function summarizeSessions(rows: UsageRow[], table: PricingTable): SessionCostSummary {
@@ -98,7 +80,7 @@ export function summarizeSessions(rows: UsageRow[], table: PricingTable): Sessio
 export function formatSummary(summary: SessionCostSummary, placeholder: boolean): string {
   const money = (value: number) => value.toFixed(4);
   const lines = [
-    placeholder ? "Prices are PLACEHOLDERS. Verify scripts/pricing.json before any go/no-go." : "Prices loaded from scripts/pricing.json.",
+    placeholder ? "Prices are PLACEHOLDERS. Verify functions/src/pricing.ts before any go/no-go." : "Prices loaded from functions/src/pricing.ts.",
     `Sessions: ${summary.sessionCount}`,
     `Rows skipped (no sessionId): ${summary.skippedWithoutSession}`,
     `Median tokens per session: ${summary.medianTokens.toFixed(1)}`,

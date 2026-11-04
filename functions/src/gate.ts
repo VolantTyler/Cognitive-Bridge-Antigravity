@@ -1,6 +1,7 @@
 import {
   CHAT_CAP_RESET_TIME_ZONE,
   DEFAULT_BRIDGE_CHAT_DAILY_CAP,
+  DEFAULT_DAILY_USER_COST_CAP_USD,
   DEFAULT_MAX_INPUT_CHARS,
   dailyCapMessage,
   AI_ACCESS_MESSAGES,
@@ -33,6 +34,7 @@ export interface GateConfig {
   interviewsPaused: boolean;
   bridgeDailyCap: number;
   maxInputChars: number;
+  dailyUserCostCapUsd: number;
 }
 
 const BRIDGE_CHAT_FEATURES = new Set([
@@ -75,6 +77,13 @@ function parsePositiveInt(raw: string | undefined, fallback: number): number {
   return Math.floor(parsed);
 }
 
+function parsePositiveUsd(raw: string | undefined, fallback: number): number {
+  if (raw === undefined || raw.trim() === "") return fallback;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+  return parsed;
+}
+
 export function configFromEnv(env: NodeJS.ProcessEnv = process.env): GateConfig {
   return {
     mode: parseGateMode(env.AI_GATE_MODE),
@@ -83,6 +92,7 @@ export function configFromEnv(env: NodeJS.ProcessEnv = process.env): GateConfig 
     interviewsPaused: parseFlag(env.INTERVIEWS_PAUSED, false),
     bridgeDailyCap: parsePositiveInt(env.BRIDGE_CHAT_DAILY_CAP, DEFAULT_BRIDGE_CHAT_DAILY_CAP),
     maxInputChars: parsePositiveInt(env.MAX_INPUT_CHARS, DEFAULT_MAX_INPUT_CHARS),
+    dailyUserCostCapUsd: parsePositiveUsd(env.DAILY_USER_COST_CAP_USD, DEFAULT_DAILY_USER_COST_CAP_USD),
   };
 }
 

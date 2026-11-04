@@ -149,6 +149,7 @@ describe('Gemini Service Unit Tests', () => {
         { status: 401, code: 'session_expired', access: 'session_ended' },
         { status: 402, code: 'payment_required', access: 'payment_required' },
         { status: 429, code: 'rate_limited', access: 'daily_cap' },
+        { status: 429, code: 'cost_cap_reached', access: 'cost_cap' },
         { status: 429, code: 'input_too_long', access: 'input_too_long' },
         { status: 503, code: 'interviews_paused', access: 'interviews_paused' },
       ];
