@@ -10,6 +10,9 @@ import { OceanScores, Message, ComparisonMessage } from '../types';
 import { generateAlignmentPrompt, generateInverseAlignmentPrompt, RESEARCH_FRAMING } from '../constants';
 import { chatWithGeminiStream, DEFAULT_GEMINI_MODEL } from '../services/gemini';
 import { AiAccessError } from '../services/aiAccess';
+import { CHAT_PAUSED_PLACEHOLDER } from '../constants/paywallCopy';
+import { AI_ACCESS_MESSAGES } from '../constants/aiAccess';
+import { logProductEvent } from '../services/productAnalytics';
 import { AlignmentJudgment } from '../jev/questions';
 import { judgeAlignment } from '../services/jev';
 import OceanCards from './OceanCards';
@@ -46,6 +49,9 @@ interface PlaygroundProps {
    * The app omits this and reads the committed run index.
    */
   modelMatch?: { state: ModelMatchState; retry: () => void };
+  /** Paid accounts can send. Legacy viewers keep history without a composer. */
+  liveChat?: boolean;
+  onChatCapHit?: () => void;
 }
 
 type ActiveAnalysis = { text: string; explanation: string; type: 'aligned' | 'unaligned' };
@@ -73,7 +79,20 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   });
 }
 
-export default function Playground({ scores, messages, setMessages, setScores, onSaveSession, modelMatch }: PlaygroundProps) {
+function defaultChatCapHit() {
+  logProductEvent('chat_cap_hit');
+}
+
+export default function Playground({
+  scores,
+  messages,
+  setMessages,
+  setScores,
+  onSaveSession,
+  modelMatch,
+  liveChat = true,
+  onChatCapHit = defaultChatCapHit,
+}: PlaygroundProps) {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [generationStatus, setGenerationStatus] = useState('Generating Aligned and Unaligned responses...');
@@ -93,6 +112,13 @@ export default function Playground({ scores, messages, setMessages, setScores, o
   const match = modelMatch ?? loadedMatch;
   const [leaderboardModel, setLeaderboardModel] = useState<string | undefined | null>(null);
   const [accessError, setAccessError] = useState<AiAccessError | null>(null);
+  const capLogged = useRef(false);
+  const chatPaused = accessError?.code === 'daily_cap';
+  useEffect(() => {
+    if (!chatPaused || capLogged.current) return;
+    capLogged.current = true;
+    onChatCapHit();
+  }, [chatPaused, onChatCapHit]);
   const leaderboardOpen = leaderboardModel !== null;
 
   const activateAnalysis = useCallback((analysis: ActiveAnalysis, sourceEl?: HTMLElement | null) => {
@@ -507,7 +533,10 @@ export default function Playground({ scores, messages, setMessages, setScores, o
 
           <div className="p-4 bg-bg-surface border-b border-border-primary transition-colors duration-300">
             <AiAccessNotice error={accessError} />
-            <div className="relative">
+            {!liveChat && (
+              <p role="status" className="text-sm text-text-secondary">{AI_ACCESS_MESSAGES.payment_required}</p>
+            )}
+            {liveChat && <div className="relative">
               <textarea
                 ref={inputRef}
                 value={input}
@@ -518,19 +547,20 @@ export default function Playground({ scores, messages, setMessages, setScores, o
                     handleSend();
                   }
                 }}
-                placeholder="Ask a question to compare Aligned vs Unaligned responses..."
-                className="w-full bg-bg-secondary border border-border-secondary text-text-primary placeholder-text-muted-dark rounded-xl py-4 px-6 pr-14 text-sm focus:outline-none focus:border-blue-500 transition-all resize-none h-[64px]"
+                placeholder={chatPaused ? CHAT_PAUSED_PLACEHOLDER : "Ask a question to compare Aligned vs Unaligned responses..."}
+                disabled={chatPaused}
+                className="w-full bg-bg-secondary border border-border-secondary text-text-primary placeholder-text-muted-dark rounded-xl py-4 px-6 pr-14 text-sm focus:outline-none focus:border-blue-500 transition-all resize-none h-[64px] disabled:opacity-60"
               />
               <button
                 onClick={handleSend}
-                disabled={isLoading || !input.trim()}
+                disabled={isLoading || !input.trim() || chatPaused}
                 aria-label="Send prompt"
                 className="absolute right-3 bottom-3 p-2 bg-button-brand hover:bg-button-brand-hover disabled:opacity-50 transition-all rounded-lg shadow-lg shadow-orange-600/20 cursor-pointer"
               >
                 <Send className="w-4 h-4 text-white" />
               </button>
-            </div>
-            <div className="mt-3">
+            </div>}
+            {liveChat && <div className="mt-3">
               <div className="text-[10px] uppercase font-bold tracking-widest text-text-secondary mb-2">
                 Example questions
               </div>
@@ -540,7 +570,7 @@ export default function Playground({ scores, messages, setMessages, setScores, o
                     key={example.label}
                     type="button"
                     onClick={() => submitPrompt(example.prompt)}
-                    disabled={isLoading}
+                    disabled={isLoading || chatPaused}
                     title={example.prompt}
                     className="p-3 rounded-xl border border-border-card bg-bg-secondary/60 hover:bg-bg-tertiary hover:border-accent-orange text-left transition-all disabled:opacity-50 group cursor-pointer"
                   >
@@ -550,7 +580,7 @@ export default function Playground({ scores, messages, setMessages, setScores, o
                   </button>
                 ))}
               </div>
-            </div>
+            </div>}
           </div>
 
           <div className="grid grid-cols-2 bg-bg-surface border-b border-border-primary transition-colors duration-300">

@@ -1,4 +1,5 @@
 import { verifyBearerToken, TokenVerifier } from "./auth";
+import { reserveInterviewForChat } from "./interviewStore";
 import { isRequestableModel, normalizeModelName } from "./modelRouter";
 import {
   GateConfig,
@@ -14,7 +15,6 @@ import {
   isInterviewFeature,
   paymentRequiredError,
   readHeader,
-  reserveInterviewSlot,
   sanitizeFeature,
   sanitizeSessionId,
   usEasternDay,
@@ -161,7 +161,7 @@ export function defaultGuardDeps(overrides: Partial<GuardDeps> = {}): GuardDeps 
       const spentMicros = await readDailyCostMicros(uid, day);
       await assertUnderDailyCostCap({ spentMicros, capUsd });
     },
-    reserveInterview: reserveInterviewSlot,
+    reserveInterview: reserveInterviewForChat,
     verifyAppCheck: async (token: string) => {
       const { verifyAppCheckToken } = await import("./adminStore");
       return verifyAppCheckToken(token);

@@ -18,7 +18,9 @@ describe("daily dollar cap", () => {
       message: costCapMessage(),
     });
     expect(isDailyCostCapped(1_000_000, 1)).toBe(true);
-    expect(costCapReachedError().message).toBe("You've reached today's chat limit. It resets at midnight US Eastern.");
+    expect(costCapReachedError().message).toBe(
+      "You've reached today's usage limit. It resets at midnight US Eastern. Your results are still here."
+    );
     expect(costCapMessage()).not.toMatch(/dollar|cost|\$/i);
   });
 

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { guardChat, guardJudge, GuardDeps } from "./guard";
 import { GateError, configFromEnv } from "./gate";
-import { AI_ACCESS_MESSAGES } from "./accessCopy";
+import { AI_ACCESS_MESSAGES, costCapMessage, dailyCapMessage } from "./accessCopy";
 
 const memory = vi.hoisted(() => ({
   store: new Map<string, Record<string, unknown>>(),
@@ -117,6 +117,7 @@ describe("guard modes", () => {
       headers: { authorization: "Bearer token" },
       body: chatBody,
     }, unpaid)).rejects.toMatchObject({ status: 402, code: "payment_required", message: AI_ACCESS_MESSAGES.payment_required });
+    expect(unpaid.reserveInterview).not.toHaveBeenCalled();
 
     readPaid.mockResolvedValueOnce(true);
     const paid = await guardChat({
@@ -142,9 +143,51 @@ describe("guard modes", () => {
     expect(allowlisted.readPaid).not.toHaveBeenCalled();
   });
 
+  it("paid mode lets the interview counter reject a third run", async () => {
+    const reserveInterview = vi.fn(async () => {
+      throw new GateError(429, "interviews_exhausted", AI_ACCESS_MESSAGES.interviews_exhausted);
+    });
+    const gate = deps({ AI_GATE_MODE: "paid" }, {
+      readPaid: async () => true,
+      reserveInterview,
+    });
+    await expect(guardChat({
+      method: "POST",
+      headers: { authorization: "Bearer token" },
+      body: { messages: [{ content: "hi" }], feature: "mirror" },
+    }, gate)).rejects.toMatchObject({
+      status: 429,
+      code: "interviews_exhausted",
+      message: AI_ACCESS_MESSAGES.interviews_exhausted,
+    });
+    expect(reserveInterview).toHaveBeenCalledWith("user-1", "mirror");
+  });
+
+  it("applies the dollar cap to interview and judge calls, not only bridge chat", async () => {
+    const assertUnderCostCap = vi.fn(async () => {
+      throw new GateError(429, "cost_cap_reached", costCapMessage());
+    });
+    const gate = deps({ AI_GATE_MODE: "paid" }, { readPaid: async () => true, assertUnderCostCap });
+    await expect(guardChat({
+      method: "POST",
+      headers: { authorization: "Bearer token" },
+      body: { messages: [{ content: "hi" }], feature: "mirror" },
+    }, gate)).rejects.toMatchObject({ status: 429, code: "cost_cap_reached", message: costCapMessage() });
+    await expect(guardJudge({
+      method: "POST",
+      headers: { authorization: "Bearer token" },
+      body: { feature: "judge" },
+    }, gate)).rejects.toMatchObject({ code: "cost_cap_reached", message: costCapMessage() });
+    expect(costCapMessage()).toBe(
+      "You've reached today's usage limit. It resets at midnight US Eastern. Your results are still here."
+    );
+    expect(dailyCapMessage()).toMatch(/chat limit/);
+    expect(costCapMessage()).not.toMatch(/chat limit/);
+  });
+
   it("applies the dollar cap to allowlisted uids and does not spend a bridge slot when blocked", async () => {
     const assertUnderCostCap = vi.fn(async () => {
-      throw new GateError(429, "cost_cap_reached", "You've reached today's chat limit. It resets at midnight US Eastern.");
+      throw new GateError(429, "cost_cap_reached", costCapMessage());
     });
     const gate = deps({ AI_GATE_MODE: "paid", AI_ALLOWLIST_UIDS: "user-1" }, { assertUnderCostCap });
     await expect(guardChat({

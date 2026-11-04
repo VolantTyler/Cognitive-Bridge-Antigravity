@@ -40,6 +40,7 @@ async function grant(snapshot, uid, deps) {
         disputeId: existing?.disputeId ?? null,
     };
     await deps.store.writeEntitlement(uid, state, { paidAt: true });
+    deps.logger.info("analytics checkout_completed");
     await deps.store.writeCheckoutRecord({
         ...baseRecord(snapshot, uid),
         outcome: "granted",
@@ -63,6 +64,7 @@ async function refundNonUs(snapshot, uid, deps) {
     }
     try {
         await deps.refunds.refundNonUs(paymentIntentId, snapshot.id);
+        deps.logger.info("analytics refund_issued reason=non_us");
         await deps.store.writeCheckoutRecord({
             ...record,
             outcome: "non_us_refunded",
@@ -71,6 +73,7 @@ async function refundNonUs(snapshot, uid, deps) {
     }
     catch (error) {
         if ((0, checkoutTypes_1.isAlreadyRefundedError)(error)) {
+            deps.logger.info("analytics refund_issued reason=non_us");
             await deps.store.writeCheckoutRecord({
                 ...record,
                 outcome: "non_us_refunded",
@@ -201,10 +204,12 @@ async function onChargeRefunded(charge, deps) {
         return;
     }
     await revokePaymentIntent(uid, charge.paymentIntentId, deps);
+    deps.logger.info("analytics refund_issued reason=unspecified");
 }
 async function onDisputeOpened(dispute, deps) {
     const uid = await uidForPaymentIntent(dispute.paymentIntentId, dispute.metadataUid, deps);
     deps.logger.error(`dispute_opened dispute=${dispute.id || "unknown"} uid=${uid ?? "unknown"}`);
+    deps.logger.info("analytics dispute_opened");
     if (!uid)
         return;
     const existing = await deps.store.readEntitlement(uid);

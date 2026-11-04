@@ -153,6 +153,7 @@ describe('Gemini Service Unit Tests', () => {
         { status: 429, code: 'cost_cap_reached', access: 'cost_cap' },
         { status: 429, code: 'input_too_long', access: 'input_too_long' },
         { status: 503, code: 'interviews_paused', access: 'interviews_paused' },
+        { status: 429, code: 'interviews_exhausted', access: 'interviews_exhausted' },
       ];
       for (const item of cases) {
         mockFetch.mockReset();

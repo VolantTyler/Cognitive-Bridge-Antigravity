@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { APP_VERSION_LABEL } from "./appVersion";
 import { PrivacyPage, TermsPage } from "./components/LegalPages";
 import { StandaloneRoutes } from "./components/StandaloneRoutes";
+import { SUPPORT_EMAIL_PLACEHOLDER } from "./constants/checkoutCopy";
 import { parseLocation } from "./routes";
 
 describe("legal routes", () => {
@@ -28,7 +29,7 @@ describe("legal routes", () => {
     );
     expect(screen.getByRole("heading", { name: "Terms" })).toBeInTheDocument();
     expect(screen.getByText(/you must be 18 or older to buy/i)).toBeInTheDocument();
-    expect(screen.getByText("[SUPPORT EMAIL, pending Tyler]", { exact: false })).toBeInTheDocument();
+    expect(screen.getByText(SUPPORT_EMAIL_PLACEHOLDER, { exact: false })).toBeInTheDocument();
     expect(screen.getByText(
       "[GOVERNING LAW / LEGAL CHECK, pending Tyler] New Jersey law governs these terms."
     )).toBeInTheDocument();
@@ -41,6 +42,11 @@ describe("legal routes", () => {
     expect(screen.getByText(
       /basic usage events \(for example, which section you open or when you sign in\)/
     )).toBeInTheDocument();
+    const interviews = screen.getByRole("heading", { name: "Interviews" });
+    expect(interviews).toHaveAttribute("id", "interviews");
+    expect(interviews.parentElement?.textContent).toContain(
+      "Each purchase includes two interviews (one interview and one retake). An interview counts as used when you accept its results (Keep, accept corrections, or choose a preset), or 6 hours after the AI's first reply if you don't finish. A started interview with no AI reply expires after 6 hours and does not count."
+    );
     expect(screen.queryByRole("heading", { name: "The Mirror" })).not.toBeInTheDocument();
     expect(screen.getByRole("navigation", { name: "Legal" })).toHaveTextContent(
       `${APP_VERSION_LABEL} · Terms · Privacy`
@@ -56,6 +62,8 @@ describe("legal routes", () => {
     expect(screen.getByText(/There is no consent step/)).toBeInTheDocument();
     expect(screen.getByText(/sets cookies/)).toBeInTheDocument();
     expect(screen.getByText(/sends usage data to Google/)).toBeInTheDocument();
+    expect(screen.getByText(/starting checkout, starting or finishing an interview, hitting the chat limit/)).toBeInTheDocument();
+    expect(screen.getByText(/We've set the app not to send your email, name, or chat messages in these events/)).toBeInTheDocument();
     expect(screen.getAllByText(/email and password/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Stripe/).length).toBeGreaterThan(0);
     expect(screen.getByText(
@@ -67,10 +75,10 @@ describe("legal routes", () => {
     expect(screen.getByText(
       /Stripe receives your account email \(we fill it in for you\), and the name, billing address and card details you enter there, and emails your receipt\./
     )).toBeInTheDocument();
-    expect(screen.getAllByText(/\[SUPPORT EMAIL, pending Tyler\]/).length).toBeGreaterThan(1);
+    expect(screen.getAllByText(SUPPORT_EMAIL_PLACEHOLDER, { exact: false }).length).toBeGreaterThan(1);
     const deletion = screen.getByRole("heading", { name: "Requesting deletion" }).closest("section");
     expect(deletion?.textContent ?? "").toContain(
-      "To ask us to delete your account data, email [SUPPORT EMAIL, pending Tyler]. We'll review and process your request. We may keep payment records."
+      `To ask us to delete your account data, email ${SUPPORT_EMAIL_PLACEHOLDER}. We'll review and process your request. We may keep payment records.`
     );
     expect(deletion?.textContent ?? "").not.toMatch(/within \d+|by hand/i);
     expect(screen.queryByText(/team only/i)).not.toBeInTheDocument();
@@ -85,6 +93,9 @@ describe("legal routes", () => {
       "/api/checkout/restore",
       "/api/checkout/status",
       "/api/stripe/webhook",
+      "/api/access",
+      "/api/interview/reserve",
+      "/api/interview/complete",
     ]));
   });
 

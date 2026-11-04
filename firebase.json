@@ -53,6 +53,18 @@
         "function": "stripeWebhook"
       },
       {
+        "source": "/api/access",
+        "function": "accessStatus"
+      },
+      {
+        "source": "/api/interview/reserve",
+        "function": "reserveInterviewSlot"
+      },
+      {
+        "source": "/api/interview/complete",
+        "function": "completeInterview"
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }

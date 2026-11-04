@@ -46,6 +46,8 @@ export interface ChatDeps {
   guard: (req: GuardRequest) => Promise<GuardContext>;
   ai: GeminiClient;
   logUsage: (record: UsageRecord) => Promise<void>;
+  /** Set after a provider accepts the interview call. Failures before that do not count. */
+  markInterviewStarted?: (ctx: GuardContext) => Promise<void>;
 }
 
 function sendTerminalError(res: HttpResponse, failures: ModelFailure[], error: unknown) {
@@ -73,6 +75,15 @@ function sendGate(res: HttpResponse, error: GateError) {
   if (res.headersSent) return;
   console.warn(`chatProxy denied code=${error.code}`);
   res.status(error.status).json({ error: error.message, code: error.code });
+}
+
+async function noteInterviewStarted(deps: ChatDeps, ctx: GuardContext) {
+  if (!deps.markInterviewStarted || !ctx.uid) return;
+  try {
+    await deps.markInterviewStarted(ctx);
+  } catch {
+    console.error("interview start mark failed");
+  }
 }
 
 async function safeLog(deps: ChatDeps, ctx: GuardContext, model: string, promptTokens: number, completionTokens: number) {
@@ -148,6 +159,8 @@ export async function handleChat(req: GuardRequest, res: HttpResponse, deps: Cha
         sendTerminalError(res, failures, new Error("No Gemini model accepted the stream."));
         return;
       }
+
+      await noteInterviewStarted(deps, ctx);
 
       res.writeHead(200, {
         "Content-Type": "text/event-stream",
@@ -226,6 +239,7 @@ export async function handleChat(req: GuardRequest, res: HttpResponse, deps: Cha
       return;
     }
 
+    await noteInterviewStarted(deps, ctx);
     await safeLog(deps, ctx, activeModel, promptTokens, completionTokens);
     res.status(200).json({
       text: responseText,

@@ -6,7 +6,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { ACCOUNT_COPY } from '../constants/accountCopy';
-import { logAnalyticsEvent } from '../services/firebase';
+import { PAYWALL_AGE } from '../constants/paywallCopy';
+import { logProductEvent } from '../services/productAnalytics';
 import {
   AccountAuthClient,
   AccountEvent,
@@ -30,6 +31,7 @@ interface AccountAuthPanelProps {
   isOpen: boolean;
   onClose: () => void;
   initialView?: 'sign-in' | 'verify';
+  embedded?: boolean;
   client?: AccountAuthClient;
   onSignedIn?: (user: AccountUser) => void;
   onAccountUpdated?: () => void;
@@ -47,10 +49,10 @@ const secondaryClass =
 
 function defaultLog(event: AccountEvent) {
   if (event.name === 'signin_started' || event.name === 'signin_completed') {
-    logAnalyticsEvent(event.name, { method: event.method });
+    logProductEvent(event.name, { method: event.method });
     return;
   }
-  logAnalyticsEvent(event.name);
+  logProductEvent(event.name);
 }
 
 export function VerifyEmailBanner({ onVerify }: { onVerify: () => void }) {
@@ -75,6 +77,7 @@ export default function AccountAuthPanel({
   isOpen,
   onClose,
   initialView = 'sign-in',
+  embedded = false,
   client: clientProp,
   onSignedIn,
   onAccountUpdated,
@@ -260,39 +263,45 @@ export default function AccountAuthPanel({
     !!pending.pendingPassword &&
     (pending.knownMethods === null || pending.knownMethods.includes('password'));
 
+  const Heading = embedded ? 'h1' : 'h2';
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+    <div className={embedded ? 'w-full' : 'fixed inset-0 z-50 flex items-center justify-center p-4'}>
+      {!embedded && <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />}
       <div
-        role="dialog"
-        aria-modal="true"
+        role={embedded ? 'region' : 'dialog'}
+        aria-modal={embedded ? undefined : true}
         aria-labelledby="account-auth-title"
         aria-describedby="account-auth-sub"
         data-account-view={view}
         className="w-full max-w-md rounded-2xl bg-bg-secondary border border-border-primary p-6 shadow-2xl relative z-10 transition-colors duration-300"
       >
         <div className="flex items-start justify-between gap-3 mb-4">
-          <h2
+          <Heading
             id="account-auth-title"
             ref={titleRef}
             tabIndex={-1}
             className="text-lg font-bold tracking-tight text-text-primary focus:outline-none focus:ring-2 focus:ring-orange-500 rounded"
           >
             {view === 'verify' ? ACCOUNT_COPY.verifyTitle : view === 'reset' ? ACCOUNT_COPY.resetTitle : ACCOUNT_COPY.title}
-          </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-surface transition-all cursor-pointer"
-            aria-label={ACCOUNT_COPY.close}
-          >
-            <X className="w-4 h-4" aria-hidden="true" />
-          </button>
+          </Heading>
+          {!embedded && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-surface transition-all cursor-pointer"
+              aria-label={ACCOUNT_COPY.close}
+            >
+              <X className="w-4 h-4" aria-hidden="true" />
+            </button>
+          )}
         </div>
 
         <p id="account-auth-sub" className="text-text-muted text-xs leading-relaxed mb-4">
           {description}
         </p>
+        {view === 'sign-up' && (
+          <p className="text-xs text-text-secondary mb-4">{PAYWALL_AGE}</p>
+        )}
 
         {error && (
           <p id="account-auth-error" role="alert" className="mb-4 p-3 bg-red-500/10 border border-red-500/20 text-status-danger rounded-xl text-xs">
