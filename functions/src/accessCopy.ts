@@ -13,9 +13,10 @@ export const CHAT_CAP_RESET_TIME_ZONE = "America/New_York";
 export const CHAT_CAP_RESET_LABEL = "midnight US Eastern";
 
 /**
- * User-facing sentence stays "50 messages". The server counts requests.
- * Default is 100 requests, about 50 turns, because each Bridge turn makes
- * two chatProxy calls (aligned and unaligned).
+ * User-facing line is "up to 50 messages a day, resets at midnight US Eastern".
+ * "up to" stays because a retry can use an extra request. The server counts
+ * requests. Default is 100 requests, about 50 turns, because each Bridge
+ * turn makes two chatProxy calls (aligned and unaligned).
  */
 export const BRIDGE_CHAT_DAILY_MESSAGE_COPY = 50;
 export const DEFAULT_BRIDGE_CHAT_DAILY_CAP = 100;
@@ -33,9 +34,9 @@ export const AI_ACCESS_CODES = {
 
 export type AiAccessCode = (typeof AI_ACCESS_CODES)[keyof typeof AI_ACCESS_CODES];
 
-/** Fixed copy. Does not print the request cap (default 100). */
+/** Fixed copy. Does not print the request cap (default 100). "up to" stays because a retry can use an extra request. */
 export function dailyCapMessage(): string {
-  return `You've used today's ${BRIDGE_CHAT_DAILY_MESSAGE_COPY} chat messages. Chat opens again at ${CHAT_CAP_RESET_LABEL}. Your results are still here.`;
+  return `up to ${BRIDGE_CHAT_DAILY_MESSAGE_COPY} messages a day, resets at ${CHAT_CAP_RESET_LABEL}`;
 }
 
 export const AI_ACCESS_MESSAGES: Record<AiAccessCode, string> = {

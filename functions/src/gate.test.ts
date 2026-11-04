@@ -18,7 +18,7 @@ describe("gate config", () => {
   it("defaults to auth and ignores unknown modes", () => {
     expect(DEFAULT_BRIDGE_CHAT_DAILY_CAP).toBe(100);
     expect(configFromEnv({}).bridgeDailyCap).toBe(100);
-    expect(dailyCapMessage()).toContain("50 chat messages");
+    expect(dailyCapMessage()).toBe("up to 50 messages a day, resets at midnight US Eastern");
     expect(parseGateMode(undefined)).toBe("auth");
     expect(parseGateMode("paid")).toBe("paid");
     expect(parseGateMode(" OFF ")).toBe("off");

@@ -15,9 +15,10 @@ exports.dailyCapMessage = dailyCapMessage;
 exports.CHAT_CAP_RESET_TIME_ZONE = "America/New_York";
 exports.CHAT_CAP_RESET_LABEL = "midnight US Eastern";
 /**
- * User-facing sentence stays "50 messages". The server counts requests.
- * Default is 100 requests, about 50 turns, because each Bridge turn makes
- * two chatProxy calls (aligned and unaligned).
+ * User-facing line is "up to 50 messages a day, resets at midnight US Eastern".
+ * "up to" stays because a retry can use an extra request. The server counts
+ * requests. Default is 100 requests, about 50 turns, because each Bridge
+ * turn makes two chatProxy calls (aligned and unaligned).
  */
 exports.BRIDGE_CHAT_DAILY_MESSAGE_COPY = 50;
 exports.DEFAULT_BRIDGE_CHAT_DAILY_CAP = 100;
@@ -31,9 +32,9 @@ exports.AI_ACCESS_CODES = {
     interviewsPaused: "interviews_paused",
     appCheck: "app_check",
 };
-/** Fixed copy. Does not print the request cap (default 100). */
+/** Fixed copy. Does not print the request cap (default 100). "up to" stays because a retry can use an extra request. */
 function dailyCapMessage() {
-    return `You've used today's ${exports.BRIDGE_CHAT_DAILY_MESSAGE_COPY} chat messages. Chat opens again at ${exports.CHAT_CAP_RESET_LABEL}. Your results are still here.`;
+    return `up to ${exports.BRIDGE_CHAT_DAILY_MESSAGE_COPY} messages a day, resets at ${exports.CHAT_CAP_RESET_LABEL}`;
 }
 exports.AI_ACCESS_MESSAGES = {
     signed_out: "Sign in to save your progress.",
