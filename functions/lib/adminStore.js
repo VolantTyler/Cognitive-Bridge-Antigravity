@@ -34,6 +34,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.DEFAULT_FIRESTORE_DATABASE_ID = void 0;
+exports.getAdminFirestore = getAdminFirestore;
 exports.readEntitlementPaid = readEntitlementPaid;
 exports.reserveBridgeChatSlot = reserveBridgeChatSlot;
 exports.writeUsageRecord = writeUsageRecord;
@@ -43,7 +44,7 @@ exports.verifyAppCheckToken = verifyAppCheckToken;
 const gate_1 = require("./gate");
 const pricing_1 = require("./pricing");
 exports.DEFAULT_FIRESTORE_DATABASE_ID = "ai-studio-10d489d8-3b32-488a-9698-e415f2608028";
-async function adminFirestore() {
+async function getAdminFirestore() {
     const { getApps, initializeApp } = await Promise.resolve().then(() => __importStar(require("firebase-admin/app")));
     const { getFirestore } = await Promise.resolve().then(() => __importStar(require("firebase-admin/firestore")));
     if (getApps().length === 0) {
@@ -58,12 +59,12 @@ async function adminFirestore() {
  * Live chat on those results stays paid-only when AI_GATE_MODE=paid.
  */
 async function readEntitlementPaid(uid) {
-    const db = await adminFirestore();
+    const db = await getAdminFirestore();
     const snap = await db.collection("entitlements").doc(uid).get();
     return snap.exists && snap.get("paid") === true;
 }
 async function reserveBridgeChatSlot(uid, day, cap) {
-    const db = await adminFirestore();
+    const db = await getAdminFirestore();
     const ref = db.collection("usage").doc(uid);
     try {
         await db.runTransaction(async (tx) => {
@@ -84,7 +85,7 @@ async function reserveBridgeChatSlot(uid, day, cap) {
 }
 async function writeUsageRecord(record) {
     const { FieldValue } = await Promise.resolve().then(() => __importStar(require("firebase-admin/firestore")));
-    const db = await adminFirestore();
+    const db = await getAdminFirestore();
     await db.collection("usage_server").add({
         uid: record.uid,
         sessionId: record.sessionId,
@@ -96,7 +97,7 @@ async function writeUsageRecord(record) {
     });
 }
 async function readDailyCostMicros(uid, day) {
-    const db = await adminFirestore();
+    const db = await getAdminFirestore();
     const snap = await db.collection("daily_cost").doc(uid).collection("days").doc(day).get();
     if (!snap.exists)
         return 0;
@@ -113,7 +114,7 @@ async function addDailyCostFromUsage(record, now = new Date()) {
     if (micros <= 0 || !record.uid)
         return;
     const { FieldValue } = await Promise.resolve().then(() => __importStar(require("firebase-admin/firestore")));
-    const db = await adminFirestore();
+    const db = await getAdminFirestore();
     const day = (0, gate_1.usEasternDay)(now);
     await db.collection("daily_cost").doc(record.uid).collection("days").doc(day).set({
         usdMicros: FieldValue.increment(micros),

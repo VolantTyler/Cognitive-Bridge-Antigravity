@@ -6,7 +6,7 @@ import { costMicrosForUsage } from "./pricing";
 export const DEFAULT_FIRESTORE_DATABASE_ID =
   "ai-studio-10d489d8-3b32-488a-9698-e415f2608028";
 
-async function adminFirestore(): Promise<Firestore> {
+export async function getAdminFirestore(): Promise<Firestore> {
   const { getApps, initializeApp } = await import("firebase-admin/app");
   const { getFirestore } = await import("firebase-admin/firestore");
   if (getApps().length === 0) {
@@ -22,13 +22,13 @@ async function adminFirestore(): Promise<Firestore> {
  * Live chat on those results stays paid-only when AI_GATE_MODE=paid.
  */
 export async function readEntitlementPaid(uid: string): Promise<boolean> {
-  const db = await adminFirestore();
+  const db = await getAdminFirestore();
   const snap = await db.collection("entitlements").doc(uid).get();
   return snap.exists && snap.get("paid") === true;
 }
 
 export async function reserveBridgeChatSlot(uid: string, day: string, cap: number): Promise<void> {
-  const db = await adminFirestore();
+  const db = await getAdminFirestore();
   const ref = db.collection("usage").doc(uid);
   try {
     await db.runTransaction(async (tx) => {
@@ -48,7 +48,7 @@ export async function reserveBridgeChatSlot(uid: string, day: string, cap: numbe
 
 export async function writeUsageRecord(record: UsageRecord): Promise<void> {
   const { FieldValue } = await import("firebase-admin/firestore");
-  const db = await adminFirestore();
+  const db = await getAdminFirestore();
   await db.collection("usage_server").add({
     uid: record.uid,
     sessionId: record.sessionId,
@@ -61,7 +61,7 @@ export async function writeUsageRecord(record: UsageRecord): Promise<void> {
 }
 
 export async function readDailyCostMicros(uid: string, day: string): Promise<number> {
-  const db = await adminFirestore();
+  const db = await getAdminFirestore();
   const snap = await db.collection("daily_cost").doc(uid).collection("days").doc(day).get();
   if (!snap.exists) return 0;
   const value = snap.get("usdMicros");
@@ -77,7 +77,7 @@ export async function addDailyCostFromUsage(record: UsageRecord, now: Date = new
   const micros = costMicrosForUsage(record);
   if (micros <= 0 || !record.uid) return;
   const { FieldValue } = await import("firebase-admin/firestore");
-  const db = await adminFirestore();
+  const db = await getAdminFirestore();
   const day = usEasternDay(now);
   await db.collection("daily_cost").doc(record.uid).collection("days").doc(day).set({
     usdMicros: FieldValue.increment(micros),

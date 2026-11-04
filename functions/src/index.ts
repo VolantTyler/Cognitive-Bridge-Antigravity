@@ -1,12 +1,24 @@
 import { onRequest } from "firebase-functions/v2/https";
+import { defineSecret } from "firebase-functions/params";
 import { GoogleGenAI } from "@google/genai";
 import { allowedCorsOrigins } from "./cors";
 import { handleChat, GeminiClient } from "./chatHandler";
 import { handleJudge } from "./judgeHandler";
 import { defaultGuardDeps, guardChat, guardJudge } from "./guard";
 import { loadGateConfig } from "./params";
-import { writeUsageRecord, addDailyCostFromUsage } from "./adminStore";
+import { verifyAppCheckToken, writeUsageRecord, addDailyCostFromUsage } from "./adminStore";
 import { UsageRecord } from "./usageLog";
+import { verifyIdTokenWithAdmin } from "./auth";
+import { loadCheckoutConfig } from "./checkoutConfig";
+import {
+  handleCheckoutStatus,
+  handleCreateCheckout,
+  handleRestorePurchase,
+  handleStripeWebhook,
+  productionCheckoutLogger,
+} from "./checkoutHttp";
+import { createFirestoreBillingStore } from "./checkoutStore";
+import { createStripeGateway } from "./stripeGateway";
 
 const ai = new GoogleGenAI({
   vertexai: true,
@@ -51,3 +63,44 @@ export const judgeProxy = onRequest({ cors, timeoutSeconds: 30 }, async (req, re
     logUsage,
   });
 });
+
+// Test-mode keys only. Values live in Secret Manager, not in the repo.
+const stripeSecretKey = defineSecret("STRIPE_SECRET_KEY");
+const stripeWebhookSecret = defineSecret("STRIPE_WEBHOOK_SECRET");
+
+function checkoutHttpDeps() {
+  return {
+    config: () => loadCheckoutConfig(),
+    secretKey: () => stripeSecretKey.value(),
+    webhookSecret: () => stripeWebhookSecret.value(),
+    store: createFirestoreBillingStore(),
+    verifyIdToken: verifyIdTokenWithAdmin,
+    verifyAppCheck: verifyAppCheckToken,
+    enforceAppCheck: () => loadGateConfig().enforceAppCheck,
+    now: () => Date.now(),
+    gateway: () => createStripeGateway(stripeSecretKey.value()),
+    logger: productionCheckoutLogger(),
+  };
+}
+
+export const createCheckout = onRequest({
+  cors,
+  secrets: [stripeSecretKey],
+  timeoutSeconds: 30,
+}, (req, res) => handleCreateCheckout(req, res, checkoutHttpDeps()));
+
+export const restorePurchase = onRequest({
+  cors,
+  secrets: [stripeSecretKey],
+  timeoutSeconds: 60,
+}, (req, res) => handleRestorePurchase(req, res, checkoutHttpDeps()));
+
+export const checkoutStatus = onRequest({
+  cors,
+  timeoutSeconds: 15,
+}, (req, res) => handleCheckoutStatus(req, res, checkoutHttpDeps()));
+
+export const stripeWebhook = onRequest({
+  secrets: [stripeSecretKey, stripeWebhookSecret],
+  timeoutSeconds: 60,
+}, (req, res) => handleStripeWebhook(req, res, checkoutHttpDeps()));

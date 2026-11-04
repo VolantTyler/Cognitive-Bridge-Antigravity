@@ -37,6 +37,22 @@
         "function": "judgeProxy"
       },
       {
+        "source": "/api/checkout",
+        "function": "createCheckout"
+      },
+      {
+        "source": "/api/checkout/restore",
+        "function": "restorePurchase"
+      },
+      {
+        "source": "/api/checkout/status",
+        "function": "checkoutStatus"
+      },
+      {
+        "source": "/api/stripe/webhook",
+        "function": "stripeWebhook"
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }
