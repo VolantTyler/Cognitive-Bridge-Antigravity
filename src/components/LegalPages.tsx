@@ -60,6 +60,9 @@ export function TermsPage() {
           "Cognitive Bridge: Personal Interview and Results" costs $6, paid once. It is not a subscription.
           It is offered to US residents only, and you must be 18 or older to buy. One purchase per account.
         </p>
+        <p>
+          Your billing address must be in the 50 US states or Washington, D.C. Purchases with a billing address anywhere else, including US territories such as Puerto Rico or Guam, are refunded and access is not turned on.
+        </p>
         <p>Your purchase includes:</p>
         <ul className="list-disc pl-5 space-y-1">
           <li>One AI-led interview, plus one retake.</li>
@@ -72,9 +75,8 @@ export function TermsPage() {
       </Section>
       <Section heading="All sales are final">
         <p>
-          All sales are final, except duplicate charges, charges where you didn't get access, or where the law requires a refund.
+          [SALES FINAL / REFUND WORDING, pending legal check] All sales are final, except duplicate charges, charges where you didn't get access, purchases with a billing address outside the US (these are refunded automatically), or where the law requires a refund.
         </p>
-        <p>[SALES FINAL / REFUND WORDING, pending legal check]</p>
       </Section>
       <Section heading="What this is, and what it isn't">
         <p>
@@ -97,7 +99,7 @@ export function TermsPage() {
           only while the page is open, and is copied to your account when you sign in.
         </p>
         <p>
-          We also record basic usage events (for example, when an interview starts or a payment completes) to understand how the app is used.
+          We also record basic usage events (for example, which section you open or when you sign in) to understand how the app is used.
           Details are on the <a className="underline underline-offset-2" href="/privacy">Privacy page</a>.
         </p>
       </Section>
@@ -114,7 +116,7 @@ export function TermsPage() {
         <p>Questions, or a payment problem? Contact us at [SUPPORT EMAIL, pending Tyler].</p>
       </Section>
       <Section heading="Governing law">
-        <p>[GOVERNING LAW: New Jersey recommended, pending Tyler]</p>
+        <p>[GOVERNING LAW / LEGAL CHECK, pending Tyler] New Jersey law governs these terms.</p>
       </Section>
     </LegalLayout>
   );
@@ -154,8 +156,7 @@ export function PrivacyPage() {
             email address and message you type.
           </li>
           <li>
-            <span className="font-medium text-text-primary">Payment:</span> Stripe hosts checkout. We store whether the account paid,
-            the amount, the currency, the billing country, and Stripe payment ids. We do not store the full card number.
+            <span className="font-medium text-text-primary">Payment:</span> Stripe hosts checkout. We do not receive or store your card details. We store whether your account paid, the amount and currency, your billing country, whether you accepted the Terms, Stripe payment and checkout IDs, and any refund or dispute status.
           </li>
         </ul>
         <p>
@@ -174,8 +175,7 @@ export function PrivacyPage() {
             interview conversation and scores, or a Bridge question with its two replies and your scores.
           </li>
           <li>
-            <span className="font-medium text-text-primary">Stripe:</span> hosts the checkout page and processes the payment. Stripe
-            receives the email, name, and billing address entered there, and the card details.
+            <span className="font-medium text-text-primary">Stripe:</span> hosts the checkout page and processes the payment. Stripe receives your account email (we fill it in for you), and the name, billing address and card details you enter there, and emails your receipt.
           </li>
         </ul>
       </Section>
@@ -203,8 +203,7 @@ export function PrivacyPage() {
       </Section>
       <Section heading="Requesting deletion">
         <p>
-          To ask us to delete your account data, email [SUPPORT EMAIL, pending Tyler]. We review requests by hand.
-          We do not promise a timeframe. We keep payment records.
+          To ask us to delete your account data, email [SUPPORT EMAIL, pending Tyler]. We'll review and process your request. We may keep payment records.
         </p>
       </Section>
       <Section heading="Contact">

@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { CheckoutReturn } from "../CheckoutReturn";
 import {
-  BACK_TO_DEMO,
+  BACK_TO_COGNITIVE_BRIDGE,
   NON_US_HEADING,
   NON_US_REFUND_FAILED_BODY,
   NON_US_REFUNDED_BODY,
@@ -23,7 +23,8 @@ describe("checkout return", () => {
     const status = screen.getByRole("status");
     expect(status).toHaveTextContent(NON_US_REFUNDED_BODY);
     expect(status).not.toHaveTextContent(/minutes|business days|5-10/i);
-    const back = screen.getByRole("link", { name: BACK_TO_DEMO });
+    expect(BACK_TO_COGNITIVE_BRIDGE).toBe("Back to Cognitive Bridge");
+    const back = screen.getByRole("link", { name: BACK_TO_COGNITIVE_BRIDGE });
     expect(back).toHaveAttribute("href", "/?view=demo");
     expect(back.className).not.toMatch(/red|status-danger/);
     expect(screen.queryByText(/payment confirmed/i)).not.toBeInTheDocument();
@@ -42,7 +43,7 @@ describe("checkout return", () => {
     expect(alert).toHaveTextContent(NON_US_REFUND_FAILED_BODY);
     expect(alert.textContent ?? "").not.toMatch(/we're refunding|refunding your payment/i);
     expect(screen.getByRole("heading", { name: NON_US_HEADING })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: BACK_TO_DEMO })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: BACK_TO_COGNITIVE_BRIDGE })).toHaveAttribute("href", "/?view=demo");
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 

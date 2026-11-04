@@ -22,7 +22,9 @@ describe("product surface", () => {
     expect(resolveSurface(base)).toBe("demo");
     expect(resolveSurface({ ...base, canceled: true })).toBe("paywall");
     expect(resolveSurface({ ...base, view: "paywall" })).toBe("paywall");
-    expect(resolveSurface({ ...base, authReady: false })).toBe("loading");
+    expect(resolveSurface({ ...base, authReady: false })).toBe("demo");
+    expect(resolveSurface({ ...base, authReady: false, view: "paywall" })).toBe("paywall");
+    expect(resolveSurface({ ...base, authReady: false, view: "app" })).toBe("loading");
   });
 
   it("skips the paywall for a paid account and keeps legacy results viewable", () => {

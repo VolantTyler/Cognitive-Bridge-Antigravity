@@ -5,7 +5,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
-  BACK_TO_DEMO,
+  BACK_TO_COGNITIVE_BRIDGE,
   CHECKOUT_CANCELED,
   CHECKOUT_CONFIRMED,
   CHECKOUT_CONFIRMING,
@@ -188,7 +188,7 @@ export function CheckoutReturn({
             href={DEMO_HOME}
             className="mt-6 inline-flex items-center justify-center min-h-11 px-4 rounded-lg border border-border-primary bg-bg-secondary text-sm text-text-primary"
           >
-            {BACK_TO_DEMO}
+            {BACK_TO_COGNITIVE_BRIDGE}
           </a>
         )}
       </main>

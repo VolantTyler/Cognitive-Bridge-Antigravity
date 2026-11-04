@@ -9,7 +9,11 @@ export function resolveSurface(input: {
   view: string | null;
   canceled: boolean;
 }): ProductSurface {
-  if (!input.authReady) return "loading";
+  if (!input.authReady) {
+    if (input.canceled || input.view === "paywall") return "paywall";
+    if (input.view === "app") return "loading";
+    return "demo";
+  }
   if (input.canceled) return "paywall";
   if (input.view === "demo") return "demo";
   if (input.view === "paywall") return input.paid ? "app" : "paywall";

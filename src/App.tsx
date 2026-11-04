@@ -378,6 +378,7 @@ export default function App() {
   if (surface !== 'app') {
     return (
       <div className="min-h-screen bg-bg-primary text-text-secondary flex flex-col font-sans">
+        <div className="flex-1">
         <AccessFlow
           phase={surface}
           email={liveUser?.email}
@@ -436,6 +437,7 @@ export default function App() {
             void runCheckout();
           }}
         />
+        </div>
         <SiteFooter />
       </div>
     );
