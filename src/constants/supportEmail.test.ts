@@ -41,12 +41,23 @@ describe("support email", () => {
     const text = readFileSync("functions/.env", "utf8");
     expect(text).toBe(
       [
-        "# Non-secret function config. `firebase deploy` loads this file from the functions directory.",
-        "# Stripe test mode only. STRIPE_PRICE_ID is a test-mode Price ID, not a secret.",
+        "# Non-secret defaults for non-interactive `firebase deploy`.",
+        "# The merge workflow runs from the repo root; the CLI loads this file",
+        "# from the functions directory (firebase.json functions.source).",
+        "# Launch values for Stripe test mode. STRIPE_PRICE_ID is a test-mode Price ID. No secrets.",
         "AI_GATE_MODE=paid",
-        "PAYMENTS_ENABLED=true",
-        "LEGACY_ACCESS_CUTOFF=2026-11-09T19:00:00.000Z",
+        "AI_ALLOWLIST_UIDS=",
+        "ENFORCE_APP_CHECK=false",
+        "INTERVIEWS_PAUSED=false",
+        "BRIDGE_CHAT_DAILY_CAP=100",
+        "DAILY_USER_COST_CAP_USD=1",
+        "MAX_INPUT_CHARS=8000",
         "STRIPE_PRICE_ID=price_1UZy2AIlhaYGK2ond2TfcrGe",
+        "APP_BASE_URL=https://cognitive-bridge-ai.web.app",
+        "PAYMENTS_ENABLED=true",
+        "STRIPE_MANAGED_PAYMENTS=false",
+        "STRIPE_AUTOMATIC_TAX=false",
+        "LEGACY_ACCESS_CUTOFF=2026-11-09T19:00:00.000Z",
         "",
       ].join("\n")
     );
