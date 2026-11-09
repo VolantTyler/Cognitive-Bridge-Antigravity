@@ -65,7 +65,7 @@ The application allows users to explore and interface with aligned artificial in
 This project integrates with **Cloud Firestore** to persist user session data and system feedback.
 
 ### 1. Mirror Interview Responses & Cognitive Profiles
-When a user is logged in (using Google Authentication / Cloud Sync mode), their progress and responses are continuously saved:
+When a user is logged in (Google, or email and password), their progress and responses are continuously saved. An optional display name lives on the Firebase Auth profile and is not stored in this document:
 - **Location**: Firestore Database -> **`users`** collection
 - **Path**: `/users/{userId}` (where `{userId}` is the user's Firebase Auth UID)
 - **Stored Fields**:

@@ -34,8 +34,11 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.verifyBearerToken = verifyBearerToken;
+exports.emailVerifiedFromToken = emailVerifiedFromToken;
+exports.requireEmailVerified = requireEmailVerified;
 exports.verifyIdTokenWithAdmin = verifyIdTokenWithAdmin;
 exports.asGateError = asGateError;
+const accountCopy_1 = require("./accountCopy");
 const gate_1 = require("./gate");
 async function verifyBearerToken(authorizationHeader, verify) {
     const token = (0, gate_1.bearerToken)(authorizationHeader);
@@ -60,8 +63,22 @@ async function verifyBearerToken(authorizationHeader, verify) {
     return {
         uid: decoded.uid,
         email: typeof decoded.email === "string" ? decoded.email : null,
-        email_verified: decoded.email_verified === true,
+        email_verified: emailVerifiedFromToken(decoded),
     };
+}
+/**
+ * True only when the verified ID token's email_verified claim is true.
+ * A missing claim is unverified. Checkout calls requireEmailVerified.
+ * chatProxy and judgeProxy do not.
+ */
+function emailVerifiedFromToken(decoded) {
+    return decoded.email_verified === true;
+}
+function requireEmailVerified(user) {
+    if (!emailVerifiedFromToken(user)) {
+        throw new gate_1.GateError(403, accountCopy_1.EMAIL_NOT_VERIFIED_CODE, accountCopy_1.EMAIL_NOT_VERIFIED_MESSAGE);
+    }
+    return user;
 }
 async function verifyIdTokenWithAdmin(token) {
     const { getApps, initializeApp } = await Promise.resolve().then(() => __importStar(require("firebase-admin/app")));
@@ -73,7 +90,7 @@ async function verifyIdTokenWithAdmin(token) {
     return {
         uid: decoded.uid,
         email: decoded.email,
-        email_verified: decoded.email_verified,
+        email_verified: emailVerifiedFromToken(decoded),
     };
 }
 function asGateError(error) {
