@@ -181,7 +181,7 @@ export function PrivacyPage() {
             interview conversation and scores, or a Bridge question with its two replies and your scores.
           </li>
           <li>
-            <span className="font-medium text-text-primary">Stripe:</span> hosts the checkout page and processes the payment. Stripe receives your account email (we fill it in for you), and the name, billing address and card details you enter there, and emails your receipt.
+            <span className="font-medium text-text-primary">Stripe:</span> hosts the checkout page and processes the payment. Stripe receives your account email (we fill it in for you), and the name, billing address and card details you enter there.
           </li>
         </ul>
       </Section>

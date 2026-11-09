@@ -78,8 +78,9 @@ describe("legal routes", () => {
       "Stripe hosts checkout. We do not receive or store your card details. We store whether your account paid, the amount and currency, your billing country, whether you accepted the Terms, Stripe payment and checkout IDs, and any refund or dispute status."
     )).toBeInTheDocument();
     expect(screen.getByText(
-      /Stripe receives your account email \(we fill it in for you\), and the name, billing address and card details you enter there, and emails your receipt\./
+      /Stripe receives your account email \(we fill it in for you\), and the name, billing address and card details you enter there\./
     )).toBeInTheDocument();
+    expect(screen.queryByText(/emails your receipt/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Some items in brackets are still being confirmed/)).not.toBeInTheDocument();
     expect(screen.queryByText(/\[.*pending/i)).not.toBeInTheDocument();
     const supportLinks = screen.getAllByRole("link", { name: SUPPORT_EMAIL });
