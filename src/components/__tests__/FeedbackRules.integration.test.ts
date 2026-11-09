@@ -38,7 +38,11 @@ describe('Firestore Security Rules Integration (Live Database)', () => {
     ).rejects.toThrow(/insufficient permissions|permission-denied/i);
   });
 
-  test('writing valid token usage as guest succeeds', async () => {
+  // Live Firestore still has the pre-v2.4.0 token_usage create rule until
+  // someone deploys firestore.rules. This merge does not deploy rules.
+  // The emulator test in src/test/firestore.rules.test.ts is the new contract:
+  // client creates are denied. After a rules deploy, change this test to expect denial.
+  test('writing valid token usage as guest succeeds against currently deployed rules', async () => {
     const tokenUsageRef = collection(db, 'token_usage');
     
     const docRef = await addDoc(tokenUsageRef, {
@@ -82,7 +86,7 @@ describe('Firestore Security Rules Integration (Live Database)', () => {
         timestamp: serverTimestamp(),
       })
     ).rejects.toThrow(/insufficient permissions|permission-denied/i);
-  });
+  }, 20000);
 
   test('reading token usage as unauthenticated user fails', async () => {
     const tokenUsageRef = collection(db, 'token_usage');

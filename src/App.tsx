@@ -15,6 +15,10 @@ import Playground from './components/Playground';
 import FeedbackModal from './components/FeedbackModal';
 import SettingsModal from './components/SettingsModal';
 import ReleaseNotesModal from './components/ReleaseNotesModal';
+import SiteFooter from './components/SiteFooter';
+import { StandaloneRoutes } from './components/StandaloneRoutes';
+import { parseLocation } from './routes';
+import { loadCheckoutStatus, requestRestorePurchase } from './services/checkoutClient';
 import { getOllamaConfig } from './services/gemini';
 
 import { auth, db, logAnalyticsEvent } from './services/firebase';
@@ -36,7 +40,20 @@ export default function App() {
   const [isAccountOpen, setIsAccountOpen] = useState(false);
   const [accountView, setAccountView] = useState<'sign-in' | 'verify'>('sign-in');
   const [, setAccountRevision] = useState(0);
+  const [href, setHref] = useState(() => ({
+    pathname: window.location.pathname,
+    search: window.location.search,
+  }));
   const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const sync = () => setHref({
+      pathname: window.location.pathname,
+      search: window.location.search,
+    });
+    window.addEventListener('popstate', sync);
+    return () => window.removeEventListener('popstate', sync);
+  }, []);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -197,6 +214,18 @@ export default function App() {
   const liveUser = user && auth.currentUser?.uid === user.uid ? auth.currentUser : user;
 
   const currentStep = scores ? (activeModule === 'playground' ? 3 : 2) : 1;
+  const route = parseLocation(href.pathname, href.search);
+  if (route.name !== 'app') {
+    return (
+      <StandaloneRoutes
+        pathname={href.pathname}
+        search={href.search}
+        loadStatus={loadCheckoutStatus}
+        restore={requestRestorePurchase}
+        app={null}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-bg-primary text-text-secondary flex flex-col font-sans transition-colors duration-300">
@@ -480,40 +509,10 @@ export default function App() {
       </main>
 
       {/* Footer Branding */}
-      <footer className="h-auto md:h-10 border-t border-border-primary px-6 py-4 md:py-0 flex flex-col md:flex-row items-center justify-between gap-3 md:gap-0 text-[9px] uppercase tracking-[0.3em] font-bold text-text-muted-darker bg-bg-primary transition-colors duration-300">
-        <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 md:gap-4 text-center">
-          <a
-            href="https://tylerstahl.dev"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hover:text-text-primary transition-colors"
-          >
-            Tyler J. Stahl
-          </a>
-          <span className="text-border-primary">/</span>
-          <a
-            href="https://www.linkedin.com/in/tyler-j-stahl"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hover:text-text-primary transition-colors"
-          >
-            LinkedIn
-          </a>
-          <span className="text-border-primary">/</span>
-          <button
-            onClick={() => setIsReleaseNotesOpen(true)}
-            className="hover:text-text-primary transition-colors cursor-pointer border-0 bg-transparent uppercase tracking-[0.3em] font-bold text-[9px] text-text-muted-darker"
-            title="View Release Notes"
-          >
-            Cognitive Bridge {APP_VERSION_LABEL}
-          </button>
-        </div>
-        <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 md:gap-4 text-center">
-          <span className="text-text-muted">Model: {ollamaConfig.enabled ? `Ollama (${ollamaConfig.model})` : 'Gemini 2.5 Flash (live fallbacks)'}</span>
-          <span className="text-border-primary">/</span>
-          <span>Procedural Skills Engine</span>
-        </div>
-      </footer>
+      <SiteFooter
+        modelLabel={`Model: ${ollamaConfig.enabled ? `Ollama (${ollamaConfig.model})` : 'Gemini 2.5 Flash (live fallbacks)'}`}
+        onOpenReleaseNotes={() => setIsReleaseNotesOpen(true)}
+      />
 
       <AccountAuthPanel
         isOpen={isAccountOpen}

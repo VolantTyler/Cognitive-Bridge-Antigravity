@@ -1,14 +1,20 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.judgeProxy = exports.chatProxy = void 0;
+exports.stripeWebhook = exports.checkoutStatus = exports.restorePurchase = exports.createCheckout = exports.judgeProxy = exports.chatProxy = void 0;
 const https_1 = require("firebase-functions/v2/https");
+const params_1 = require("firebase-functions/params");
 const genai_1 = require("@google/genai");
 const cors_1 = require("./cors");
 const chatHandler_1 = require("./chatHandler");
 const judgeHandler_1 = require("./judgeHandler");
 const guard_1 = require("./guard");
-const params_1 = require("./params");
+const params_2 = require("./params");
 const adminStore_1 = require("./adminStore");
+const auth_1 = require("./auth");
+const checkoutConfig_1 = require("./checkoutConfig");
+const checkoutHttp_1 = require("./checkoutHttp");
+const checkoutStore_1 = require("./checkoutStore");
+const stripeGateway_1 = require("./stripeGateway");
 const ai = new genai_1.GoogleGenAI({
     vertexai: true,
     project: process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT_ID,
@@ -30,7 +36,7 @@ async function logUsage(record) {
     }
 }
 function guardDeps() {
-    return (0, guard_1.defaultGuardDeps)({ config: () => (0, params_1.loadGateConfig)() });
+    return (0, guard_1.defaultGuardDeps)({ config: () => (0, params_2.loadGateConfig)() });
 }
 exports.chatProxy = (0, https_1.onRequest)({ cors, timeoutSeconds: 120 }, async (req, res) => {
     const deps = guardDeps();
@@ -49,4 +55,39 @@ exports.judgeProxy = (0, https_1.onRequest)({ cors, timeoutSeconds: 30 }, async 
         logUsage,
     });
 });
+// Test-mode keys only. Values live in Secret Manager, not in the repo.
+const stripeSecretKey = (0, params_1.defineSecret)("STRIPE_SECRET_KEY");
+const stripeWebhookSecret = (0, params_1.defineSecret)("STRIPE_WEBHOOK_SECRET");
+function checkoutHttpDeps() {
+    return {
+        config: () => (0, checkoutConfig_1.loadCheckoutConfig)(),
+        secretKey: () => stripeSecretKey.value(),
+        webhookSecret: () => stripeWebhookSecret.value(),
+        store: (0, checkoutStore_1.createFirestoreBillingStore)(),
+        verifyIdToken: auth_1.verifyIdTokenWithAdmin,
+        verifyAppCheck: adminStore_1.verifyAppCheckToken,
+        enforceAppCheck: () => (0, params_2.loadGateConfig)().enforceAppCheck,
+        now: () => Date.now(),
+        gateway: () => (0, stripeGateway_1.createStripeGateway)(stripeSecretKey.value()),
+        logger: (0, checkoutHttp_1.productionCheckoutLogger)(),
+    };
+}
+exports.createCheckout = (0, https_1.onRequest)({
+    cors,
+    secrets: [stripeSecretKey],
+    timeoutSeconds: 30,
+}, (req, res) => (0, checkoutHttp_1.handleCreateCheckout)(req, res, checkoutHttpDeps()));
+exports.restorePurchase = (0, https_1.onRequest)({
+    cors,
+    secrets: [stripeSecretKey],
+    timeoutSeconds: 60,
+}, (req, res) => (0, checkoutHttp_1.handleRestorePurchase)(req, res, checkoutHttpDeps()));
+exports.checkoutStatus = (0, https_1.onRequest)({
+    cors,
+    timeoutSeconds: 15,
+}, (req, res) => (0, checkoutHttp_1.handleCheckoutStatus)(req, res, checkoutHttpDeps()));
+exports.stripeWebhook = (0, https_1.onRequest)({
+    secrets: [stripeSecretKey, stripeWebhookSecret],
+    timeoutSeconds: 60,
+}, (req, res) => (0, checkoutHttp_1.handleStripeWebhook)(req, res, checkoutHttpDeps()));
 //# sourceMappingURL=index.js.map

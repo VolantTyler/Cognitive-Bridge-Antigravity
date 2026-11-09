@@ -7,17 +7,12 @@ service cloud.firestore {
       allow read, update, delete: if false;
     }
 
-    // Allow public writes to token_usage collection for user/guest telemetry
+    // token_usage is display-only. Clients may read their own rows.
+    // Creates, updates, and deletes are denied. usage_server is authoritative.
+    // Do not delete this collection here; retiring it is v2.4.1.
     match /token_usage/{document} {
-      allow create: if (request.resource.data.userId == 'guest' || (request.auth != null && request.resource.data.userId == request.auth.uid))
-                    && request.resource.data.promptTokens is number
-                    && request.resource.data.completionTokens is number
-                    && request.resource.data.totalTokens is number
-                    && request.resource.data.model is string
-                    && request.resource.data.feature is string
-                    && request.resource.data.timestamp is timestamp;
-      allow read: if request.auth != null && request.auth.uid == resource.data.userId;
-      allow update, delete: if false;
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create, update, delete: if false;
     }
     // ===============================================================
     // Assumed Data Model
@@ -77,6 +72,17 @@ service cloud.firestore {
     // Document ID: Stripe event id
     // Server-only webhook idempotency. Not readable or writable by clients.
     //
+    // Collection: token_usage
+    // Document ID: auto-generated
+    // Display-only historical rows. Clients cannot create, update, or delete.
+    // The signed-in owner may read rows whose userId matches their uid.
+    // usage_server is the authoritative log. Retire this collection in v2.4.1.
+    //
+    // Collection: checkout_sessions
+    // Document ID: Stripe Checkout Session id
+    // Server-only purchase outcome, including manualRefundRequired when a
+    // non-US refund call fails. Clients cannot read or write.
+    //
     // ===============================================================
 
     // Server-only billing, quota, and cost records.
@@ -92,6 +98,9 @@ service cloud.firestore {
       allow read, write: if false;
     }
     match /stripe_events/{document=**} {
+      allow read, write: if false;
+    }
+    match /checkout_sessions/{document=**} {
       allow read, write: if false;
     }
     match /daily_cost/{document=**} {

@@ -27,10 +27,10 @@ afterAll(async () => {
   await testEnv?.cleanup();
 });
 
-const locked = ["entitlements", "usage", "usage_server", "stripe_events", "daily_cost"] as const;
+const locked = ["entitlements", "usage", "usage_server", "stripe_events", "daily_cost", "checkout_sessions"] as const;
 
 describe("server-only Firestore collections", () => {
-  test("a signed-in client cannot read or write entitlements, usage, usage_server, stripe_events, or daily_cost", async () => {
+  test("a signed-in client cannot read or write entitlements, usage, usage_server, stripe_events, daily_cost, or checkout_sessions", async () => {
     await testEnv.withSecurityRulesDisabled(async (context) => {
       const db = context.firestore();
       for (const name of locked) {
@@ -74,5 +74,56 @@ describe("server-only Firestore collections", () => {
       playgroundMessages: [],
       updatedAt: serverTimestamp(),
     }));
+  });
+});
+
+describe("token_usage is display-only", () => {
+  test("the owner can read their row and nobody can write one", async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), "token_usage/row-alice"), {
+        userId: "alice",
+        model: "gemini",
+        promptTokens: 1,
+        completionTokens: 1,
+        totalTokens: 2,
+        feature: "mirror",
+        timestamp: new Date(),
+      });
+    });
+
+    const alice = testEnv.authenticatedContext("alice", {
+      email: "alice@example.com",
+      email_verified: true,
+    }).firestore();
+    await assertSucceeds(getDoc(doc(alice, "token_usage/row-alice")));
+    await assertFails(setDoc(doc(alice, "token_usage/new-row"), {
+      userId: "alice",
+      model: "gemini",
+      promptTokens: 1,
+      completionTokens: 1,
+      totalTokens: 2,
+      feature: "mirror",
+      timestamp: serverTimestamp(),
+    }));
+    await assertFails(updateDoc(doc(alice, "token_usage/row-alice"), { promptTokens: 9 }));
+    await assertFails(deleteDoc(doc(alice, "token_usage/row-alice")));
+
+    const bob = testEnv.authenticatedContext("bob", {
+      email: "bob@example.com",
+      email_verified: true,
+    }).firestore();
+    await assertFails(getDoc(doc(bob, "token_usage/row-alice")));
+
+    const anon = testEnv.unauthenticatedContext().firestore();
+    await assertFails(setDoc(doc(anon, "token_usage/guest-row"), {
+      userId: "guest",
+      model: "gemini",
+      promptTokens: 1,
+      completionTokens: 1,
+      totalTokens: 2,
+      feature: "mirror",
+      timestamp: serverTimestamp(),
+    }));
+    await assertFails(getDoc(doc(anon, "token_usage/row-alice")));
   });
 });
