@@ -4,9 +4,9 @@
  */
 
 import { useEffect, useRef, type ReactNode } from "react";
-import { SUPPORT_EMAIL_PLACEHOLDER } from "../constants/checkoutCopy";
 import { TERMS_RETAKE_REPLACES } from "../constants/paywallCopy";
 import SiteFooter from "./SiteFooter";
+import { SupportEmailLink } from "./SupportEmailLink";
 
 function LegalLayout({ title, children }: { title: string; children: ReactNode }) {
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -27,9 +27,6 @@ function LegalLayout({ title, children }: { title: string; children: ReactNode }
         </a>
       </header>
       <main className="flex-1 w-full max-w-2xl mx-auto px-5 py-10">
-        <p role="status" className="text-sm text-text-muted mb-6">
-          Some items in brackets are still being confirmed.
-        </p>
         <h1
           ref={headingRef}
           tabIndex={-1}
@@ -84,7 +81,7 @@ export function TermsPage() {
       </Section>
       <Section heading="All sales are final">
         <p>
-          [SALES FINAL / REFUND WORDING, pending legal check] All sales are final, except duplicate charges, charges where you didn't get access, purchases with a billing address outside the US (these are refunded automatically), or where the law requires a refund.
+          All sales are final, except duplicate charges, charges where you didn't get access, purchases with a billing address outside the US (these are refunded automatically), or where the law requires a refund.
         </p>
       </Section>
       <Section heading="What this is, and what it isn't">
@@ -115,17 +112,17 @@ export function TermsPage() {
       <Section heading="Payment">
         <p>
           Payment is handled on a checkout page hosted by Stripe. You accept these Terms on Stripe Checkout.
-          Stripe emails your receipt to the address you used at checkout.
+          Stripe handles the receipt for your payment.
         </p>
       </Section>
       <Section heading="Availability">
         <p>New interviews may sometimes be paused. If that happens, your results are still available if you're signed in.</p>
       </Section>
       <Section heading="Contact">
-        <p>Questions, or a payment problem? Contact us at {SUPPORT_EMAIL_PLACEHOLDER}.</p>
+        <p>Questions, or a payment problem? Contact us at <SupportEmailLink />.</p>
       </Section>
       <Section heading="Governing law">
-        <p>[GOVERNING LAW / LEGAL CHECK, pending Tyler] New Jersey law governs these terms.</p>
+        <p>New Jersey law governs these terms.</p>
       </Section>
     </LegalLayout>
   );
@@ -212,11 +209,11 @@ export function PrivacyPage() {
       </Section>
       <Section heading="Requesting deletion">
         <p>
-          To ask us to delete your account data, email {SUPPORT_EMAIL_PLACEHOLDER}. We'll review and process your request. We may keep payment records.
+          To ask us to delete your account data, email <SupportEmailLink />. We'll review and process your request. We may keep payment records.
         </p>
       </Section>
       <Section heading="Contact">
-        <p>Questions about this page: {SUPPORT_EMAIL_PLACEHOLDER}.</p>
+        <p>Questions about this page: <SupportEmailLink />.</p>
       </Section>
     </LegalLayout>
   );

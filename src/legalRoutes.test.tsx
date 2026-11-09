@@ -4,7 +4,8 @@ import { readFileSync } from "node:fs";
 import { APP_VERSION_LABEL } from "./appVersion";
 import { PrivacyPage, TermsPage } from "./components/LegalPages";
 import { StandaloneRoutes } from "./components/StandaloneRoutes";
-import { SUPPORT_EMAIL_PLACEHOLDER } from "./constants/checkoutCopy";
+import { SUPPORT_EMAIL } from "./constants/checkoutCopy";
+import { SUPPORT_EMAIL_LINK_CLASS } from "./components/SupportEmailLink";
 import { parseLocation } from "./routes";
 
 describe("legal routes", () => {
@@ -29,13 +30,17 @@ describe("legal routes", () => {
     );
     expect(screen.getByRole("heading", { name: "Terms" })).toBeInTheDocument();
     expect(screen.getByText(/you must be 18 or older to buy/i)).toBeInTheDocument();
-    expect(screen.getByText(SUPPORT_EMAIL_PLACEHOLDER, { exact: false })).toBeInTheDocument();
+    expect(screen.queryByText(/Some items in brackets are still being confirmed/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/\[.*pending/i)).not.toBeInTheDocument();
+    const support = screen.getByRole("link", { name: SUPPORT_EMAIL });
+    expect(support).toHaveAttribute("href", `mailto:${SUPPORT_EMAIL}`);
+    expect(support.className).toContain(SUPPORT_EMAIL_LINK_CLASS);
+    expect(screen.getByText("New Jersey law governs these terms.")).toBeInTheDocument();
     expect(screen.getByText(
-      "[GOVERNING LAW / LEGAL CHECK, pending Tyler] New Jersey law governs these terms."
+      "All sales are final, except duplicate charges, charges where you didn't get access, purchases with a billing address outside the US (these are refunded automatically), or where the law requires a refund."
     )).toBeInTheDocument();
-    expect(screen.getByText(
-      "[SALES FINAL / REFUND WORDING, pending legal check] All sales are final, except duplicate charges, charges where you didn't get access, purchases with a billing address outside the US (these are refunded automatically), or where the law requires a refund."
-    )).toBeInTheDocument();
+    expect(screen.getByText(/Stripe handles the receipt for your payment/)).toBeInTheDocument();
+    expect(screen.queryByText(/Stripe emails your receipt to the address you used at checkout/)).not.toBeInTheDocument();
     expect(screen.getByText(
       "Your billing address must be in the 50 US states or Washington, D.C. Purchases with a billing address anywhere else, including US territories such as Puerto Rico or Guam, are refunded and access is not turned on."
     )).toBeInTheDocument();
@@ -75,11 +80,19 @@ describe("legal routes", () => {
     expect(screen.getByText(
       /Stripe receives your account email \(we fill it in for you\), and the name, billing address and card details you enter there, and emails your receipt\./
     )).toBeInTheDocument();
-    expect(screen.getAllByText(SUPPORT_EMAIL_PLACEHOLDER, { exact: false }).length).toBeGreaterThan(1);
+    expect(screen.queryByText(/Some items in brackets are still being confirmed/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/\[.*pending/i)).not.toBeInTheDocument();
+    const supportLinks = screen.getAllByRole("link", { name: SUPPORT_EMAIL });
+    expect(supportLinks.length).toBeGreaterThan(1);
+    for (const link of supportLinks) {
+      expect(link).toHaveAttribute("href", `mailto:${SUPPORT_EMAIL}`);
+      expect(link.className).toContain("[overflow-wrap:anywhere]");
+    }
     const deletion = screen.getByRole("heading", { name: "Requesting deletion" }).closest("section");
     expect(deletion?.textContent ?? "").toContain(
-      `To ask us to delete your account data, email ${SUPPORT_EMAIL_PLACEHOLDER}. We'll review and process your request. We may keep payment records.`
+      `To ask us to delete your account data, email ${SUPPORT_EMAIL}. We'll review and process your request. We may keep payment records.`
     );
+    expect(deletion?.querySelector("a")?.getAttribute("href")).toBe(`mailto:${SUPPORT_EMAIL}`);
     expect(deletion?.textContent ?? "").not.toMatch(/within \d+|by hand/i);
     expect(screen.queryByText(/team only/i)).not.toBeInTheDocument();
   });

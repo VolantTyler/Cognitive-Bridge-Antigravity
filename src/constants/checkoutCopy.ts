@@ -1,18 +1,18 @@
 /**
- * Checkout return copy. Bracketed support text stays until Tyler sets an address.
+ * Checkout return copy.
  * The non-US refunded paragraph is Charlie's wording. The refund-failed paragraph
  * must not say a refund happened.
  */
 
-export const SUPPORT_EMAIL_PLACEHOLDER = "[SUPPORT EMAIL, pending Tyler]";
+export const SUPPORT_EMAIL = "cos-stahl+cbsupport@mail.grokbot.com";
 
 export const NON_US_HEADING = "We couldn't complete your purchase";
 
 export const NON_US_REFUNDED_BODY =
-  `Cognitive Bridge is only available in the US right now, so access wasn't turned on. We're refunding your payment. If you don't see the refund, contact ${SUPPORT_EMAIL_PLACEHOLDER}.`;
+  `Cognitive Bridge is only available in the US right now, so access wasn't turned on. We're refunding your payment. If you don't see the refund, contact ${SUPPORT_EMAIL}.`;
 
 export const NON_US_REFUND_FAILED_BODY =
-  `Cognitive Bridge is only available in the US right now, so access wasn't turned on. A refund has not been confirmed. Contact ${SUPPORT_EMAIL_PLACEHOLDER} so we can look up the payment.`;
+  `Cognitive Bridge is only available in the US right now, so access wasn't turned on. A refund has not been confirmed. Contact ${SUPPORT_EMAIL} so we can look up the payment.`;
 
 export const BACK_TO_COGNITIVE_BRIDGE = "Back to Cognitive Bridge";
 
@@ -27,10 +27,10 @@ export const CHECKOUT_TIMEOUT = "Your payment is still being confirmed.";
 export const CHECKOUT_SIGN_IN = "Sign in to confirm this payment.";
 
 export const CHECKOUT_UNMATCHED =
-  `We couldn't match this payment to your account. Contact ${SUPPORT_EMAIL_PLACEHOLDER}.`;
+  `We couldn't match this payment to your account. Contact ${SUPPORT_EMAIL}.`;
 
 export const CHECKOUT_NOT_GRANTED =
-  `We couldn't turn on access for this payment. Contact ${SUPPORT_EMAIL_PLACEHOLDER}.`;
+  `We couldn't turn on access for this payment. Contact ${SUPPORT_EMAIL}.`;
 
 export const CHECKOUT_RESTORE_FAILED = "We couldn't confirm your access.";
 

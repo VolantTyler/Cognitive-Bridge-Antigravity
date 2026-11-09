@@ -37,6 +37,7 @@ import {
   RETAKE_REPLACES_RESULTS,
 } from "../constants/paywallCopy";
 import SiteFooter from "./SiteFooter";
+import { withSupportEmail } from "./SupportEmailLink";
 
 const POLL_MS = 30_000;
 
@@ -129,29 +130,29 @@ export function CheckoutReturn({
         </div>
         {phase === "non_us_refunded" && (
           <p role="status" className="mt-4 text-sm leading-relaxed border border-border-primary rounded-lg p-4">
-            {NON_US_REFUNDED_BODY}
+            {withSupportEmail(NON_US_REFUNDED_BODY)}
           </p>
         )}
         {refundFailed && (
           <p role="alert" className="mt-4 text-sm leading-relaxed rounded-lg p-4 bg-red-500/10 border border-red-500/20 text-status-danger">
-            {NON_US_REFUND_FAILED_BODY}
+            {withSupportEmail(NON_US_REFUND_FAILED_BODY)}
           </p>
         )}
         {(phase === "terms_not_accepted" || phase === "country_unconfirmed") && (
           <p role="alert" className="mt-4 text-sm leading-relaxed rounded-lg p-4 bg-red-500/10 border border-red-500/20 text-status-danger">
-            {CHECKOUT_NOT_GRANTED}
+            {withSupportEmail(CHECKOUT_NOT_GRANTED)}
           </p>
         )}
         {phase === "not_found" && (
           <p role="alert" className="mt-4 text-sm leading-relaxed rounded-lg p-4 bg-red-500/10 border border-red-500/20 text-status-danger">
-            {CHECKOUT_UNMATCHED}
+            {withSupportEmail(CHECKOUT_UNMATCHED)}
           </p>
         )}
         {restoreFailed && (
           <p role="alert" className="mt-4 text-sm leading-relaxed">{CHECKOUT_RESTORE_FAILED}</p>
         )}
         {phase === "timeout" && (
-          <p className="mt-4 text-sm leading-relaxed text-text-secondary">{CHECKOUT_TIMEOUT_NEXT}</p>
+          <p className="mt-4 text-sm leading-relaxed text-text-secondary">{withSupportEmail(CHECKOUT_TIMEOUT_NEXT)}</p>
         )}
         {phase === "paid" && (
           <div className="mt-4 space-y-3 text-sm leading-relaxed text-text-secondary">

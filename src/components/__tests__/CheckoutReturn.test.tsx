@@ -6,7 +6,9 @@ import {
   NON_US_HEADING,
   NON_US_REFUND_FAILED_BODY,
   NON_US_REFUNDED_BODY,
+  SUPPORT_EMAIL,
 } from "../../constants/checkoutCopy";
+import { SUPPORT_EMAIL_LINK_CLASS } from "../SupportEmailLink";
 
 const noop = async () => "pending" as const;
 
@@ -22,6 +24,9 @@ describe("checkout return", () => {
     expect(await screen.findByRole("heading", { name: NON_US_HEADING })).toBeInTheDocument();
     const status = screen.getByRole("status");
     expect(status).toHaveTextContent(NON_US_REFUNDED_BODY);
+    const mail = screen.getByRole("link", { name: SUPPORT_EMAIL });
+    expect(mail).toHaveAttribute("href", `mailto:${SUPPORT_EMAIL}`);
+    expect(mail.className).toContain(SUPPORT_EMAIL_LINK_CLASS);
     expect(status).not.toHaveTextContent(/minutes|business days|5-10/i);
     expect(BACK_TO_COGNITIVE_BRIDGE).toBe("Back to Cognitive Bridge");
     const back = screen.getByRole("link", { name: BACK_TO_COGNITIVE_BRIDGE });

@@ -3,9 +3,7 @@
  * Strings are copied from the spec. Gaps that the spec left open are named
  * COPY_GAP_* constants and listed in the PR.
  */
-import { SUPPORT_EMAIL_PLACEHOLDER } from "./checkoutCopy";
-
-export const COPY_GAP_SUPPORT_EMAIL = SUPPORT_EMAIL_PLACEHOLDER;
+import { SUPPORT_EMAIL } from "./checkoutCopy";
 
 /** Spec entry label. The demo is the signed-out landing, so this is not a separate screen. */
 export const COPY_GAP_LANDING_CTA = "Try the free demo";
@@ -97,6 +95,9 @@ export const FINAL_SALE =
 
 export const PAYWALL_BUTTON = "Unlock my interview, $6";
 
+/** Remove when live Stripe keys replace test mode. */
+export const PAYWALL_TEST_MODE = "Test mode: no real charge. Use a Stripe test card.";
+
 export const PAYWALL_BUTTON_BUSY = "Opening checkout…";
 
 export const PAYWALL_CAPTION =
@@ -134,7 +135,7 @@ export const SUCCESS_RECEIPT = "Stripe emails your receipt to the address you us
 export const START_INTERVIEW = "Start interview";
 
 export const CHECKOUT_TIMEOUT_NEXT =
-  `Tap Restore purchase. If that doesn't work, contact us. We'll fix it or refund you. Contact ${COPY_GAP_SUPPORT_EMAIL}.`;
+  `Tap Restore purchase. If that doesn't work, contact us. We'll fix it or refund you. Contact ${SUPPORT_EMAIL}.`;
 
 export const SIGNED_IN_AS = "Signed in as";
 

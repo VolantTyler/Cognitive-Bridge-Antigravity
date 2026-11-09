@@ -6,6 +6,7 @@ import {
   buildCheckoutSessionCreateParams,
   checkoutIdempotencyKey,
   isStripeTestKey,
+  loadCheckoutConfig,
   termsAcceptanceMessage,
   termsUrlForBase,
 } from "./checkoutConfig";
@@ -512,6 +513,37 @@ describe("createCheckout", () => {
       line_items: [{ price: "price_from_env", quantity: 1 }],
     });
     expect(store.sessions.get("cs_123")?.outcome).toBe("open");
+  });
+
+  it("returns 503 when the price id is empty and does not call Stripe", async () => {
+    const store = new MemoryStore();
+    const createSession = vi.fn();
+    const res = jsonRes();
+    await handleCreateCheckout({
+      method: "POST",
+      headers: { authorization: "Bearer token" },
+    }, res, deps(store, {
+      config: () => ({
+        priceId: "",
+        baseUrl: "https://cognitive-bridge-ai.web.app",
+        paymentsEnabled: true,
+        managedPayments: false,
+        automaticTax: false,
+      }),
+      gateway: () => ({
+        createSession,
+        refundNonUs: async () => undefined,
+        retrieveSession: async () => null,
+        findSucceededSessionIds: async () => [],
+      }),
+    }));
+    expect(res.code).toBe(503);
+    expect(res.body).toMatchObject({ code: "payments_disabled" });
+    expect(createSession).not.toHaveBeenCalled();
+    expect(loadCheckoutConfig({
+      STRIPE_PRICE_ID: "",
+      PAYMENTS_ENABLED: "true",
+    })).toMatchObject({ priceId: "", paymentsEnabled: true });
   });
 
   it("refuses a live secret key", async () => {

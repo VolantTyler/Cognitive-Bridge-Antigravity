@@ -6,6 +6,7 @@ import {
   FINAL_SALE,
   PAYWALL_BUTTON,
   PAYWALL_PRICE,
+  PAYWALL_TEST_MODE,
   PAYWALL_TITLE,
   PAYWALL_US,
 } from "../../constants/paywallCopy";
@@ -39,6 +40,8 @@ describe("paywall", () => {
     expect(sale?.textContent).toContain("Terms");
     const button = screen.getByRole("button", { name: PAYWALL_BUTTON });
     expect(button).toHaveAttribute("aria-describedby", "final-sale");
+    const testMode = screen.getByText(PAYWALL_TEST_MODE);
+    expect(testMode.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
     expect(screen.getByRole("status")).toHaveTextContent(CHECKOUT_CANCELED_BANNER);
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     fireEvent.click(button);

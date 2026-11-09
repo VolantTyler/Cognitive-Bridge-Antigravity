@@ -20,6 +20,7 @@ import {
   PAYWALL_BUTTON,
   PAYWALL_BUTTON_BUSY,
   PAYWALL_CAPTION,
+  PAYWALL_TEST_MODE,
   PAYWALL_FRAMING,
   INTERVIEW_COUNT_LINE,
   PAYWALL_INCLUSIONS,
@@ -148,15 +149,18 @@ export default function AccessFlow({
         {" "}
         <a href="/terms" className="underline">Terms</a>
       </div>
-      <button
-        type="button"
-        className={`${primaryClass} mt-3`}
-        aria-describedby="final-sale"
-        disabled={busy}
-        onClick={onUnlock}
-      >
-        {busy ? PAYWALL_BUTTON_BUSY : PAYWALL_BUTTON}
-      </button>
+      <div className="mt-3 flex flex-col items-start gap-2">
+        <button
+          type="button"
+          className={primaryClass}
+          aria-describedby="final-sale"
+          disabled={busy}
+          onClick={onUnlock}
+        >
+          {busy ? PAYWALL_BUTTON_BUSY : PAYWALL_BUTTON}
+        </button>
+        <p className="text-sm text-text-secondary">{PAYWALL_TEST_MODE}</p>
+      </div>
       <p className="mt-2 text-xs leading-relaxed text-text-secondary">{PAYWALL_CAPTION}</p>
       <div className="mt-4 flex flex-col gap-2 text-sm">
         <button type="button" className="min-h-11 text-left text-text-secondary underline" onClick={onBackToDemo}>
