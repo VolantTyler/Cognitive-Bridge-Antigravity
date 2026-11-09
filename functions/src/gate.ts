@@ -198,18 +198,6 @@ export function appCheckError(): GateError {
   return new GateError(401, "app_check", AI_ACCESS_MESSAGES.app_check);
 }
 
-/**
- * TODO(v2.4.0 FR-16): enforce entitlements/{uid}.interviewsAllowed
- * (2 per purchase: 1 interview + 1 retake). Not implemented in this PR.
- * The Stripe webhook writes interviewsAllowed. The counter is a later PR.
- * When added, increment usage/{uid}.interviewsUsed in the same transaction
- * style as the bridge daily cap and return 429 when the purchase is used up.
- * Pre-v2.4.0 saved results do not grant a free live-chat or interview exception.
- */
-export async function reserveInterviewSlot(_uid: string, _feature: string): Promise<void> {
-  return;
-}
-
 export interface HeaderSource {
   headers?: Record<string, string | string[] | undefined>;
   header?: (name: string) => string | undefined;

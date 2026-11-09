@@ -10,6 +10,7 @@ import { Message, OceanScores } from '../types';
 import { MIRROR_SYSTEM_PROMPT } from '../constants';
 import { chatWithGeminiStream } from '../services/gemini';
 import { AiAccessError } from '../services/aiAccess';
+import { AI_DISCLOSURE } from '../constants/paywallCopy';
 import { OceanJudgment } from '../jev/questions';
 import { judgeOcean } from '../services/jev';
 import OceanCards from './OceanCards';
@@ -211,6 +212,7 @@ export default function Mirror({ messages, setMessages, onComplete, onSaveSessio
 
   return (
     <div className="h-full flex flex-col gap-6 overflow-hidden">
+      <p className="text-sm leading-relaxed text-text-secondary">{AI_DISCLOSURE}</p>
       <OceanCards scores={null} />
 
       <div className="flex-1 flex flex-col bg-bg-secondary text-text-primary font-sans border border-border-primary rounded-xl overflow-hidden shadow-2xl relative transition-colors duration-300">

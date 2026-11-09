@@ -37,6 +37,7 @@ exports.guardChat = guardChat;
 exports.guardJudge = guardJudge;
 exports.defaultGuardDeps = defaultGuardDeps;
 const auth_1 = require("./auth");
+const interviewStore_1 = require("./interviewStore");
 const modelRouter_1 = require("./modelRouter");
 const gate_1 = require("./gate");
 function asRecord(body) {
@@ -153,7 +154,7 @@ function defaultGuardDeps(overrides = {}) {
             const spentMicros = await readDailyCostMicros(uid, day);
             await assertUnderDailyCostCap({ spentMicros, capUsd });
         },
-        reserveInterview: gate_1.reserveInterviewSlot,
+        reserveInterview: interviewStore_1.reserveInterviewForChat,
         verifyAppCheck: async (token) => {
             const { verifyAppCheckToken } = await Promise.resolve().then(() => __importStar(require("./adminStore")));
             return verifyAppCheckToken(token);

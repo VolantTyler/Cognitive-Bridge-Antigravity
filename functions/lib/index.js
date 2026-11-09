@@ -1,13 +1,16 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.stripeWebhook = exports.checkoutStatus = exports.restorePurchase = exports.createCheckout = exports.judgeProxy = exports.chatProxy = void 0;
+exports.completeInterview = exports.reserveInterviewSlot = exports.accessStatus = exports.stripeWebhook = exports.checkoutStatus = exports.restorePurchase = exports.createCheckout = exports.judgeProxy = exports.chatProxy = void 0;
 const https_1 = require("firebase-functions/v2/https");
 const params_1 = require("firebase-functions/params");
 const genai_1 = require("@google/genai");
 const cors_1 = require("./cors");
 const chatHandler_1 = require("./chatHandler");
 const judgeHandler_1 = require("./judgeHandler");
+const gate_1 = require("./gate");
 const guard_1 = require("./guard");
+const interviewStore_1 = require("./interviewStore");
+const interviewHttp_1 = require("./interviewHttp");
 const params_2 = require("./params");
 const adminStore_1 = require("./adminStore");
 const auth_1 = require("./auth");
@@ -44,6 +47,11 @@ exports.chatProxy = (0, https_1.onRequest)({ cors, timeoutSeconds: 120 }, async 
         guard: (incoming) => (0, guard_1.guardChat)(incoming, deps),
         ai: ai,
         logUsage,
+        markInterviewStarted: async (ctx) => {
+            if (!ctx.uid || !(0, gate_1.isInterviewFeature)(ctx.feature))
+                return;
+            await (0, interviewStore_1.markInterviewStarted)(ctx.uid);
+        },
     });
 });
 exports.judgeProxy = (0, https_1.onRequest)({ cors, timeoutSeconds: 30 }, async (req, res) => {
@@ -90,4 +98,24 @@ exports.stripeWebhook = (0, https_1.onRequest)({
     secrets: [stripeSecretKey, stripeWebhookSecret],
     timeoutSeconds: 60,
 }, (req, res) => (0, checkoutHttp_1.handleStripeWebhook)(req, res, checkoutHttpDeps()));
+function interviewHttpDeps() {
+    return {
+        verifyIdToken: auth_1.verifyIdTokenWithAdmin,
+        verifyAppCheck: adminStore_1.verifyAppCheckToken,
+        enforceAppCheck: () => (0, params_2.loadGateConfig)().enforceAppCheck,
+        now: () => Date.now(),
+        readAccess: (uid) => (0, interviewStore_1.readAccessView)(uid),
+        reserve: (uid, now) => (0, interviewStore_1.reserveInterviewSlot)(uid, now),
+        complete: (uid, reservationId, now) => (0, interviewStore_1.completeInterviewSlot)(uid, reservationId, now),
+    };
+}
+exports.accessStatus = (0, https_1.onRequest)({ cors, timeoutSeconds: 15 }, (req, res) => {
+    return (0, interviewHttp_1.handleAccessStatus)(req, res, interviewHttpDeps());
+});
+exports.reserveInterviewSlot = (0, https_1.onRequest)({ cors, timeoutSeconds: 15 }, (req, res) => {
+    return (0, interviewHttp_1.handleReserveInterview)(req, res, interviewHttpDeps());
+});
+exports.completeInterview = (0, https_1.onRequest)({ cors, timeoutSeconds: 15 }, (req, res) => {
+    return (0, interviewHttp_1.handleCompleteInterview)(req, res, interviewHttpDeps());
+});
 //# sourceMappingURL=index.js.map

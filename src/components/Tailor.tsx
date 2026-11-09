@@ -9,6 +9,7 @@ import { OceanScores } from '../types';
 import { getActiveDirectives, generatePortableMetadata } from '../constants';
 import { Brain, ArrowRight, Dna, Activity, Users, ShieldAlert, Heart, Copy, Check, FileCode } from 'lucide-react';
 import OceanCards from './OceanCards';
+import { RESULTS_HEADING, RESULTS_SUB } from '../constants/paywallCopy';
 import StrategyBadge from './StrategyBadge';
 
 interface TailorProps {
@@ -19,7 +20,7 @@ interface TailorProps {
 const TRAIT_CONFIG = {
   openness: { label: 'Openness', color: 'text-accent-purple' },
   conscientiousness: { label: 'Conscientiousness', color: 'text-accent-blue' },
-  extroversion: { label: 'Extroversion', color: 'text-accent-yellow' },
+  extroversion: { label: 'Extraversion', color: 'text-accent-yellow' },
   agreeableness: { label: 'Agreeableness', color: 'text-accent-green' },
   neuroticism: { label: 'Neuroticism', color: 'text-accent-red' },
 };
@@ -38,6 +39,10 @@ export default function Tailor({ scores, onNext }: TailorProps) {
 
   return (
     <div className="h-full flex flex-col gap-6 overflow-hidden">
+      <div>
+        <h2 className="text-lg font-semibold text-text-primary">{RESULTS_HEADING}</h2>
+        <p className="mt-1 text-sm text-text-secondary">{RESULTS_SUB}</p>
+      </div>
       <OceanCards scores={scores} />
 
       <div className="flex-1 flex flex-col bg-bg-secondary text-text-primary font-sans border border-border-primary rounded-xl overflow-hidden shadow-2xl relative transition-colors duration-300 min-h-0">

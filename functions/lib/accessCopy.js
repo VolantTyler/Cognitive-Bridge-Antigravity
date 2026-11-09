@@ -34,24 +34,30 @@ exports.AI_ACCESS_CODES = {
     costCap: "cost_cap",
     inputTooLong: "input_too_long",
     interviewsPaused: "interviews_paused",
+    interviewsExhausted: "interviews_exhausted",
     appCheck: "app_check",
 };
 /** Request-count cap. Does not print the 100-request ceiling. */
 function dailyCapMessage() {
     return `You've reached today's chat limit (up to ${exports.BRIDGE_CHAT_DAILY_MESSAGE_COPY} messages a day). Chat opens again at ${exports.CHAT_CAP_RESET_LABEL}. Your results are still here.`;
 }
-/** Dollar cap. No amounts, and no talk of cost. Same Eastern-day reset as the message cap. */
+/**
+ * Dollar cap. Checked on every guarded chatProxy and judgeProxy call, including
+ * Mirror and scoring, so the wording is a usage limit. The 50-message line
+ * stays on the bridge request cap only.
+ */
 function costCapMessage() {
-    return `You've reached today's chat limit. It resets at ${exports.CHAT_CAP_RESET_LABEL}.`;
+    return `You've reached today's usage limit. It resets at ${exports.CHAT_CAP_RESET_LABEL}. Your results are still here.`;
 }
 exports.AI_ACCESS_MESSAGES = {
     signed_out: "Sign in to save your progress.",
     session_ended: "Your session ended. Sign in to save your progress.",
-    payment_required: "This is part of Cognitive Bridge: Personal Interview and Results ($6, one-time). Already bought it? Try Restore purchase.",
+    payment_required: "This part needs a purchase. If you've paid, try Restore purchase.",
     daily_cap: dailyCapMessage(),
     cost_cap: costCapMessage(),
     input_too_long: "That message is too long. Try a shorter one.",
-    interviews_paused: "New interviews are paused for now. Your results are still available.",
+    interviews_paused: "New interviews are paused for now. Your results are still available if you're signed in.",
+    interviews_exhausted: "You've used both interviews included with your purchase. Your results stay available. Each account can buy once.",
     app_check: "We couldn't connect just now. Refresh the page and try again.",
 };
 /** Server `code` values on /api/chat and /api/judge. */
@@ -63,6 +69,7 @@ exports.SERVER_ACCESS_CODES = {
     costCapReached: "cost_cap_reached",
     inputTooLong: "input_too_long",
     interviewsPaused: "interviews_paused",
+    interviewsExhausted: "interviews_exhausted",
     appCheck: "app_check",
 };
 exports.SERVER_CODE_TO_CLIENT = {
@@ -73,6 +80,7 @@ exports.SERVER_CODE_TO_CLIENT = {
     cost_cap_reached: "cost_cap",
     input_too_long: "input_too_long",
     interviews_paused: "interviews_paused",
+    interviews_exhausted: "interviews_exhausted",
     app_check: "app_check",
 };
 //# sourceMappingURL=accessCopy.js.map

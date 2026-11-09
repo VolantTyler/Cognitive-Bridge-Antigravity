@@ -1,0 +1,1009 @@
+{
+ "generatedBy": "frontier-real-verify/run-demo.ts: real matchModels + buildView + deriveSection from /workspace/cb-fresh @ b3a0d04",
+ "scoreFile": "scores-frontier-real-2026-11-02.json",
+ "generatedAt": "2026-11-04T20:03:44.835Z",
+ "profiles": {
+  "Example A (The Explorer)": {
+   "profile": {
+    "openness": 85,
+    "conscientiousness": 25,
+    "extroversion": 50,
+    "agreeableness": 50,
+    "neuroticism": 50
+   },
+   "recommendation": "tiers",
+   "tiers": [
+    {
+     "model": "google/gemini-3.8-flash",
+     "tier": "strong",
+     "driving_traits": [
+      "openness",
+      "conscientiousness"
+     ]
+    },
+    {
+     "model": "x-ai/grok-4.7",
+     "tier": "strong",
+     "driving_traits": [
+      "openness",
+      "conscientiousness"
+     ]
+    },
+    {
+     "model": "anthropic/claude-opus-5.5",
+     "tier": "decent",
+     "driving_traits": [
+      "conscientiousness"
+     ]
+    },
+    {
+     "model": "openai/gpt-6-luna",
+     "tier": "strong",
+     "driving_traits": [
+      "openness",
+      "conscientiousness"
+     ]
+    }
+   ],
+   "match": {
+    "label": "design hypothesis based on research",
+    "recommendation": "tiers",
+    "targets": [
+     {
+      "trait": "openness",
+      "threshold": "high",
+      "strategy": "congruent",
+      "target_direction": "high",
+      "confidence": "normal",
+      "exclude_from_tiering": false,
+      "exclusion_reason": null,
+      "user_score": 85
+     },
+     {
+      "trait": "conscientiousness",
+      "threshold": "low",
+      "strategy": "compensatory",
+      "target_direction": "high",
+      "confidence": "normal",
+      "exclude_from_tiering": false,
+      "exclusion_reason": null,
+      "user_score": 25
+     }
+    ],
+    "strategy_table": [
+     {
+      "trait": "openness",
+      "threshold": "high",
+      "strategy": "congruent",
+      "target_direction": "high",
+      "confidence": "normal",
+      "exclude_from_tiering": false,
+      "exclusion_reason": null
+     },
+     {
+      "trait": "openness",
+      "threshold": "low",
+      "strategy": "congruent",
+      "target_direction": "low",
+      "confidence": "normal",
+      "exclude_from_tiering": false,
+      "exclusion_reason": null
+     },
+     {
+      "trait": "conscientiousness",
+      "threshold": "high",
+      "strategy": "congruent",
+      "target_direction": "high",
+      "confidence": "normal",
+      "exclude_from_tiering": false,
+      "exclusion_reason": null
+     },
+     {
+      "trait": "conscientiousness",
+      "threshold": "low",
+      "strategy": "compensatory",
+      "target_direction": "high",
+      "confidence": "normal",
+      "exclude_from_tiering": false,
+      "exclusion_reason": null
+     },
+     {
+      "trait": "extroversion",
+      "threshold": "high",
+      "strategy": "complementary",
+      "target_direction": "low",
+      "confidence": "low",
+      "exclude_from_tiering": true,
+      "exclusion_reason": "Excluded from tiering: extroversion scores sit near the middle of the scale and swing from run to run by about as much as models differ from each other, so they cannot separate models reliably. Means are still reported."
+     },
+     {
+      "trait": "extroversion",
+      "threshold": "low",
+      "strategy": "congruent",
+      "target_direction": "low",
+      "confidence": "normal",
+      "exclude_from_tiering": true,
+      "exclusion_reason": "Excluded from tiering: extroversion scores sit near the middle of the scale and swing from run to run by about as much as models differ from each other, so they cannot separate models reliably. Means are still reported."
+     },
+     {
+      "trait": "agreeableness",
+      "threshold": "high",
+      "strategy": "congruent",
+      "target_direction": "high",
+      "confidence": "normal",
+      "exclude_from_tiering": false,
+      "exclusion_reason": null
+     },
+     {
+      "trait": "agreeableness",
+      "threshold": "low",
+      "strategy": "congruent",
+      "target_direction": "low",
+      "confidence": "normal",
+      "exclude_from_tiering": false,
+      "exclusion_reason": null
+     },
+     {
+      "trait": "neuroticism",
+      "threshold": "high",
+      "strategy": "compensatory",
+      "target_direction": "low",
+      "confidence": "normal",
+      "exclude_from_tiering": false,
+      "exclusion_reason": null
+     },
+     {
+      "trait": "neuroticism",
+      "threshold": "low",
+      "strategy": "complementary",
+      "target_direction": null,
+      "confidence": "not_scored",
+      "exclude_from_tiering": true,
+      "exclusion_reason": null
+     }
+    ],
+    "active_traits": [
+     "openness",
+     "conscientiousness"
+    ],
+    "ranking_note": null,
+    "models": [
+     {
+      "model_id": "google/gemini-3.8-flash",
+      "tier": "strong",
+      "driving_traits": [
+       "openness",
+       "conscientiousness"
+      ],
+      "missing_traits": [],
+      "traits": {
+       "openness": {
+        "strategy": "congruent",
+        "target_direction": "high",
+        "confidence": "normal",
+        "included_in_tier": true,
+        "exclusion_reason": null,
+        "user_score": 85,
+        "model_mean": 79.5,
+        "model_low": 70,
+        "model_high": 85
+       },
+       "conscientiousness": {
+        "strategy": "compensatory",
+        "target_direction": "high",
+        "confidence": "normal",
+        "included_in_tier": true,
+        "exclusion_reason": null,
+        "user_score": 25,
+        "model_mean": 80.5,
+        "model_low": 75,
+        "model_high": 90
+       }
+      }
+     },
+     {
+      "model_id": "x-ai/grok-4.7",
+      "tier": "strong",
+      "driving_traits": [
+       "openness",
+       "conscientiousness"
+      ],
+      "missing_traits": [],
+      "traits": {
+       "openness": {
+        "strategy": "congruent",
+        "target_direction": "high",
+        "confidence": "normal",
+        "included_in_tier": true,
+        "exclusion_reason": null,
+        "user_score": 85,
+        "model_mean": 75,
+        "model_low": 70,
+        "model_high": 85
+       },
+       "conscientiousness": {
+        "strategy": "compensatory",
+        "target_direction": "high",
+        "confidence": "normal",
+        "included_in_tier": true,
+        "exclusion_reason": null,
+        "user_score": 25,
+        "model_mean": 83.57142857142857,
+        "model_low": 80,
+        "model_high": 90
+       }
+      }
+     },
+     {
+      "model_id": "anthropic/claude-opus-5.5",
+      "tier": "decent",
+      "driving_traits": [
+       "conscientiousness"
+      ],
+      "missing_traits": [],
+      "traits": {
+       "openness": {
+        "strategy": "congruent",
+        "target_direction": "high",
+        "confidence": "normal",
+        "included_in_tier": true,
+        "exclusion_reason": null,
+        "user_score": 85,
+        "model_mean": 87,
+        "model_low": 80,
+        "model_high": 90
+       },
+       "conscientiousness": {
+        "strategy": "compensatory",
+        "target_direction": "high",
+        "confidence": "normal",
+        "included_in_tier": true,
+        "exclusion_reason": null,
+        "user_score": 25,
+        "model_mean": 71,
+        "model_low": 40,
+        "model_high": 85
+       }
+      }
+     },
+     {
+      "model_id": "openai/gpt-6-luna",
+      "tier": "strong",
+      "driving_traits": [
+       "openness",
+       "conscientiousness"
+      ],
+      "missing_traits": [],
+      "traits": {
+       "openness": {
+        "strategy": "congruent",
+        "target_direction": "high",
+        "confidence": "normal",
+        "included_in_tier": true,
+        "exclusion_reason": null,
+        "user_score": 85,
+        "model_mean": 73,
+        "model_low": 60,
+        "model_high": 80
+       },
+       "conscientiousness": {
+        "strategy": "compensatory",
+        "target_direction": "high",
+        "confidence": "normal",
+        "included_in_tier": true,
+        "exclusion_reason": null,
+        "user_score": 25,
+        "model_mean": 78,
+        "model_low": 70,
+        "model_high": 90
+       }
+      }
+     }
+    ]
+   },
+   "section": {
+    "chips": [
+     {
+      "key": "openness-high",
+      "primary": "Openness: high, so models should be high",
+      "secondary": "congruent",
+      "muted": false
+     },
+     {
+      "key": "conscientiousness-low",
+      "primary": "Conscientiousness: low, so models should be high",
+      "secondary": "compensatory",
+      "muted": false
+     }
+    ],
+    "showExtroversionNote": false,
+    "showNeuroticismNote": false,
+    "emptyState": null,
+    "tieBanner": null,
+    "allPoor": false,
+    "groups": [
+     {
+      "id": "strong",
+      "heading": "Strong fit",
+      "models": [
+       {
+        "modelId": "google/gemini-3.8-flash",
+        "tier": "strong",
+        "showTierChip": true,
+        "sentence": "Matches you on openness and conscientiousness.",
+        "rows": [
+         {
+          "trait": "openness",
+          "label": "Openness, wants high",
+          "caption": "Mean 80, runs 70 to 85",
+          "mean": 79.5,
+          "low": 70,
+          "high": 85,
+          "direction": "high",
+          "wideRange": false,
+          "lowConfidence": false,
+          "dashed": false,
+          "ariaLabel": "Openness, wants high: mean 80, minimum 70, maximum 85. Target zone is above 50."
+         },
+         {
+          "trait": "conscientiousness",
+          "label": "Conscientiousness, wants high",
+          "caption": "Mean 81, runs 75 to 90",
+          "mean": 80.5,
+          "low": 75,
+          "high": 90,
+          "direction": "high",
+          "wideRange": false,
+          "lowConfidence": false,
+          "dashed": false,
+          "ariaLabel": "Conscientiousness, wants high: mean 81, minimum 75, maximum 90. Target zone is above 50."
+         }
+        ],
+        "fewerRunsTag": null,
+        "closeCallNote": null,
+        "missingTraitLabel": null,
+        "sourceRank": null,
+        "relativeRankLabel": null,
+        "timestampIso": "2026-11-02T15:25:24.342Z",
+        "runLabelChip": "frontier",
+        "repeats": 10,
+        "technicalDetail": null,
+        "providerDetail": "Served by Google (10).",
+        "reasoningDetail": null
+       },
+       {
+        "modelId": "openai/gpt-6-luna",
+        "tier": "strong",
+        "showTierChip": true,
+        "sentence": "Matches you on openness and conscientiousness.",
+        "rows": [
+         {
+          "trait": "openness",
+          "label": "Openness, wants high",
+          "caption": "Mean 73, runs 60 to 80",
+          "mean": 73,
+          "low": 60,
+          "high": 80,
+          "direction": "high",
+          "wideRange": false,
+          "lowConfidence": false,
+          "dashed": false,
+          "ariaLabel": "Openness, wants high: mean 73, minimum 60, maximum 80. Target zone is above 50."
+         },
+         {
+          "trait": "conscientiousness",
+          "label": "Conscientiousness, wants high",
+          "caption": "Mean 78, runs 70 to 90",
+          "mean": 78,
+          "low": 70,
+          "high": 90,
+          "direction": "high",
+          "wideRange": false,
+          "lowConfidence": false,
+          "dashed": false,
+          "ariaLabel": "Conscientiousness, wants high: mean 78, minimum 70, maximum 90. Target zone is above 50."
+         }
+        ],
+        "fewerRunsTag": null,
+        "closeCallNote": null,
+        "missingTraitLabel": null,
+        "sourceRank": null,
+        "relativeRankLabel": null,
+        "timestampIso": "2026-11-02T16:03:28.018Z",
+        "runLabelChip": "frontier",
+        "repeats": 10,
+        "technicalDetail": null,
+        "providerDetail": "Served by OpenAI (10).",
+        "reasoningDetail": null
+       },
+       {
+        "modelId": "x-ai/grok-4.7",
+        "tier": "strong",
+        "showTierChip": true,
+        "sentence": "Matches you on openness and conscientiousness.",
+        "rows": [
+         {
+          "trait": "openness",
+          "label": "Openness, wants high",
+          "caption": "Mean 75, runs 70 to 85",
+          "mean": 75,
+          "low": 70,
+          "high": 85,
+          "direction": "high",
+          "wideRange": false,
+          "lowConfidence": false,
+          "dashed": true,
+          "ariaLabel": "Openness, wants high: mean 75, minimum 70, maximum 85. Target zone is above 50."
+         },
+         {
+          "trait": "conscientiousness",
+          "label": "Conscientiousness, wants high",
+          "caption": "Mean 84, runs 80 to 90",
+          "mean": 83.57142857142857,
+          "low": 80,
+          "high": 90,
+          "direction": "high",
+          "wideRange": false,
+          "lowConfidence": false,
+          "dashed": true,
+          "ariaLabel": "Conscientiousness, wants high: mean 84, minimum 80, maximum 90. Target zone is above 50."
+         }
+        ],
+        "fewerRunsTag": "7 of 10 runs",
+        "closeCallNote": null,
+        "missingTraitLabel": null,
+        "sourceRank": null,
+        "relativeRankLabel": null,
+        "timestampIso": "2026-11-02T15:47:31.637Z",
+        "runLabelChip": "frontier",
+        "repeats": 10,
+        "technicalDetail": null,
+        "providerDetail": "Served by xAI (7).",
+        "reasoningDetail": null
+       }
+      ],
+      "collapsed": false
+     },
+     {
+      "id": "decent",
+      "heading": "Decent fit",
+      "models": [
+       {
+        "modelId": "anthropic/claude-opus-5.5",
+        "tier": "decent",
+        "showTierChip": true,
+        "sentence": "In at least one test run, this model scored at or below the midpoint on a trait you care about.",
+        "rows": [
+         {
+          "trait": "conscientiousness",
+          "label": "Conscientiousness, wants high",
+          "caption": "Mean 71, runs 40 to 85",
+          "mean": 71,
+          "low": 40,
+          "high": 85,
+          "direction": "high",
+          "wideRange": true,
+          "lowConfidence": false,
+          "dashed": false,
+          "ariaLabel": "Conscientiousness, wants high: mean 71, minimum 40, maximum 85. Target zone is above 50."
+         }
+        ],
+        "fewerRunsTag": null,
+        "closeCallNote": null,
+        "missingTraitLabel": null,
+        "sourceRank": null,
+        "relativeRankLabel": null,
+        "timestampIso": "2026-11-02T15:57:32.675Z",
+        "runLabelChip": "frontier",
+        "repeats": 10,
+        "technicalDetail": null,
+        "providerDetail": "Served by Claude Platform on AWS (10).",
+        "reasoningDetail": null
+       }
+      ],
+      "collapsed": false
+     }
+    ],
+    "rankingNote": null,
+    "orderedBy": "model-id",
+    "context": {
+     "runLabel": "frontier",
+     "hypothesisLabel": "design hypothesis based on research",
+     "repeats": 10,
+     "generatedAt": "2026-11-02T16:03:28.019Z",
+     "partial": false,
+     "spreadWarning": false,
+     "judgeModelId": "google/gemini-2.5-flash-lite",
+     "reasoningEffort": "minimal"
+    }
+   }
+  },
+  "Example B (The Planner)": {
+   "profile": {
+    "openness": 45,
+    "conscientiousness": 85,
+    "extroversion": 50,
+    "agreeableness": 50,
+    "neuroticism": 25
+   },
+   "recommendation": "tiers",
+   "tiers": [
+    {
+     "model": "google/gemini-3.8-flash",
+     "tier": "strong",
+     "driving_traits": [
+      "conscientiousness"
+     ]
+    },
+    {
+     "model": "x-ai/grok-4.7",
+     "tier": "strong",
+     "driving_traits": [
+      "conscientiousness"
+     ]
+    },
+    {
+     "model": "anthropic/claude-opus-5.5",
+     "tier": "decent",
+     "driving_traits": [
+      "conscientiousness"
+     ]
+    },
+    {
+     "model": "openai/gpt-6-luna",
+     "tier": "strong",
+     "driving_traits": [
+      "conscientiousness"
+     ]
+    }
+   ],
+   "match": {
+    "label": "design hypothesis based on research",
+    "recommendation": "tiers",
+    "targets": [
+     {
+      "trait": "conscientiousness",
+      "threshold": "high",
+      "strategy": "congruent",
+      "target_direction": "high",
+      "confidence": "normal",
+      "exclude_from_tiering": false,
+      "exclusion_reason": null,
+      "user_score": 85
+     },
+     {
+      "trait": "neuroticism",
+      "threshold": "low",
+      "strategy": "complementary",
+      "target_direction": null,
+      "confidence": "not_scored",
+      "exclude_from_tiering": true,
+      "exclusion_reason": null,
+      "user_score": 25
+     }
+    ],
+    "strategy_table": [
+     {
+      "trait": "openness",
+      "threshold": "high",
+      "strategy": "congruent",
+      "target_direction": "high",
+      "confidence": "normal",
+      "exclude_from_tiering": false,
+      "exclusion_reason": null
+     },
+     {
+      "trait": "openness",
+      "threshold": "low",
+      "strategy": "congruent",
+      "target_direction": "low",
+      "confidence": "normal",
+      "exclude_from_tiering": false,
+      "exclusion_reason": null
+     },
+     {
+      "trait": "conscientiousness",
+      "threshold": "high",
+      "strategy": "congruent",
+      "target_direction": "high",
+      "confidence": "normal",
+      "exclude_from_tiering": false,
+      "exclusion_reason": null
+     },
+     {
+      "trait": "conscientiousness",
+      "threshold": "low",
+      "strategy": "compensatory",
+      "target_direction": "high",
+      "confidence": "normal",
+      "exclude_from_tiering": false,
+      "exclusion_reason": null
+     },
+     {
+      "trait": "extroversion",
+      "threshold": "high",
+      "strategy": "complementary",
+      "target_direction": "low",
+      "confidence": "low",
+      "exclude_from_tiering": true,
+      "exclusion_reason": "Excluded from tiering: extroversion scores sit near the middle of the scale and swing from run to run by about as much as models differ from each other, so they cannot separate models reliably. Means are still reported."
+     },
+     {
+      "trait": "extroversion",
+      "threshold": "low",
+      "strategy": "congruent",
+      "target_direction": "low",
+      "confidence": "normal",
+      "exclude_from_tiering": true,
+      "exclusion_reason": "Excluded from tiering: extroversion scores sit near the middle of the scale and swing from run to run by about as much as models differ from each other, so they cannot separate models reliably. Means are still reported."
+     },
+     {
+      "trait": "agreeableness",
+      "threshold": "high",
+      "strategy": "congruent",
+      "target_direction": "high",
+      "confidence": "normal",
+      "exclude_from_tiering": false,
+      "exclusion_reason": null
+     },
+     {
+      "trait": "agreeableness",
+      "threshold": "low",
+      "strategy": "congruent",
+      "target_direction": "low",
+      "confidence": "normal",
+      "exclude_from_tiering": false,
+      "exclusion_reason": null
+     },
+     {
+      "trait": "neuroticism",
+      "threshold": "high",
+      "strategy": "compensatory",
+      "target_direction": "low",
+      "confidence": "normal",
+      "exclude_from_tiering": false,
+      "exclusion_reason": null
+     },
+     {
+      "trait": "neuroticism",
+      "threshold": "low",
+      "strategy": "complementary",
+      "target_direction": null,
+      "confidence": "not_scored",
+      "exclude_from_tiering": true,
+      "exclusion_reason": null
+     }
+    ],
+    "active_traits": [
+     "conscientiousness"
+    ],
+    "ranking_note": null,
+    "models": [
+     {
+      "model_id": "google/gemini-3.8-flash",
+      "tier": "strong",
+      "driving_traits": [
+       "conscientiousness"
+      ],
+      "missing_traits": [],
+      "traits": {
+       "conscientiousness": {
+        "strategy": "congruent",
+        "target_direction": "high",
+        "confidence": "normal",
+        "included_in_tier": true,
+        "exclusion_reason": null,
+        "user_score": 85,
+        "model_mean": 80.5,
+        "model_low": 75,
+        "model_high": 90
+       },
+       "neuroticism": {
+        "strategy": "complementary",
+        "target_direction": null,
+        "confidence": "not_scored",
+        "included_in_tier": false,
+        "exclusion_reason": null,
+        "user_score": 25,
+        "model_mean": 27.5,
+        "model_low": 25,
+        "model_high": 30
+       }
+      }
+     },
+     {
+      "model_id": "x-ai/grok-4.7",
+      "tier": "strong",
+      "driving_traits": [
+       "conscientiousness"
+      ],
+      "missing_traits": [],
+      "traits": {
+       "conscientiousness": {
+        "strategy": "congruent",
+        "target_direction": "high",
+        "confidence": "normal",
+        "included_in_tier": true,
+        "exclusion_reason": null,
+        "user_score": 85,
+        "model_mean": 83.57142857142857,
+        "model_low": 80,
+        "model_high": 90
+       },
+       "neuroticism": {
+        "strategy": "complementary",
+        "target_direction": null,
+        "confidence": "not_scored",
+        "included_in_tier": false,
+        "exclusion_reason": null,
+        "user_score": 25,
+        "model_mean": 25,
+        "model_low": 20,
+        "model_high": 30
+       }
+      }
+     },
+     {
+      "model_id": "anthropic/claude-opus-5.5",
+      "tier": "decent",
+      "driving_traits": [
+       "conscientiousness"
+      ],
+      "missing_traits": [],
+      "traits": {
+       "conscientiousness": {
+        "strategy": "congruent",
+        "target_direction": "high",
+        "confidence": "normal",
+        "included_in_tier": true,
+        "exclusion_reason": null,
+        "user_score": 85,
+        "model_mean": 71,
+        "model_low": 40,
+        "model_high": 85
+       },
+       "neuroticism": {
+        "strategy": "complementary",
+        "target_direction": null,
+        "confidence": "not_scored",
+        "included_in_tier": false,
+        "exclusion_reason": null,
+        "user_score": 25,
+        "model_mean": 27.5,
+        "model_low": 20,
+        "model_high": 30
+       }
+      }
+     },
+     {
+      "model_id": "openai/gpt-6-luna",
+      "tier": "strong",
+      "driving_traits": [
+       "conscientiousness"
+      ],
+      "missing_traits": [],
+      "traits": {
+       "conscientiousness": {
+        "strategy": "congruent",
+        "target_direction": "high",
+        "confidence": "normal",
+        "included_in_tier": true,
+        "exclusion_reason": null,
+        "user_score": 85,
+        "model_mean": 78,
+        "model_low": 70,
+        "model_high": 90
+       },
+       "neuroticism": {
+        "strategy": "complementary",
+        "target_direction": null,
+        "confidence": "not_scored",
+        "included_in_tier": false,
+        "exclusion_reason": null,
+        "user_score": 25,
+        "model_mean": 23.5,
+        "model_low": 20,
+        "model_high": 30
+       }
+      }
+     }
+    ]
+   },
+   "section": {
+    "chips": [
+     {
+      "key": "conscientiousness-high",
+      "primary": "Conscientiousness: high, so models should be high",
+      "secondary": "congruent",
+      "muted": false
+     },
+     {
+      "key": "neuroticism-low",
+      "primary": "Neuroticism: not used",
+      "secondary": null,
+      "muted": true
+     }
+    ],
+    "showExtroversionNote": false,
+    "showNeuroticismNote": true,
+    "emptyState": null,
+    "tieBanner": null,
+    "allPoor": false,
+    "groups": [
+     {
+      "id": "strong",
+      "heading": "Strong fit",
+      "models": [
+       {
+        "modelId": "google/gemini-3.8-flash",
+        "tier": "strong",
+        "showTierChip": true,
+        "sentence": "Matches you on conscientiousness.",
+        "rows": [
+         {
+          "trait": "conscientiousness",
+          "label": "Conscientiousness, wants high",
+          "caption": "Mean 81, runs 75 to 90",
+          "mean": 80.5,
+          "low": 75,
+          "high": 90,
+          "direction": "high",
+          "wideRange": false,
+          "lowConfidence": false,
+          "dashed": false,
+          "ariaLabel": "Conscientiousness, wants high: mean 81, minimum 75, maximum 90. Target zone is above 50."
+         }
+        ],
+        "fewerRunsTag": null,
+        "closeCallNote": null,
+        "missingTraitLabel": null,
+        "sourceRank": null,
+        "relativeRankLabel": null,
+        "timestampIso": "2026-11-02T15:25:24.342Z",
+        "runLabelChip": "frontier",
+        "repeats": 10,
+        "technicalDetail": null,
+        "providerDetail": "Served by Google (10).",
+        "reasoningDetail": null
+       },
+       {
+        "modelId": "openai/gpt-6-luna",
+        "tier": "strong",
+        "showTierChip": true,
+        "sentence": "Matches you on conscientiousness.",
+        "rows": [
+         {
+          "trait": "conscientiousness",
+          "label": "Conscientiousness, wants high",
+          "caption": "Mean 78, runs 70 to 90",
+          "mean": 78,
+          "low": 70,
+          "high": 90,
+          "direction": "high",
+          "wideRange": false,
+          "lowConfidence": false,
+          "dashed": false,
+          "ariaLabel": "Conscientiousness, wants high: mean 78, minimum 70, maximum 90. Target zone is above 50."
+         }
+        ],
+        "fewerRunsTag": null,
+        "closeCallNote": null,
+        "missingTraitLabel": null,
+        "sourceRank": null,
+        "relativeRankLabel": null,
+        "timestampIso": "2026-11-02T16:03:28.018Z",
+        "runLabelChip": "frontier",
+        "repeats": 10,
+        "technicalDetail": null,
+        "providerDetail": "Served by OpenAI (10).",
+        "reasoningDetail": null
+       },
+       {
+        "modelId": "x-ai/grok-4.7",
+        "tier": "strong",
+        "showTierChip": true,
+        "sentence": "Matches you on conscientiousness.",
+        "rows": [
+         {
+          "trait": "conscientiousness",
+          "label": "Conscientiousness, wants high",
+          "caption": "Mean 84, runs 80 to 90",
+          "mean": 83.57142857142857,
+          "low": 80,
+          "high": 90,
+          "direction": "high",
+          "wideRange": false,
+          "lowConfidence": false,
+          "dashed": true,
+          "ariaLabel": "Conscientiousness, wants high: mean 84, minimum 80, maximum 90. Target zone is above 50."
+         }
+        ],
+        "fewerRunsTag": "7 of 10 runs",
+        "closeCallNote": null,
+        "missingTraitLabel": null,
+        "sourceRank": null,
+        "relativeRankLabel": null,
+        "timestampIso": "2026-11-02T15:47:31.637Z",
+        "runLabelChip": "frontier",
+        "repeats": 10,
+        "technicalDetail": null,
+        "providerDetail": "Served by xAI (7).",
+        "reasoningDetail": null
+       }
+      ],
+      "collapsed": false
+     },
+     {
+      "id": "decent",
+      "heading": "Decent fit",
+      "models": [
+       {
+        "modelId": "anthropic/claude-opus-5.5",
+        "tier": "decent",
+        "showTierChip": true,
+        "sentence": "In at least one test run, this model scored at or below the midpoint on a trait you care about.",
+        "rows": [
+         {
+          "trait": "conscientiousness",
+          "label": "Conscientiousness, wants high",
+          "caption": "Mean 71, runs 40 to 85",
+          "mean": 71,
+          "low": 40,
+          "high": 85,
+          "direction": "high",
+          "wideRange": true,
+          "lowConfidence": false,
+          "dashed": false,
+          "ariaLabel": "Conscientiousness, wants high: mean 71, minimum 40, maximum 85. Target zone is above 50."
+         }
+        ],
+        "fewerRunsTag": null,
+        "closeCallNote": null,
+        "missingTraitLabel": null,
+        "sourceRank": null,
+        "relativeRankLabel": null,
+        "timestampIso": "2026-11-02T15:57:32.675Z",
+        "runLabelChip": "frontier",
+        "repeats": 10,
+        "technicalDetail": null,
+        "providerDetail": "Served by Claude Platform on AWS (10).",
+        "reasoningDetail": null
+       }
+      ],
+      "collapsed": false
+     }
+    ],
+    "rankingNote": null,
+    "orderedBy": "model-id",
+    "context": {
+     "runLabel": "frontier",
+     "hypothesisLabel": "design hypothesis based on research",
+     "repeats": 10,
+     "generatedAt": "2026-11-02T16:03:28.019Z",
+     "partial": false,
+     "spreadWarning": false,
+     "judgeModelId": "google/gemini-2.5-flash-lite",
+     "reasoningEffort": "minimal"
+    }
+   }
+  }
+ },
+ "testedOn": [
+  [
+   "google/gemini-3.8-flash",
+   "tested on Nov 2, 2026"
+  ],
+  [
+   "x-ai/grok-4.7",
+   "tested on Nov 2, 2026"
+  ],
+  [
+   "anthropic/claude-opus-5.5",
+   "tested on Nov 2, 2026"
+  ],
+  [
+   "openai/gpt-6-luna",
+   "tested on Nov 2, 2026"
+  ]
+ ]
+}

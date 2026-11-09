@@ -21,7 +21,23 @@ import {
   NON_US_REFUNDED_BODY,
   RESTORE_PURCHASE,
 } from "../constants/checkoutCopy";
+import {
+  APP_HOME,
+  CHECKOUT_TIMEOUT_NEXT,
+  DEMO_HOME,
+  START_INTERVIEW,
+  SUCCESS_CHAT,
+  SUCCESS_ESTIMATE,
+  SUCCESS_INTERVIEWS,
+  SUCCESS_PRODUCT,
+  SUCCESS_READY,
+  SUCCESS_RECEIPT,
+  AI_DISCLOSURE,
+  INTERVIEW_COUNT_LINE,
+  RETAKE_REPLACES_RESULTS,
+} from "../constants/paywallCopy";
 import SiteFooter from "./SiteFooter";
+import { withSupportEmail } from "./SupportEmailLink";
 
 const POLL_MS = 30_000;
 
@@ -114,26 +130,45 @@ export function CheckoutReturn({
         </div>
         {phase === "non_us_refunded" && (
           <p role="status" className="mt-4 text-sm leading-relaxed border border-border-primary rounded-lg p-4">
-            {NON_US_REFUNDED_BODY}
+            {withSupportEmail(NON_US_REFUNDED_BODY)}
           </p>
         )}
         {refundFailed && (
           <p role="alert" className="mt-4 text-sm leading-relaxed rounded-lg p-4 bg-red-500/10 border border-red-500/20 text-status-danger">
-            {NON_US_REFUND_FAILED_BODY}
+            {withSupportEmail(NON_US_REFUND_FAILED_BODY)}
           </p>
         )}
         {(phase === "terms_not_accepted" || phase === "country_unconfirmed") && (
           <p role="alert" className="mt-4 text-sm leading-relaxed rounded-lg p-4 bg-red-500/10 border border-red-500/20 text-status-danger">
-            {CHECKOUT_NOT_GRANTED}
+            {withSupportEmail(CHECKOUT_NOT_GRANTED)}
           </p>
         )}
         {phase === "not_found" && (
           <p role="alert" className="mt-4 text-sm leading-relaxed rounded-lg p-4 bg-red-500/10 border border-red-500/20 text-status-danger">
-            {CHECKOUT_UNMATCHED}
+            {withSupportEmail(CHECKOUT_UNMATCHED)}
           </p>
         )}
         {restoreFailed && (
           <p role="alert" className="mt-4 text-sm leading-relaxed">{CHECKOUT_RESTORE_FAILED}</p>
+        )}
+        {phase === "timeout" && (
+          <p className="mt-4 text-sm leading-relaxed text-text-secondary">{withSupportEmail(CHECKOUT_TIMEOUT_NEXT)}</p>
+        )}
+        {phase === "paid" && (
+          <div className="mt-4 space-y-3 text-sm leading-relaxed text-text-secondary">
+            <h2 className="text-lg font-semibold text-text-primary">{SUCCESS_READY}</h2>
+            <p>{SUCCESS_INTERVIEWS}</p>
+            <p>{INTERVIEW_COUNT_LINE}</p>
+            <p>{RETAKE_REPLACES_RESULTS}</p>
+            <p>{SUCCESS_CHAT}</p>
+            <p>{SUCCESS_ESTIMATE}</p>
+            <p>{SUCCESS_PRODUCT}</p>
+            <p>{SUCCESS_RECEIPT}</p>
+            <p>{AI_DISCLOSURE}</p>
+            <a href={APP_HOME} className="inline-flex min-h-11 items-center justify-center rounded-lg bg-button-brand px-4 text-sm font-semibold text-white">
+              {START_INTERVIEW}
+            </a>
+          </div>
         )}
         {phase === "timeout" && (
           <button
@@ -155,7 +190,7 @@ export function CheckoutReturn({
         )}
         {nonUs && (
           <a
-            href="/"
+            href={DEMO_HOME}
             className="mt-6 inline-flex items-center justify-center min-h-11 px-4 rounded-lg border border-border-primary bg-bg-secondary text-sm text-text-primary"
           >
             {BACK_TO_COGNITIVE_BRIDGE}

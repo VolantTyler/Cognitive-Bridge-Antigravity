@@ -6,6 +6,7 @@ import {
   buildCheckoutSessionCreateParams,
   checkoutIdempotencyKey,
   isStripeTestKey,
+  loadCheckoutConfig,
   termsAcceptanceMessage,
   termsUrlForBase,
 } from "./checkoutConfig";
@@ -269,6 +270,9 @@ describe("stripe webhook", () => {
       interviewsAllowed: 2,
     });
     expect(logs.info).toHaveBeenCalledWith("duplicate ignored");
+    expect(logs.info).toHaveBeenCalledWith("analytics checkout_completed");
+    const analytics = logs.info.mock.calls.map((call) => String(call[0])).filter((line) => line.startsWith("analytics "));
+    expect(analytics.join(" ")).not.toMatch(/uid|@|uid-1/);
   });
 
   it("does not grant access when terms were not accepted", async () => {
@@ -373,6 +377,9 @@ describe("stripe webhook", () => {
     expect(store.entitlements.get("uid-1")?.paid).toBe(true);
     expect(store.entitlements.get("uid-1")?.disputeStatus).toBe("open");
     expect(logs.error).toHaveBeenCalledWith("dispute_opened dispute=dp_1 uid=uid-1");
+    expect(logs.info).toHaveBeenCalledWith("analytics dispute_opened");
+    const analytics = logs.info.mock.calls.map((call) => String(call[0])).filter((line) => line.startsWith("analytics "));
+    expect(analytics.join(" ")).not.toMatch(/uid=|@|uid-1/);
 
     await deliver(store, "charge.dispute.closed", {
       id: "dp_1",
@@ -506,6 +513,37 @@ describe("createCheckout", () => {
       line_items: [{ price: "price_from_env", quantity: 1 }],
     });
     expect(store.sessions.get("cs_123")?.outcome).toBe("open");
+  });
+
+  it("returns 503 when the price id is empty and does not call Stripe", async () => {
+    const store = new MemoryStore();
+    const createSession = vi.fn();
+    const res = jsonRes();
+    await handleCreateCheckout({
+      method: "POST",
+      headers: { authorization: "Bearer token" },
+    }, res, deps(store, {
+      config: () => ({
+        priceId: "",
+        baseUrl: "https://cognitive-bridge-ai.web.app",
+        paymentsEnabled: true,
+        managedPayments: false,
+        automaticTax: false,
+      }),
+      gateway: () => ({
+        createSession,
+        refundNonUs: async () => undefined,
+        retrieveSession: async () => null,
+        findSucceededSessionIds: async () => [],
+      }),
+    }));
+    expect(res.code).toBe(503);
+    expect(res.body).toMatchObject({ code: "payments_disabled" });
+    expect(createSession).not.toHaveBeenCalled();
+    expect(loadCheckoutConfig({
+      STRIPE_PRICE_ID: "",
+      PAYMENTS_ENABLED: "true",
+    })).toMatchObject({ priceId: "", paymentsEnabled: true });
   });
 
   it("refuses a live secret key", async () => {

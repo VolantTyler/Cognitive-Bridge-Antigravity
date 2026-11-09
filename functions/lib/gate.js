@@ -17,7 +17,6 @@ exports.paymentRequiredError = paymentRequiredError;
 exports.inputTooLongError = inputTooLongError;
 exports.interviewsPausedError = interviewsPausedError;
 exports.appCheckError = appCheckError;
-exports.reserveInterviewSlot = reserveInterviewSlot;
 exports.readHeader = readHeader;
 exports.bearerToken = bearerToken;
 const accessCopy_1 = require("./accessCopy");
@@ -177,17 +176,6 @@ function interviewsPausedError() {
 }
 function appCheckError() {
     return new GateError(401, "app_check", accessCopy_1.AI_ACCESS_MESSAGES.app_check);
-}
-/**
- * TODO(v2.4.0 FR-16): enforce entitlements/{uid}.interviewsAllowed
- * (2 per purchase: 1 interview + 1 retake). Not implemented in this PR.
- * The Stripe webhook writes interviewsAllowed. The counter is a later PR.
- * When added, increment usage/{uid}.interviewsUsed in the same transaction
- * style as the bridge daily cap and return 429 when the purchase is used up.
- * Pre-v2.4.0 saved results do not grant a free live-chat or interview exception.
- */
-async function reserveInterviewSlot(_uid, _feature) {
-    return;
 }
 function readHeader(req, name) {
     if (typeof req.header === "function") {
