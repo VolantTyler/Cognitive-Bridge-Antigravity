@@ -23,6 +23,12 @@ export default defineConfig(({mode}) => {
       environment: 'jsdom',
       setupFiles: './src/test/setup.ts',
       globalSetup: './src/test/globalSetup.ts',
+      exclude: [
+        '**/node_modules/**',
+        '**/dist/**',
+        'functions/**',
+        'src/test/firestore.rules.test.ts',
+      ],
     },
   };
 });

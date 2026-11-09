@@ -8,6 +8,18 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import Mirror from '../Mirror';
 import { Message } from '../../types';
 
+vi.mock('../../services/firebase', () => ({
+  auth: {
+    currentUser: {
+      uid: 'user-1',
+      getIdToken: async () => 'test-token',
+    },
+  },
+  db: {},
+  getAppCheckToken: async () => null,
+  logAnalyticsEvent: () => {},
+}));
+
 const dialogue: Message[] = [
   { role: 'model', content: 'A teammate falls sick before launch. What do you do?' },
   { role: 'user', content: 'I would take the night shift so they can recover.' },

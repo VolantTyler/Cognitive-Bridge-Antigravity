@@ -1,0 +1,217 @@
+import { describe, expect, it, vi } from "vitest";
+import { handleChat, GeminiClient } from "./chatHandler";
+import { handleJudge } from "./judgeHandler";
+import { GateError } from "./gate";
+import { usageFromChunks, buildUsageRecord } from "./usageLog";
+
+function mockRes() {
+  let statusCode = 0;
+  let payload: unknown;
+  let headersSent = false;
+  const chunks: string[] = [];
+  return {
+    get headersSent() {
+      return headersSent;
+    },
+    status(code: number) {
+      statusCode = code;
+      return {
+        json(body: unknown) {
+          payload = body;
+        },
+        send(body: unknown) {
+          payload = body;
+        },
+      };
+    },
+    writeHead(code: number) {
+      statusCode = code;
+      headersSent = true;
+    },
+    write(chunk: string) {
+      chunks.push(chunk);
+    },
+    end() {},
+    snapshot() {
+      return { statusCode, payload, chunks, headersSent };
+    },
+  };
+}
+
+describe("usage records", () => {
+  it("keeps the last usageMetadata and drops message content", () => {
+    expect(usageFromChunks([
+      { text: "secret prompt", usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 1 } },
+      { usageMetadata: { promptTokenCount: 9, candidatesTokenCount: 4 } },
+    ])).toEqual({ promptTokens: 9, completionTokens: 4 });
+
+    const record = buildUsageRecord({
+      uid: "u",
+      sessionId: "s",
+      feature: "mirror",
+      model: "gemini-2.5-flash",
+      promptTokens: 9,
+      completionTokens: 4,
+    });
+    expect(Object.keys(record).sort()).toEqual([
+      "completionTokens",
+      "feature",
+      "model",
+      "promptTokens",
+      "sessionId",
+      "uid",
+    ]);
+    expect(JSON.stringify(record)).not.toContain("secret");
+  });
+});
+
+describe("handleChat", () => {
+  it("stops before Gemini when the gate denies the caller", async () => {
+    const generateContent = vi.fn();
+    const res = mockRes();
+    await handleChat({ method: "POST", body: { messages: [] } }, res, {
+      guard: async () => {
+        throw new GateError(401, "unauthenticated", "Sign in to save your progress.");
+      },
+      ai: { models: { generateContent, generateContentStream: vi.fn() } },
+      logUsage: vi.fn(),
+    });
+    expect(generateContent).not.toHaveBeenCalled();
+    expect(res.snapshot().statusCode).toBe(401);
+    expect(res.snapshot().payload).toEqual({ error: "Sign in to save your progress.", code: "unauthenticated" });
+  });
+
+  it("logs the model that answered, including a fallback", async () => {
+    const logUsage = vi.fn(async () => {});
+    const generateContent = vi.fn()
+      .mockRejectedValueOnce(Object.assign(new Error("404 not found"), { status: 404 }))
+      .mockResolvedValueOnce({
+        text: "answered",
+        usageMetadata: { promptTokenCount: 12, candidatesTokenCount: 3 },
+      });
+    const res = mockRes();
+    await handleChat({
+      method: "POST",
+      body: {
+        messages: [{ role: "user", content: "private diary text" }],
+        modelName: "gemini-2.5-pro",
+        feature: "mirror",
+        sessionId: "sess-1",
+      },
+    }, res, {
+      guard: async () => ({
+        uid: "user-1",
+        email: "a@example.com",
+        email_verified: true,
+        feature: "mirror",
+        sessionId: "sess-1",
+      }),
+      ai: { models: { generateContent, generateContentStream: vi.fn() } } as GeminiClient,
+      logUsage,
+    });
+    expect(res.snapshot().payload).toMatchObject({ text: "answered", model: "gemini-2.5-flash" });
+    expect(logUsage).toHaveBeenCalledWith({
+      uid: "user-1",
+      sessionId: "sess-1",
+      feature: "mirror",
+      model: "gemini-2.5-flash",
+      promptTokens: 12,
+      completionTokens: 3,
+    });
+    expect(JSON.stringify(logUsage.mock.calls)).not.toContain("private diary");
+  });
+
+  it("reads usageMetadata from the last stream chunk", async () => {
+    const logUsage = vi.fn(async () => {});
+    async function* chunks() {
+      yield { text: "Hello", usageMetadata: { promptTokenCount: 2, candidatesTokenCount: 1 } };
+      yield { text: " there", usageMetadata: { promptTokenCount: 8, candidatesTokenCount: 6 } };
+    }
+    const res = mockRes();
+    await handleChat({
+      method: "POST",
+      body: { messages: [{ role: "user", content: "hi" }], stream: true, modelName: "gemini-2.5-flash" },
+    }, res, {
+      guard: async () => ({
+        uid: "user-1",
+        email: null,
+        email_verified: false,
+        feature: "playground-aligned",
+        sessionId: null,
+      }),
+      ai: {
+        models: {
+          generateContent: vi.fn(),
+          generateContentStream: vi.fn(async () => chunks()),
+        },
+      },
+      logUsage,
+    });
+    expect(res.snapshot().chunks.join("")).toContain("[DONE]");
+    expect(logUsage).toHaveBeenCalledWith(expect.objectContaining({
+      model: "gemini-2.5-flash",
+      promptTokens: 8,
+      completionTokens: 6,
+      feature: "playground-aligned",
+      sessionId: null,
+    }));
+  });
+});
+
+describe("handleJudge", () => {
+  it("logs a judge call without token counts or conversation state", async () => {
+    const logUsage = vi.fn(async () => {});
+    const fetchImpl = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ answers: { openness: { type: "noul" } }, model: "jev-latest" }),
+    }));
+    const res = mockRes();
+    await handleJudge({
+      method: "POST",
+      body: {
+        state: "the user said something private",
+        questions: { openness: { type: "noul", instructions: "Check the score." } },
+        feature: "mirror",
+        sessionId: "sess-9",
+      },
+    }, res, {
+      guard: async () => ({
+        uid: "user-1",
+        email: "a@example.com",
+        email_verified: true,
+        feature: "mirror",
+        sessionId: "sess-9",
+      }),
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      apiKey: "typesafe-test-key",
+      logUsage,
+    });
+    expect(res.snapshot().statusCode).toBe(200);
+    expect(logUsage).toHaveBeenCalledWith(expect.objectContaining({
+      feature: "judge",
+      model: "jev-latest",
+      promptTokens: 0,
+      completionTokens: 0,
+      sessionId: "sess-9",
+      uid: "user-1",
+    }));
+    expect(JSON.stringify(logUsage.mock.calls)).not.toContain("private");
+    expect(JSON.stringify(logUsage.mock.calls)).not.toContain("typesafe-test-key");
+  });
+
+  it("does not call Typesafe when the gate returns 401", async () => {
+    const fetchImpl = vi.fn();
+    const res = mockRes();
+    await handleJudge({ method: "POST", body: { state: "x", questions: {} } }, res, {
+      guard: async () => {
+        throw new GateError(401, "unauthenticated", "Sign in to save your progress.");
+      },
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      apiKey: "typesafe-test-key",
+      logUsage: vi.fn(),
+    });
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(res.snapshot().payload).toMatchObject({ code: "unauthenticated" });
+  });
+});
