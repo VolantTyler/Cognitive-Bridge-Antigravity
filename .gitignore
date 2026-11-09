@@ -6,6 +6,7 @@ coverage/
 *.log
 .env*
 !.env.example
+!functions/.env
 scripts/benchmark/output/
 .antigravity/
 venv/
