@@ -55,7 +55,9 @@ describe("checkout return", () => {
         restore={async () => false}
       />
     );
-    expect(await screen.findByRole("status")).toHaveTextContent("Payment confirmed.");
+    await waitFor(() => {
+      expect(screen.getByRole("status")).toHaveTextContent("Payment confirmed.");
+    });
     expect(screen.queryByText(NON_US_REFUNDED_BODY)).not.toBeInTheDocument();
   });
 
