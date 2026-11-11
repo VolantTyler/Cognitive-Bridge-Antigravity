@@ -1,12 +1,13 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.CHECKOUT_IDEMPOTENCY_WINDOW_MS = exports.INTERVIEWS_ALLOWED = exports.STRIPE_WEBHOOK_SECRET_NAME = exports.STRIPE_SECRET_KEY_NAME = void 0;
+exports.CHECKOUT_CONSENT_REQUIRED = exports.TERMS_VERSION = exports.CHECKOUT_IDEMPOTENCY_WINDOW_MS = exports.INTERVIEWS_ALLOWED = exports.STRIPE_WEBHOOK_SECRET_NAME = exports.STRIPE_SECRET_KEY_NAME = void 0;
 exports.loadCheckoutConfig = loadCheckoutConfig;
 exports.isStripeTestKey = isStripeTestKey;
 exports.assertStripeTestKey = assertStripeTestKey;
 exports.termsUrlForBase = termsUrlForBase;
 exports.termsAcceptanceMessage = termsAcceptanceMessage;
 exports.checkoutIdempotencyKey = checkoutIdempotencyKey;
+exports.assertCheckoutConsent = assertCheckoutConsent;
 exports.buildCheckoutSessionCreateParams = buildCheckoutSessionCreateParams;
 exports.isSafeStripeQueryUid = isSafeStripeQueryUid;
 const params_1 = require("firebase-functions/params");
@@ -27,6 +28,13 @@ exports.STRIPE_WEBHOOK_SECRET_NAME = "STRIPE_WEBHOOK_SECRET";
 /** One purchase: 1 interview + 1 retake. The interview counter itself is a later PR. */
 exports.INTERVIEWS_ALLOWED = 2;
 exports.CHECKOUT_IDEMPOTENCY_WINDOW_MS = 15_000;
+/**
+ * Terms page has no displayed last-updated line. This is the date of the
+ * last edit to that page (LegalPages.tsx, 2026-11-09). Bump it when the
+ * Terms text changes. The client must send the same value.
+ */
+exports.TERMS_VERSION = "2026-11-09";
+exports.CHECKOUT_CONSENT_REQUIRED = "Please agree to the Terms and confirm you are 18 or older.";
 const stripePriceId = (0, params_1.defineString)("STRIPE_PRICE_ID", {
     default: "",
     description: "Stripe Price ID for the one-time purchase. Test-mode price until launch.",
@@ -41,7 +49,7 @@ const paymentsEnabled = (0, params_1.defineString)("PAYMENTS_ENABLED", {
 });
 const managedPayments = (0, params_1.defineString)("STRIPE_MANAGED_PAYMENTS", {
     default: "false",
-    description: "When true, Checkout sets managed_payments.enabled and does not set automatic_tax or shipping.",
+    description: "When true, Checkout sets managed_payments.enabled and does not set automatic_tax or shipping. When false, Checkout sets managed_payments.enabled to false.",
 });
 const automaticTax = (0, params_1.defineString)("STRIPE_AUTOMATIC_TAX", {
     default: "false",
@@ -105,6 +113,15 @@ function checkoutIdempotencyKey(uid, nowMs) {
     const bucket = Math.floor(nowMs / exports.CHECKOUT_IDEMPOTENCY_WINDOW_MS);
     return `cb-checkout-${uid}-${bucket}`;
 }
+/** Rejects a checkout body that did not accept the current Terms and the 18+ attestation. */
+function assertCheckoutConsent(body) {
+    const record = body && typeof body === "object" && !Array.isArray(body)
+        ? body
+        : null;
+    if (record?.termsAccepted !== true || record.termsVersion !== exports.TERMS_VERSION) {
+        throw new gate_1.GateError(400, "terms_not_accepted", exports.CHECKOUT_CONSENT_REQUIRED);
+    }
+}
 function buildCheckoutSessionCreateParams(input) {
     const termsUrl = termsUrlForBase(input.baseUrl);
     const base = input.baseUrl.replace(/\/$/, "");
@@ -115,10 +132,6 @@ function buildCheckoutSessionCreateParams(input) {
         // Collects the billing country. It does not restrict which country.
         // shipping_address_collection is for physical goods and is intentionally omitted.
         billing_address_collection: "required",
-        consent_collection: { terms_of_service: "required" },
-        custom_text: {
-            terms_of_service_acceptance: { message: termsAcceptanceMessage(termsUrl) },
-        },
         success_url: `${base}/?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${base}/?checkout=cancel`,
         metadata: { uid: input.uid },
@@ -126,14 +139,27 @@ function buildCheckoutSessionCreateParams(input) {
     };
     if (input.email && input.email.includes("@")) {
         params.customer_email = input.email;
-        params.payment_intent_data.receipt_email = input.email;
     }
     if (input.managedPayments) {
-        // Managed Payments calculates tax itself and rejects shipping collection.
+        // Managed Payments calculates tax and sends the receipt itself.
+        // It rejects custom_text and payment_intent_data.receipt_email.
+        // consent_collection is omitted in both modes: Stripe rejects it unless a
+        // public Terms URL is set, and the in-app checkbox is the consent record.
         params.managed_payments = { enabled: true };
     }
-    else if (input.automaticTax) {
-        params.automatic_tax = { enabled: true };
+    else {
+        // New accounts turn Managed Payments on at the account level. Omitting the
+        // field lets that default win, and Stripe then rejects custom_text.
+        params.custom_text = {
+            terms_of_service_acceptance: { message: termsAcceptanceMessage(termsUrl) },
+        };
+        if (input.email && input.email.includes("@")) {
+            params.payment_intent_data.receipt_email = input.email;
+        }
+        params.managed_payments = { enabled: false };
+        if (input.automaticTax) {
+            params.automatic_tax = { enabled: true };
+        }
     }
     return params;
 }

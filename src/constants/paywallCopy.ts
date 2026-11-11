@@ -105,6 +105,12 @@ export const PAYWALL_CAPTION =
 
 export const PAYWALL_AGE = "You must be 18 or older to buy.";
 
+/** Keep equal to functions TERMS_VERSION. The Terms page has no displayed date. */
+export const TERMS_VERSION = "2026-11-09";
+
+export const CHECKOUT_CONSENT_ERROR =
+  "Check the box to agree to the Terms and confirm you are 18 or older.";
+
 export const BACK_TO_EXAMPLE = "Back to the example";
 
 export const ALREADY_PAID = "Already paid? Restore purchase";

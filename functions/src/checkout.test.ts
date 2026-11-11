@@ -3,6 +3,8 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  CHECKOUT_CONSENT_REQUIRED,
+  TERMS_VERSION,
   buildCheckoutSessionCreateParams,
   checkoutIdempotencyKey,
   isStripeTestKey,
@@ -10,6 +12,7 @@ import {
   termsAcceptanceMessage,
   termsUrlForBase,
 } from "./checkoutConfig";
+import { createFirestoreBillingStore } from "./checkoutStore";
 import { handleStripeEvent, restorePurchaseForUser } from "./checkoutEvents";
 import {
   handleCheckoutStatus,
@@ -19,6 +22,7 @@ import {
 } from "./checkoutHttp";
 import {
   BillingStore,
+  CheckoutConsent,
   CheckoutRecord,
   EntitlementState,
   EntitlementStamps,
@@ -42,6 +46,7 @@ class MemoryStore implements BillingStore {
   events = new Map<string, { processed: boolean }>();
   entitlements = new Map<string, EntitlementState>();
   sessions = new Map<string, CheckoutRecord>();
+  consents: CheckoutConsent[] = [];
   stamps = new Map<string, EntitlementStamps>();
   entitlementWrites = 0;
 
@@ -66,6 +71,14 @@ class MemoryStore implements BillingStore {
     this.stamps.set(uid, stamps);
   }
 
+  async writeCheckoutConsent(consent: CheckoutConsent): Promise<void> {
+    this.consents.push(consent);
+  }
+
+  async readCheckoutConsent(sessionId: string): Promise<CheckoutConsent | null> {
+    return this.consents.find((consent) => consent.sessionId === sessionId) ?? null;
+  }
+
   async writeCheckoutRecord(record: CheckoutRecord): Promise<void> {
     this.sessions.set(record.sessionId, record);
   }
@@ -84,6 +97,15 @@ class MemoryStore implements BillingStore {
     }
     return null;
   }
+}
+
+function acceptTerms(store: MemoryStore, sessionId = "cs_123", uid = "uid-1") {
+  store.consents.push({
+    uid,
+    termsVersion: TERMS_VERSION,
+    attested18OrOlder: true,
+    sessionId,
+  });
 }
 
 function logger() {
@@ -138,7 +160,6 @@ describe("checkout session params", () => {
       line_items: [{ price: "price_from_env", quantity: 1 }],
       client_reference_id: "uid-1",
       billing_address_collection: "required",
-      consent_collection: { terms_of_service: "required" },
       customer_email: "ada@example.com",
       metadata: { uid: "uid-1" },
       payment_intent_data: { metadata: { uid: "uid-1" }, receipt_email: "ada@example.com" },
@@ -150,8 +171,9 @@ describe("checkout session params", () => {
     );
     expect(params.custom_text.terms_of_service_acceptance.message).toBe(termsAcceptanceMessage(termsUrl));
     expect("shipping_address_collection" in params).toBe(false);
+    expect("consent_collection" in params).toBe(false);
     expect(params.automatic_tax).toBeUndefined();
-    expect(params.managed_payments).toBeUndefined();
+    expect(params.managed_payments).toEqual({ enabled: false });
 
     const other = buildCheckoutSessionCreateParams({
       uid: "uid-1",
@@ -162,22 +184,36 @@ describe("checkout session params", () => {
       automaticTax: true,
     });
     expect(other.line_items[0].price).toBe("price_other");
+    expect(other.managed_payments).toEqual({ enabled: false });
     expect(other.automatic_tax).toEqual({ enabled: true });
     expect(other.customer_email).toBeUndefined();
   });
 
-  it("turns on Managed Payments without tax or shipping params", () => {
+  it("builds Managed Payments params without receipt email, tax, or custom text", () => {
     const params = buildCheckoutSessionCreateParams({
       uid: "uid-1",
-      email: null,
+      email: "ada@example.com",
       priceId: "price_from_env",
       baseUrl: "https://cognitive-bridge-ai.web.app",
       managedPayments: true,
       automaticTax: true,
     });
-    expect(params.managed_payments).toEqual({ enabled: true });
+    expect(params).toEqual({
+      mode: "payment",
+      line_items: [{ price: "price_from_env", quantity: 1 }],
+      client_reference_id: "uid-1",
+      billing_address_collection: "required",
+      success_url: "https://cognitive-bridge-ai.web.app/?checkout=success&session_id={CHECKOUT_SESSION_ID}",
+      cancel_url: "https://cognitive-bridge-ai.web.app/?checkout=cancel",
+      metadata: { uid: "uid-1" },
+      payment_intent_data: { metadata: { uid: "uid-1" } },
+      customer_email: "ada@example.com",
+      managed_payments: { enabled: true },
+    });
+    expect(params.payment_intent_data.receipt_email).toBeUndefined();
     expect(params.automatic_tax).toBeUndefined();
-    expect("shipping_address_collection" in params).toBe(false);
+    expect(params.custom_text).toBeUndefined();
+    expect("consent_collection" in params).toBe(false);
   });
 
   it("refuses a non-https terms URL and live secret keys", () => {
@@ -201,6 +237,8 @@ describe("checkout session params", () => {
     const index = readFileSync(path.join(sourceDir, "index.ts"), "utf8");
     expect(index).toContain('defineSecret("STRIPE_SECRET_KEY")');
     expect(index).toContain('defineSecret("STRIPE_WEBHOOK_SECRET")');
+    const copy = readFileSync(path.resolve(sourceDir, "../../src/constants/paywallCopy.ts"), "utf8");
+    expect(copy).toContain(`export const TERMS_VERSION = "${TERMS_VERSION}"`);
   });
 });
 
@@ -257,6 +295,7 @@ describe("stripe webhook", () => {
   it("ignores a duplicate event after the entitlement is written", async () => {
     const store = new MemoryStore();
     const logs = logger();
+    acceptTerms(store);
     await deliver(store, "checkout.session.completed", paidObject(), "evt_1", vi.fn(), logs);
     await deliver(store, "checkout.session.completed", paidObject(), "evt_1", vi.fn(), logs);
     expect(store.entitlementWrites).toBe(1);
@@ -275,15 +314,21 @@ describe("stripe webhook", () => {
     expect(analytics.join(" ")).not.toMatch(/uid|@|uid-1/);
   });
 
-  it("does not grant access when terms were not accepted", async () => {
+  it("does not grant access without a stored consent record", async () => {
     const store = new MemoryStore();
     const refunds = vi.fn(async () => undefined);
     await deliver(store, "checkout.session.completed", paidObject({
-      consent: { terms_of_service: null },
+      consent: { terms_of_service: "accepted" },
     }), "evt_terms", refunds);
     expect(store.entitlementWrites).toBe(0);
     expect(refunds).not.toHaveBeenCalled();
     expect(store.sessions.get("cs_123")?.outcome).toBe("terms_not_accepted");
+
+    acceptTerms(store);
+    await deliver(store, "checkout.session.completed", paidObject({
+      consent: { terms_of_service: null },
+    }), "evt_terms_recorded");
+    expect(store.entitlements.get("uid-1")?.paid).toBe(true);
   });
 
   it("refunds a non-US billing country and does not grant access", async () => {
@@ -320,6 +365,9 @@ describe("stripe webhook", () => {
 
   it("revokes access on a full refund unless another paid session remains", async () => {
     const store = new MemoryStore();
+    acceptTerms(store);
+    acceptTerms(store, "cs_second");
+    acceptTerms(store, "cs_third");
     await deliver(store, "checkout.session.completed", paidObject(), "evt_pay");
     await deliver(store, "charge.refunded", {
       payment_intent: "pi_123",
@@ -353,6 +401,7 @@ describe("stripe webhook", () => {
   it("does not revoke access on a partial refund", async () => {
     const store = new MemoryStore();
     const logs = logger();
+    acceptTerms(store);
     await deliver(store, "checkout.session.completed", paidObject(), "evt_pay");
     await deliver(store, "charge.refunded", {
       payment_intent: "pi_123",
@@ -368,6 +417,7 @@ describe("stripe webhook", () => {
   it("logs a dispute when it opens and revokes access only when it is lost", async () => {
     const store = new MemoryStore();
     const logs = logger();
+    acceptTerms(store);
     await deliver(store, "checkout.session.completed", paidObject(), "evt_pay");
     await deliver(store, "charge.dispute.created", {
       id: "dp_1",
@@ -491,6 +541,7 @@ describe("createCheckout", () => {
     await handleCreateCheckout({
       method: "POST",
       headers: { authorization: "Bearer token" },
+      body: { termsAccepted: true, termsVersion: TERMS_VERSION },
     }, res, deps(store, {
       gateway: () => ({
         createSession: async (params, key) => {
@@ -509,10 +560,88 @@ describe("createCheckout", () => {
     expect(seen).toMatchObject({
       mode: "payment",
       billing_address_collection: "required",
-      consent_collection: { terms_of_service: "required" },
       line_items: [{ price: "price_from_env", quantity: 1 }],
+      managed_payments: { enabled: false },
+      custom_text: {
+        terms_of_service_acceptance: {
+          message: "I agree to the [Terms](https://cognitive-bridge-ai.web.app/terms) and I am 18 or older.",
+        },
+      },
     });
     expect(store.sessions.get("cs_123")?.outcome).toBe("open");
+    expect(store.consents).toEqual([{
+      uid: "uid-1",
+      termsVersion: TERMS_VERSION,
+      attested18OrOlder: true,
+      sessionId: "cs_123",
+    }]);
+  });
+
+  it("rejects checkout without terms consent and does not call Stripe", async () => {
+    const store = new MemoryStore();
+    const createSession = vi.fn();
+    const res = jsonRes();
+    await handleCreateCheckout({
+      method: "POST",
+      headers: { authorization: "Bearer token" },
+      body: { termsAccepted: false },
+    }, res, deps(store, {
+      gateway: () => ({
+        createSession,
+        refundNonUs: async () => undefined,
+        retrieveSession: async () => null,
+        findSucceededSessionIds: async () => [],
+      }),
+    }));
+    expect(res.code).toBe(400);
+    expect(res.body).toMatchObject({
+      code: "terms_not_accepted",
+      error: CHECKOUT_CONSENT_REQUIRED,
+    });
+    expect(createSession).not.toHaveBeenCalled();
+    expect(store.consents).toEqual([]);
+
+    const missing = jsonRes();
+    await handleCreateCheckout({
+      method: "POST",
+      headers: { authorization: "Bearer token" },
+    }, missing, deps(store));
+    expect(missing.code).toBe(400);
+    expect(missing.body).toMatchObject({ error: CHECKOUT_CONSENT_REQUIRED });
+  });
+
+  it("writes the consent record with a server timestamp", async () => {
+    const written = new Map<string, Record<string, unknown>>();
+    const db = {
+      collection(name: string) {
+        return {
+          doc(id: string) {
+            return {
+              async set(data: Record<string, unknown>) {
+                written.set(`${name}/${id}`, data);
+              },
+            };
+          },
+        };
+      },
+    };
+    const store = createFirestoreBillingStore(async () => db as never);
+    await store.writeCheckoutConsent({
+      uid: "uid-1",
+      termsVersion: TERMS_VERSION,
+      attested18OrOlder: true,
+      sessionId: "cs_123",
+    });
+    const saved = written.get("checkout_consents/cs_123");
+    expect(saved).toMatchObject({
+      uid: "uid-1",
+      termsVersion: TERMS_VERSION,
+      attested18OrOlder: true,
+      sessionId: "cs_123",
+    });
+    expect(saved?.acceptedAt).toBeTruthy();
+    expect(typeof saved?.acceptedAt).not.toBe("string");
+    expect(typeof saved?.acceptedAt).not.toBe("number");
   });
 
   it("returns 503 when the price id is empty and does not call Stripe", async () => {
@@ -626,6 +755,7 @@ describe("checkout status and restore", () => {
       amount: null,
       currency: null,
     });
+    acceptTerms(store);
     const result = await restorePurchaseForUser("uid-1", {
       store,
       logger: logger(),

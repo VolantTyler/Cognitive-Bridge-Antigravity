@@ -111,7 +111,7 @@ export function TermsPage() {
       </Section>
       <Section heading="Payment">
         <p>
-          Payment is handled on a checkout page hosted by Stripe. You accept these Terms on Stripe Checkout.
+          Payment is handled on a checkout page hosted by Stripe. Before checkout, you agree to these Terms and confirm you are 18 or older by checking "I agree to the Terms and I am 18 or older."
           Stripe handles the receipt for your payment.
         </p>
       </Section>
@@ -162,7 +162,7 @@ export function PrivacyPage() {
             email address and message you type.
           </li>
           <li>
-            <span className="font-medium text-text-primary">Payment:</span> Stripe hosts checkout. We do not receive or store your card details. We store whether your account paid, the amount and currency, your billing country, whether you accepted the Terms, Stripe payment and checkout IDs, and any refund or dispute status.
+            <span className="font-medium text-text-primary">Payment:</span> Stripe hosts checkout. We do not receive or store your card details. We store whether your account paid, the amount and currency, your billing country, whether you accepted the Terms, Stripe payment and checkout IDs, and any refund or dispute status. When you start a purchase we store a consent record (your account id, the time you agreed, the Terms version, your 18+ confirmation, and the checkout session id) to show you agreed to the Terms.
           </li>
         </ul>
         <p>

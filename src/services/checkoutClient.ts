@@ -5,6 +5,7 @@
 
 import { authorizedAiHeaders, AiAccessError } from "./aiAccess";
 import { CheckoutClientError, CheckoutViewStatus } from "../constants/checkoutCopy";
+import { TERMS_VERSION } from "../constants/paywallCopy";
 
 function endpoint(path: string, functionName: string): string {
   const host = window.location.hostname;
@@ -70,6 +71,7 @@ export async function startCheckout(): Promise<string> {
   const response = await fetch(endpoint("/api/checkout", "createCheckout"), {
     method: "POST",
     headers,
+    body: JSON.stringify({ termsAccepted: true, termsVersion: TERMS_VERSION }),
   });
   const body = await response.json().catch(() => ({})) as { url?: unknown; code?: unknown };
   const code = typeof body.code === "string" ? body.code : null;

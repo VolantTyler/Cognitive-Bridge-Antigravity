@@ -42,11 +42,21 @@ export interface EntitlementStamps {
   refundedAt?: boolean;
 }
 
+/** Server-written proof that this user accepted the current Terms and attested 18+. */
+export interface CheckoutConsent {
+  uid: string;
+  termsVersion: string;
+  attested18OrOlder: true;
+  sessionId: string;
+}
+
 export interface BillingStore {
   claimEvent(id: string, type: string): Promise<"duplicate" | "start">;
   completeEvent(id: string): Promise<void>;
   readEntitlement(uid: string): Promise<EntitlementState | null>;
   writeEntitlement(uid: string, state: EntitlementState, stamps: EntitlementStamps): Promise<void>;
+  writeCheckoutConsent(consent: CheckoutConsent): Promise<void>;
+  readCheckoutConsent(sessionId: string): Promise<CheckoutConsent | null>;
   writeCheckoutRecord(record: CheckoutRecord): Promise<void>;
   readCheckoutRecord(sessionId: string): Promise<CheckoutRecord | null>;
   listCheckoutRecordsForUid(uid: string): Promise<CheckoutRecord[]>;
