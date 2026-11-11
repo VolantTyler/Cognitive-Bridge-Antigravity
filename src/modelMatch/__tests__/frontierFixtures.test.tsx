@@ -249,7 +249,7 @@ describe('frontier B and the other profiles', () => {
       />,
     );
     expect(screen.queryByRole('heading', { level: 4 })).toBeNull();
-    expect(screen.getByText(/Your strongest trait is extroversion/)).toBeVisible();
+    expect(screen.getByText(/Your strongest trait is extraversion/)).toBeVisible();
     expect(document.body.textContent).not.toContain(EXTROVERSION_EXCLUSION_REASON);
     unmount();
 
@@ -271,7 +271,7 @@ describe('Mirror presets on the frontier fixtures', () => {
             onOpenLeaderboard={() => undefined}
           />,
         );
-        expect(screen.getByText('Extroversion: not used')).toBeVisible();
+        expect(screen.getByText('Extraversion: not used')).toBeVisible();
         expect(screen.getAllByRole('heading', { level: 4 })).toHaveLength(4);
         expect(screen.queryByRole('heading', { name: 'Decent fit' })).toBeNull();
         expect(screen.getByText(/We don't rank them/)).toBeInTheDocument();

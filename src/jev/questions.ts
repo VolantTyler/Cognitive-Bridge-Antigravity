@@ -24,7 +24,7 @@ export type OceanTrait = (typeof OCEAN_TRAITS)[number];
 export const TRAIT_LABELS: Record<OceanTrait, string> = {
   openness: 'Openness',
   conscientiousness: 'Conscientiousness',
-  extroversion: 'Extroversion',
+  extroversion: 'Extraversion',
   agreeableness: 'Agreeableness',
   neuroticism: 'Neuroticism',
 };

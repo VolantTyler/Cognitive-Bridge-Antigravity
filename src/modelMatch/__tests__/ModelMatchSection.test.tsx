@@ -185,23 +185,23 @@ describe('states from the samples', () => {
     const entry = sampleEntry('C');
     expect(entry.result.active_traits).toEqual(['extroversion']);
     expect(entry.result.models).toEqual([]);
-    expect(EXTROVERSION_CHIP).toBe('Extroversion: not used');
-    expect(EXTROVERSION_WHY_TITLE).toBe("Why we don't use extroversion to pick a model");
+    expect(EXTROVERSION_CHIP).toBe('Extraversion: not used');
+    expect(EXTROVERSION_WHY_TITLE).toBe("Why we don't use extraversion to pick a model");
     expect(EXTROVERSION_ONLY).toBe(
-      "Your strongest trait is extroversion, which we don't use for matching, so we don't have a strong model recommendation for you.",
+      "Your strongest trait is extraversion, which we don't use for matching, so we don't have a strong model recommendation for you.",
     );
     expect(EXTROVERSION_SHORT).toBe(
-      "Extroversion isn't used to rank models. In our tests, every model scored near the middle on it and varied too much from run to run to tell them apart.",
+      "Extraversion isn't used to rank models. In our tests, every model scored near the middle on it and varied too much from run to run to tell them apart.",
     );
     expect(EXTROVERSION_WHY_BODY).toBe(
-      "We tested each AI model on all five personality traits, repeating the test many times. On extroversion, the models' averages sit around the middle of the scale, a few a little below it and a few a little above. Scores for the same model also swung widely from one run to the next, by about as much as the models differ from each other. Ranking models by it would suggest a difference we can't show. We'll revisit this as we test more models. If extroversion is your strongest trait, we don't have a strong model recommendation for you yet.",
+      "We tested each AI model on all five personality traits, repeating the test many times. On extraversion, the models' averages sit around the middle of the scale, a few a little below it and a few a little above. Scores for the same model also swung widely from one run to the next, by about as much as the models differ from each other. Ranking models by it would suggest a difference we can't show. We'll revisit this as we test more models. If extraversion is your strongest trait, we don't have a strong model recommendation for you yet.",
     );
     expect(EXTROVERSION_SHORT).not.toContain('similar middle range');
     expect(EXTROVERSION_WHY_BODY).not.toContain('landed a little above');
     renderView(sampleView('C'));
-    expect(screen.getByText('Extroversion: not used')).toBeVisible();
+    expect(screen.getByText('Extraversion: not used')).toBeVisible();
     expect(screen.getByText(EXTROVERSION_SHORT)).toBeVisible();
-    expect(screen.getByText(/Your strongest trait is extroversion/)).toBeVisible();
+    expect(screen.getByText(/Your strongest trait is extraversion/)).toBeVisible();
     expect(screen.queryByRole('heading', { level: 4 })).toBeNull();
     expect(document.body.textContent).not.toContain(OLD_REASON);
     expect(document.body.textContent).not.toContain('no benchmarked model scored extroversion below 50');
@@ -219,7 +219,7 @@ describe('states from the samples', () => {
     renderView(sampleView('D'));
     expect(screen.getByText('Neuroticism: not used')).toBeVisible();
     expect(screen.getByText(NO_TESTED_STRATEGY)).toBeVisible();
-    expect(screen.queryByText('Extroversion: not used')).toBeNull();
+    expect(screen.queryByText('Extraversion: not used')).toBeNull();
     expect(screen.queryByRole('heading', { level: 4 })).toBeNull();
     expect(document.body.textContent).not.toContain(OLD_REASON);
   });
@@ -367,7 +367,7 @@ describe('acceptance fixtures', () => {
       }],
     };
     renderView(buildView(match, { ...realScoreFile, run_label: 'default' } as ScoreFile));
-    expect(screen.getByText('Extroversion: not used')).toBeVisible();
+    expect(screen.getByText('Extraversion: not used')).toBeVisible();
     expect(screen.getByText(EXTROVERSION_SHORT)).toBeVisible();
     expect(article('example/model').querySelector('[data-trait="extroversion"]')).toBeNull();
     expect(article('example/model').querySelector('[data-trait="openness"]')).toBeTruthy();

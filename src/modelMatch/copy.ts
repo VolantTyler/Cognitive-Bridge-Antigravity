@@ -58,21 +58,21 @@ export const HOW_MEASURED = 'How we measured this';
 
 export const TARGETS_HEADING = 'What you asked for';
 
-export const EXTROVERSION_CHIP = 'Extroversion: not used';
+export const EXTROVERSION_CHIP = 'Extraversion: not used';
 
 /** Spec 14b, short footnote under the chip. */
 export const EXTROVERSION_SHORT =
-  "Extroversion isn't used to rank models. In our tests, every model scored near the middle on it and varied too much from run to run to tell them apart.";
+  "Extraversion isn't used to rank models. In our tests, every model scored near the middle on it and varied too much from run to run to tell them apart.";
 
 /** Title of Charlie's disclosure. The body is EXTROVERSION_WHY_BODY, with no numbers. */
-export const EXTROVERSION_WHY_TITLE = "Why we don't use extroversion to pick a model";
+export const EXTROVERSION_WHY_TITLE = "Why we don't use extraversion to pick a model";
 
 export const EXTROVERSION_WHY_BODY =
-  "We tested each AI model on all five personality traits, repeating the test many times. On extroversion, the models' averages sit around the middle of the scale, a few a little below it and a few a little above. Scores for the same model also swung widely from one run to the next, by about as much as the models differ from each other. Ranking models by it would suggest a difference we can't show. We'll revisit this as we test more models. If extroversion is your strongest trait, we don't have a strong model recommendation for you yet.";
+  "We tested each AI model on all five personality traits, repeating the test many times. On extraversion, the models' averages sit around the middle of the scale, a few a little below it and a few a little above. Scores for the same model also swung widely from one run to the next, by about as much as the models differ from each other. Ranking models by it would suggest a difference we can't show. We'll revisit this as we test more models. If extraversion is your strongest trait, we don't have a strong model recommendation for you yet.";
 
-/** Spec 14b, only when extroversion is the only active target. */
+/** Spec 14b, only when extraversion is the only active target. */
 export const EXTROVERSION_ONLY =
-  "Your strongest trait is extroversion, which we don't use for matching, so we don't have a strong model recommendation for you.";
+  "Your strongest trait is extraversion, which we don't use for matching, so we don't have a strong model recommendation for you.";
 
 export const NEUROTICISM_CHIP = 'Neuroticism: not used';
 

@@ -6,6 +6,7 @@
 export interface OceanScores {
   openness: number;
   conscientiousness: number;
+  // Kept as `extroversion` on purpose so saved profiles and Firestore rules stay compatible.
   extroversion: number;
   agreeableness: number;
   neuroticism: number;

@@ -55,7 +55,7 @@ describe('Mirror Jev score check', () => {
       />
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /High Extroversion and Neuroticism/i }));
+    fireEvent.click(screen.getByRole('button', { name: /High Extraversion and Neuroticism/i }));
 
     expect(fetch).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: /Proceed to Phase 2/i }));
