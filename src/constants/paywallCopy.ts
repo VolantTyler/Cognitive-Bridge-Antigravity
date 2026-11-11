@@ -32,8 +32,37 @@ export const DEMO_FRAMING =
 
 export const DEMO_CTA = "Start my interview";
 
+export const DEMO_SEE_EXAMPLE = "See an example";
+
+/** Research review, 2026-11-11. Overrides the v2.4.1 mock headlines. */
+export const DEMO_HERO_TITLE = "Shape an AI's replies around your personality.";
+
+export const DEMO_HERO_LEDE =
+  "Cognitive Bridge interviews you in a short chat, estimates your Big Five personality traits, and turns them into instructions you can give an AI assistant. It's an experiment in whether that changes how useful its answers feel to you.";
+
 export const DEMO_CTA_CAPTION =
-  "Your own interview costs $6, one-time, no subscription. You'll see what's included first.";
+  "$6, one time, no subscription. You'll see what's included before you pay.";
+
+export const DEMO_HOW_MIRROR =
+  "Chat with an AI interviewer. It estimates your scores on five traits. A second check may suggest corrections, and you choose whether to accept them.";
+
+export const DEMO_HOW_TAILOR =
+  "Your clearly high and low scores become instructions you can paste into ChatGPT, Gemini, Claude or another assistant.";
+
+export const DEMO_HOW_BRIDGE =
+  "Ask a question and compare replies with and without your instructions, then see which models scored closest to your profile in our tests.";
+
+export const DEMO_RIBBON_TAG = "Example";
+
+export const DEMO_RIBBON =
+  "A fictional person written by our team. Not you. Nothing here was generated live.";
+
+export const DEMO_REPLY_FOOTER =
+  "Replies written by our team to show the difference in style. You decide which you prefer.";
+
+export const DEMO_CLOSING_TITLE = "Ready to see your own?";
+
+export const DEMO_CLOSING_LINE = "$6, one time. Includes your interview and one retake.";
 
 export const DEMO_CARD_BADGE_EXAMPLE = "Example, made-up person, no AI used";
 

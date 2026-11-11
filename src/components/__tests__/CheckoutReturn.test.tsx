@@ -48,6 +48,22 @@ function deferredAuth() {
 }
 
 describe("checkout return", () => {
+  it("places a provided main nav above the checkout message", () => {
+    render(
+      <CheckoutReturn
+        search="?checkout=cancel"
+        loadStatus={noop}
+        restore={async () => false}
+        header={<nav aria-label="Main"><button type="button">Sign in</button></nav>}
+      />,
+    );
+    const nav = screen.getByRole("navigation", { name: "Main" });
+    const heading = screen.getByRole("heading");
+    expect(nav.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Sign in" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /The Mirror/ })).not.toBeInTheDocument();
+  });
+
   it("shows Charlie's non-US copy and one neutral button", async () => {
     render(
       <CheckoutReturn

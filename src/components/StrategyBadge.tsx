@@ -8,7 +8,7 @@ import { AlignmentStrategy } from '../types';
 import { ALIGNMENT_STRATEGY_INFO } from '../constants';
 
 const PILL_CLASS =
-  'text-[10px] px-2 py-0.5 rounded font-medium bg-bg-tertiary border border-border-secondary text-text-muted';
+  'min-h-6 text-[10px] px-2 py-0.5 rounded font-medium bg-bg-tertiary border border-border-secondary text-text-muted';
 
 interface StrategyBadgeProps {
   strategy: AlignmentStrategy;
