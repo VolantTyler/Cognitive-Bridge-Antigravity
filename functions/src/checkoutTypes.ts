@@ -56,6 +56,7 @@ export interface BillingStore {
   readEntitlement(uid: string): Promise<EntitlementState | null>;
   writeEntitlement(uid: string, state: EntitlementState, stamps: EntitlementStamps): Promise<void>;
   writeCheckoutConsent(consent: CheckoutConsent): Promise<void>;
+  readCheckoutConsent(sessionId: string): Promise<CheckoutConsent | null>;
   writeCheckoutRecord(record: CheckoutRecord): Promise<void>;
   readCheckoutRecord(sessionId: string): Promise<CheckoutRecord | null>;
   listCheckoutRecordsForUid(uid: string): Promise<CheckoutRecord[]>;

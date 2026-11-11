@@ -39,6 +39,8 @@ describe("legal routes", () => {
     expect(screen.getByText(
       "All sales are final, except duplicate charges, charges where you didn't get access, purchases with a billing address outside the US (these are refunded automatically), or where the law requires a refund."
     )).toBeInTheDocument();
+    expect(screen.getByText(/Before checkout, you agree to these Terms and confirm you are 18 or older by checking "I agree to the Terms and I am 18 or older."/)).toBeInTheDocument();
+    expect(screen.queryByText(/You accept these Terms on Stripe Checkout/)).not.toBeInTheDocument();
     expect(screen.getByText(/Stripe handles the receipt for your payment/)).toBeInTheDocument();
     expect(screen.queryByText(/Stripe emails your receipt to the address you used at checkout/)).not.toBeInTheDocument();
     expect(screen.getByText(
@@ -75,7 +77,7 @@ describe("legal routes", () => {
       "If you try to create an account with an email that already has one, we tell you that address is already registered so you can sign in and keep a single account. We do not say whether an email is registered when you sign in or reset a password."
     )).toBeInTheDocument();
     expect(screen.getByText(
-      "Stripe hosts checkout. We do not receive or store your card details. We store whether your account paid, the amount and currency, your billing country, whether you accepted the Terms, Stripe payment and checkout IDs, and any refund or dispute status."
+      /When you start a purchase we store a consent record \(your account id, the time you agreed, the Terms version, your 18\+ confirmation, and the checkout session id\) to show you agreed to the Terms\./
     )).toBeInTheDocument();
     expect(screen.getByText(
       /Stripe receives your account email \(we fill it in for you\), and the name, billing address and card details you enter there\./

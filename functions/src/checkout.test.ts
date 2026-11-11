@@ -75,6 +75,10 @@ class MemoryStore implements BillingStore {
     this.consents.push(consent);
   }
 
+  async readCheckoutConsent(sessionId: string): Promise<CheckoutConsent | null> {
+    return this.consents.find((consent) => consent.sessionId === sessionId) ?? null;
+  }
+
   async writeCheckoutRecord(record: CheckoutRecord): Promise<void> {
     this.sessions.set(record.sessionId, record);
   }
@@ -93,6 +97,15 @@ class MemoryStore implements BillingStore {
     }
     return null;
   }
+}
+
+function acceptTerms(store: MemoryStore, sessionId = "cs_123", uid = "uid-1") {
+  store.consents.push({
+    uid,
+    termsVersion: TERMS_VERSION,
+    attested18OrOlder: true,
+    sessionId,
+  });
 }
 
 function logger() {
@@ -147,7 +160,6 @@ describe("checkout session params", () => {
       line_items: [{ price: "price_from_env", quantity: 1 }],
       client_reference_id: "uid-1",
       billing_address_collection: "required",
-      consent_collection: { terms_of_service: "required" },
       customer_email: "ada@example.com",
       metadata: { uid: "uid-1" },
       payment_intent_data: { metadata: { uid: "uid-1" }, receipt_email: "ada@example.com" },
@@ -159,6 +171,7 @@ describe("checkout session params", () => {
     );
     expect(params.custom_text.terms_of_service_acceptance.message).toBe(termsAcceptanceMessage(termsUrl));
     expect("shipping_address_collection" in params).toBe(false);
+    expect("consent_collection" in params).toBe(false);
     expect(params.automatic_tax).toBeUndefined();
     expect(params.managed_payments).toEqual({ enabled: false });
 
@@ -190,7 +203,6 @@ describe("checkout session params", () => {
       line_items: [{ price: "price_from_env", quantity: 1 }],
       client_reference_id: "uid-1",
       billing_address_collection: "required",
-      consent_collection: { terms_of_service: "required" },
       success_url: "https://cognitive-bridge-ai.web.app/?checkout=success&session_id={CHECKOUT_SESSION_ID}",
       cancel_url: "https://cognitive-bridge-ai.web.app/?checkout=cancel",
       metadata: { uid: "uid-1" },
@@ -201,6 +213,7 @@ describe("checkout session params", () => {
     expect(params.payment_intent_data.receipt_email).toBeUndefined();
     expect(params.automatic_tax).toBeUndefined();
     expect(params.custom_text).toBeUndefined();
+    expect("consent_collection" in params).toBe(false);
   });
 
   it("refuses a non-https terms URL and live secret keys", () => {
@@ -282,6 +295,7 @@ describe("stripe webhook", () => {
   it("ignores a duplicate event after the entitlement is written", async () => {
     const store = new MemoryStore();
     const logs = logger();
+    acceptTerms(store);
     await deliver(store, "checkout.session.completed", paidObject(), "evt_1", vi.fn(), logs);
     await deliver(store, "checkout.session.completed", paidObject(), "evt_1", vi.fn(), logs);
     expect(store.entitlementWrites).toBe(1);
@@ -300,15 +314,21 @@ describe("stripe webhook", () => {
     expect(analytics.join(" ")).not.toMatch(/uid|@|uid-1/);
   });
 
-  it("does not grant access when terms were not accepted", async () => {
+  it("does not grant access without a stored consent record", async () => {
     const store = new MemoryStore();
     const refunds = vi.fn(async () => undefined);
     await deliver(store, "checkout.session.completed", paidObject({
-      consent: { terms_of_service: null },
+      consent: { terms_of_service: "accepted" },
     }), "evt_terms", refunds);
     expect(store.entitlementWrites).toBe(0);
     expect(refunds).not.toHaveBeenCalled();
     expect(store.sessions.get("cs_123")?.outcome).toBe("terms_not_accepted");
+
+    acceptTerms(store);
+    await deliver(store, "checkout.session.completed", paidObject({
+      consent: { terms_of_service: null },
+    }), "evt_terms_recorded");
+    expect(store.entitlements.get("uid-1")?.paid).toBe(true);
   });
 
   it("refunds a non-US billing country and does not grant access", async () => {
@@ -345,6 +365,9 @@ describe("stripe webhook", () => {
 
   it("revokes access on a full refund unless another paid session remains", async () => {
     const store = new MemoryStore();
+    acceptTerms(store);
+    acceptTerms(store, "cs_second");
+    acceptTerms(store, "cs_third");
     await deliver(store, "checkout.session.completed", paidObject(), "evt_pay");
     await deliver(store, "charge.refunded", {
       payment_intent: "pi_123",
@@ -378,6 +401,7 @@ describe("stripe webhook", () => {
   it("does not revoke access on a partial refund", async () => {
     const store = new MemoryStore();
     const logs = logger();
+    acceptTerms(store);
     await deliver(store, "checkout.session.completed", paidObject(), "evt_pay");
     await deliver(store, "charge.refunded", {
       payment_intent: "pi_123",
@@ -393,6 +417,7 @@ describe("stripe webhook", () => {
   it("logs a dispute when it opens and revokes access only when it is lost", async () => {
     const store = new MemoryStore();
     const logs = logger();
+    acceptTerms(store);
     await deliver(store, "checkout.session.completed", paidObject(), "evt_pay");
     await deliver(store, "charge.dispute.created", {
       id: "dp_1",
@@ -535,7 +560,6 @@ describe("createCheckout", () => {
     expect(seen).toMatchObject({
       mode: "payment",
       billing_address_collection: "required",
-      consent_collection: { terms_of_service: "required" },
       line_items: [{ price: "price_from_env", quantity: 1 }],
       managed_payments: { enabled: false },
       custom_text: {
@@ -731,6 +755,7 @@ describe("checkout status and restore", () => {
       amount: null,
       currency: null,
     });
+    acceptTerms(store);
     const result = await restorePurchaseForUser("uid-1", {
       store,
       logger: logger(),

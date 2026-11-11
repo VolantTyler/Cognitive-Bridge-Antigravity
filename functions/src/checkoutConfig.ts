@@ -143,7 +143,6 @@ export interface CheckoutSessionCreateParams {
   line_items: Array<{ price: string; quantity: number }>;
   client_reference_id: string;
   billing_address_collection: "required";
-  consent_collection: { terms_of_service: "required" };
   custom_text?: { terms_of_service_acceptance: { message: string } };
   success_url: string;
   cancel_url: string;
@@ -171,7 +170,6 @@ export function buildCheckoutSessionCreateParams(input: {
     // Collects the billing country. It does not restrict which country.
     // shipping_address_collection is for physical goods and is intentionally omitted.
     billing_address_collection: "required",
-    consent_collection: { terms_of_service: "required" },
     success_url: `${base}/?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${base}/?checkout=cancel`,
     metadata: { uid: input.uid },
@@ -183,9 +181,8 @@ export function buildCheckoutSessionCreateParams(input: {
   if (input.managedPayments) {
     // Managed Payments calculates tax and sends the receipt itself.
     // It rejects custom_text and payment_intent_data.receipt_email.
-    // The one-time unsupported list does not include billing_address_collection,
-    // client_reference_id, metadata, payment_intent_data.metadata, or
-    // consent_collection.terms_of_service, so those stay.
+    // consent_collection is omitted in both modes: Stripe rejects it unless a
+    // public Terms URL is set, and the in-app checkbox is the consent record.
     params.managed_payments = { enabled: true };
   } else {
     // New accounts turn Managed Payments on at the account level. Omitting the

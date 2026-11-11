@@ -113,6 +113,8 @@ async function applyPaidSession(snapshot, deps) {
         return;
     }
     const uid = snapshot.uid;
+    const consent = await deps.store.readCheckoutConsent(snapshot.id);
+    const termsAccepted = consent?.uid === uid && consent.attested18OrOlder === true;
     if (snapshot.countryKind === "other") {
         await refundNonUs(snapshot, uid, deps);
         return;
@@ -126,7 +128,7 @@ async function applyPaidSession(snapshot, deps) {
         });
         return;
     }
-    if (!(0, checkoutTypes_1.termsWereAccepted)(snapshot)) {
+    if (!termsAccepted) {
         deps.logger.error(`terms_not_accepted session=${snapshot.id} uid=${uid}`);
         await deps.store.writeCheckoutRecord({
             ...baseRecord(snapshot, uid),
