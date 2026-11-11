@@ -4,6 +4,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
+import { ACCOUNT_COPY } from "../constants/accountCopy";
 import {
   BACK_TO_COGNITIVE_BRIDGE,
   CHECKOUT_CANCELED,
@@ -36,21 +37,31 @@ import {
   INTERVIEW_COUNT_LINE,
   RETAKE_REPLACES_RESULTS,
 } from "../constants/paywallCopy";
+import { CheckoutAuthGate, checkoutAuthGate } from "../services/checkoutAuth";
+import AccountAuthPanel from "./AccountAuthPanel";
 import SiteFooter from "./SiteFooter";
 import { withSupportEmail } from "./SupportEmailLink";
 
 const POLL_MS = 30_000;
+
+const signInButtonClass =
+  "inline-flex min-h-11 items-center justify-center rounded-lg bg-button-brand px-4 text-sm font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-600";
+
+const backLinkClass =
+  "inline-flex min-h-11 items-center justify-center rounded-lg border border-border-primary bg-bg-secondary px-4 text-sm text-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-600";
 
 export function CheckoutReturn({
   search,
   loadStatus,
   restore,
   initialPhase,
+  authGate = checkoutAuthGate,
 }: {
   search: string;
   loadStatus: (sessionId: string) => Promise<CheckoutViewStatus>;
   restore: () => Promise<boolean>;
   initialPhase?: CheckoutViewStatus;
+  authGate?: CheckoutAuthGate;
 }) {
   const params = new URLSearchParams(search);
   const checkout = params.get("checkout");
@@ -59,48 +70,100 @@ export function CheckoutReturn({
     initialPhase ?? (checkout === "cancel" ? "cancel" : "pending")
   );
   const [restoreFailed, setRestoreFailed] = useState(false);
+  const [signInOpen, setSignInOpen] = useState(false);
   const headingRef = useRef<HTMLHeadingElement>(null);
+  const signInButtonRef = useRef<HTMLButtonElement>(null);
+  const phaseRef = useRef(phase);
+  const resumePollingRef = useRef<() => void>(() => {});
+  phaseRef.current = phase;
 
   useEffect(() => {
     headingRef.current?.focus();
   }, [phase]);
 
   useEffect(() => {
+    if (phase !== "signin" && phase !== "pending") setSignInOpen(false);
+  }, [phase]);
+
+  useEffect(() => {
     if (initialPhase || checkout !== "success" || !sessionId) return;
     let stopped = false;
-    const started = Date.now();
-    const poll = async () => {
-      while (!stopped) {
+    let generation = 0;
+    let authSettled = false;
+
+    const apply = (next: CheckoutViewStatus) => {
+      phaseRef.current = next;
+      setPhase(next);
+    };
+
+    const poll = async (gen: number) => {
+      const startedAt = Date.now();
+      while (!stopped && gen === generation) {
         try {
           const status = await loadStatus(sessionId);
-          if (stopped) return;
+          if (stopped || gen !== generation) return;
           if (status !== "pending") {
-            setPhase(status);
+            apply(status);
             return;
           }
         } catch (error) {
-          if (stopped) return;
+          if (stopped || gen !== generation) return;
           if (error instanceof CheckoutClientError && error.code === "signed_out") {
-            setPhase("signin");
-            return;
-          }
-          if (error instanceof CheckoutClientError && error.code === "not_found") {
-            setPhase("not_found");
+            // A missing user before auth settles is Firebase still restoring
+            // the persisted session, not a person who needs to sign in.
+            if (authSettled) {
+              apply("signin");
+              return;
+            }
+          } else if (error instanceof CheckoutClientError && error.code === "not_found") {
+            apply("not_found");
             return;
           }
         }
-        if (Date.now() - started >= POLL_MS) {
-          if (!stopped) setPhase("timeout");
+        if (Date.now() - startedAt >= POLL_MS) {
+          if (!stopped && gen === generation) apply("timeout");
           return;
         }
         await new Promise((resolve) => setTimeout(resolve, 2000));
       }
     };
-    void poll();
+
+    const startPolling = () => {
+      if (stopped) return;
+      const gen = ++generation;
+      void poll(gen);
+    };
+
+    const resumeFromSignIn = () => {
+      if (stopped || phaseRef.current !== "signin") return;
+      apply("pending");
+      startPolling();
+    };
+
+    resumePollingRef.current = resumeFromSignIn;
+    const unsubscribe = authGate.subscribe((user) => {
+      if (user) resumeFromSignIn();
+    });
+
+    void (async () => {
+      try {
+        await authGate.ready();
+      } catch {
+        // Persistence didn't settle. The status call still reports a real sign-out.
+      }
+      if (stopped) return;
+      authSettled = true;
+      startPolling();
+    })();
+
     return () => {
       stopped = true;
+      if (resumePollingRef.current === resumeFromSignIn) {
+        resumePollingRef.current = () => {};
+      }
+      unsubscribe();
     };
-  }, [checkout, initialPhase, loadStatus, sessionId]);
+  }, [authGate, checkout, initialPhase, loadStatus, sessionId]);
 
   const heading = phase === "non_us_refunded" || phase === "non_us_refund_failed"
     ? NON_US_HEADING
@@ -188,6 +251,21 @@ export function CheckoutReturn({
             {RESTORE_PURCHASE}
           </button>
         )}
+        {phase === "signin" && (
+          <div className="mt-6 flex flex-col items-start gap-3">
+            <button
+              ref={signInButtonRef}
+              type="button"
+              className={signInButtonClass}
+              onClick={() => setSignInOpen(true)}
+            >
+              {ACCOUNT_COPY.signInButton}
+            </button>
+            <a href={DEMO_HOME} className={backLinkClass}>
+              {BACK_TO_COGNITIVE_BRIDGE}
+            </a>
+          </div>
+        )}
         {nonUs && (
           <a
             href={DEMO_HOME}
@@ -198,6 +276,19 @@ export function CheckoutReturn({
         )}
       </main>
       <SiteFooter />
+      {signInOpen && (
+        <AccountAuthPanel
+          isOpen
+          onClose={() => {
+            setSignInOpen(false);
+            requestAnimationFrame(() => signInButtonRef.current?.focus());
+          }}
+          onSignedIn={() => {
+            setSignInOpen(false);
+            resumePollingRef.current();
+          }}
+        />
+      )}
     </div>
   );
 }
