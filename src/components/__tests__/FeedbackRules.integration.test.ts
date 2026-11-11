@@ -38,24 +38,22 @@ describe('Firestore Security Rules Integration (Live Database)', () => {
     ).rejects.toThrow(/insufficient permissions|permission-denied/i);
   });
 
-  // Live Firestore still has the pre-v2.4.0 token_usage create rule until
-  // someone deploys firestore.rules. This merge does not deploy rules.
-  // The emulator test in src/test/firestore.rules.test.ts is the new contract:
-  // client creates are denied. After a rules deploy, change this test to expect denial.
-  test('writing valid token usage as guest succeeds against currently deployed rules', async () => {
+  // Deployed rules now deny client creates on token_usage, matching
+  // firestore.rules and the emulator test in src/test/firestore.rules.test.ts.
+  test('writing valid token usage as a guest is denied', async () => {
     const tokenUsageRef = collection(db, 'token_usage');
-    
-    const docRef = await addDoc(tokenUsageRef, {
-      userId: 'guest',
-      model: 'gemini-2.5-pro',
-      promptTokens: 100,
-      completionTokens: 50,
-      totalTokens: 150,
-      feature: 'test-suite',
-      timestamp: serverTimestamp(),
-    });
-    
-    expect(docRef.id).toBeDefined();
+
+    await expect(
+      addDoc(tokenUsageRef, {
+        userId: 'guest',
+        model: 'gemini-2.5-pro',
+        promptTokens: 100,
+        completionTokens: 50,
+        totalTokens: 150,
+        feature: 'test-suite',
+        timestamp: serverTimestamp(),
+      })
+    ).rejects.toThrow(/insufficient permissions|permission-denied/i);
   });
 
   test('writing token usage with invalid userId as unauthenticated user fails', async () => {
