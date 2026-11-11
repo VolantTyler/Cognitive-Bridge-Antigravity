@@ -144,6 +144,13 @@ describe('portable exports', () => {
     expect(markdown).not.toContain('## Research references');
     expect(markdown).not.toContain('bibliographic citations');
   });
+
+  it('spells Extraversion in the exported profile heading', () => {
+    const markdown = generatePortableMetadata({ ...scores, extroversion: 42 });
+
+    expect(markdown).toContain('* **Extraversion:** 42/100');
+    expect(markdown).not.toContain('Extroversion');
+  });
 });
 
 describe('MIRROR_SYSTEM_PROMPT bleed rules', () => {
