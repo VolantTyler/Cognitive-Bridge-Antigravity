@@ -73,7 +73,7 @@ describe('extraversion spelling on user-facing surfaces', () => {
     const demo = render(<DemoExperience onStart={() => undefined} />);
     expect(demo.getAllByText('Extraversion').length).toBeGreaterThan(0);
     assertVisibleSpelling(demo.container);
-    fireEvent.click(demo.getByRole('button', { name: /Example B/ }));
+    fireEvent.click(demo.getByRole('button', { name: 'The Planner' }));
     expect(demo.getAllByText('Extraversion').length).toBeGreaterThan(0);
     assertVisibleSpelling(demo.container);
     demo.unmount();

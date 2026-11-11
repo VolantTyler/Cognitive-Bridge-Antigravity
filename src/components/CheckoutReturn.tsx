@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ACCOUNT_COPY } from "../constants/accountCopy";
 import {
   BACK_TO_COGNITIVE_BRIDGE,
@@ -56,12 +56,15 @@ export function CheckoutReturn({
   restore,
   initialPhase,
   authGate = checkoutAuthGate,
+  header,
 }: {
   search: string;
   loadStatus: (sessionId: string) => Promise<CheckoutViewStatus>;
   restore: () => Promise<boolean>;
   initialPhase?: CheckoutViewStatus;
   authGate?: CheckoutAuthGate;
+  /** Shared signed-out bar. Omitted in unit tests that render the return on its own. */
+  header?: ReactNode;
 }) {
   const params = new URLSearchParams(search);
   const checkout = params.get("checkout");
@@ -184,7 +187,8 @@ export function CheckoutReturn({
   const neutral = phase === "paid" || phase === "cancel" || phase === "pending" || phase === "timeout" || phase === "signin" || phase === "non_us_refunded";
 
   return (
-    <div className="min-h-screen bg-bg-primary text-text-secondary flex flex-col font-sans" data-screen={phase}>
+    <div className="min-h-screen bg-bg-primary text-text-secondary flex flex-col font-sans overflow-x-hidden" data-screen={phase}>
+      {header}
       <main className="flex-1 w-full max-w-md mx-auto px-5 py-16">
         <div role={neutral && !nonUs ? "status" : undefined}>
           <h1 ref={headingRef} tabIndex={-1} className="text-2xl font-semibold text-text-primary outline-none">

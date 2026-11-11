@@ -7,13 +7,18 @@ import type { OceanScores } from "../types";
 
 export type DemoProfileId = "A" | "B";
 
+export interface DemoBullet {
+  strategy: "congruent" | "compensatory";
+  text: string;
+}
+
 export interface DemoProfile {
   id: DemoProfileId;
   title: string;
   description: string;
   scores: OceanScores;
   activeTraits: string;
-  bullets: string[];
+  bullets: DemoBullet[];
 }
 
 export const DEMO_QUESTION = "How should I prepare for a job interview next week?";
@@ -30,31 +35,31 @@ export const DEMO_REPLY_PLANNER =
 export const DEMO_PROFILES: Record<DemoProfileId, DemoProfile> = {
   A: {
     id: "A",
-    title: "The Explorer (made-up)",
+    title: "The Explorer",
     description:
-      "A made-up person who enjoys new ideas and tangents, and often finds it hard to stick to plans and finish tasks.",
+      "Enjoys new ideas and tangents, and often finds it hard to stick to plans and finish tasks.",
     scores: { openness: 85, conscientiousness: 25, extroversion: 50, agreeableness: 50, neuroticism: 50 },
     activeTraits:
-      "Active traits: high Openness (congruent), low Conscientiousness (compensatory: add structure). Extraversion, Agreeableness and Neuroticism are in the middle range, so they are not used.",
+      "Uses high Openness (congruent) and low Conscientiousness (compensatory). The middle-range traits aren't used.",
     bullets: [
-      "[congruent] Explore novel angles, theoretical mechanisms, and cross-domain analogies.",
-      "[congruent] Brainstorm broadly before converging.",
-      "[compensatory] Act as an external executive function: break complex tasks into bite-sized milestones.",
-      "[compensatory] Give clear step-by-step checklists and an immediate next action.",
+      { strategy: "congruent", text: "Explore novel angles, theoretical mechanisms, and cross-domain analogies." },
+      { strategy: "congruent", text: "Brainstorm broadly before converging." },
+      { strategy: "compensatory", text: "Act as an external executive function: break complex tasks into bite-sized milestones." },
+      { strategy: "compensatory", text: "Give clear step-by-step checklists and an immediate next action." },
     ],
   },
   B: {
     id: "B",
-    title: "The Planner (made-up)",
+    title: "The Planner",
     description:
-      "A made-up person who likes clear structure, finishes what they start, and prefers familiar, practical options over brainstorming.",
+      "Likes clear structure, finishes what they start, and prefers familiar, practical options over brainstorming.",
     scores: { openness: 45, conscientiousness: 85, extroversion: 50, agreeableness: 50, neuroticism: 35 },
     activeTraits:
-      "Active trait: high Conscientiousness (congruent). Openness and Neuroticism are in the middle range, so they are not used.",
+      "Uses high Conscientiousness (congruent). The middle-range traits aren't used.",
     bullets: [
-      "[congruent] Provide concise, high-density, rigorously structured responses.",
-      "[congruent] Focus on precision.",
-      "[congruent] Adhere strictly to specifications.",
+      { strategy: "congruent", text: "Provide concise, high-density, rigorously structured responses." },
+      { strategy: "congruent", text: "Focus on precision." },
+      { strategy: "congruent", text: "Adhere strictly to specifications." },
     ],
   },
 };
@@ -111,7 +116,7 @@ export function demoModelCard(profile: DemoProfileId): DemoModelCard {
   if (profile === "A") {
     const model = firstStrong("Example A (The Explorer)");
     return {
-      title: "Example: The Explorer (made-up)",
+      title: "The Explorer",
       modelId: model.modelId,
       tierLabel: "Strong fit",
       sentence: DEMO_CARD_SENTENCE_A,
@@ -126,7 +131,7 @@ export function demoModelCard(profile: DemoProfileId): DemoModelCard {
   }
   const model = firstStrong("Example B (The Planner)");
   return {
-    title: "Example: The Planner (made-up)",
+    title: "The Planner",
     modelId: model.modelId,
     tierLabel: "Strong fit",
     sentence: DEMO_CARD_SENTENCE_B,

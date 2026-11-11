@@ -5,9 +5,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Brain, User as UserIcon, Cpu } from 'lucide-react';
 import { ModuleId, OceanScores, Message, ComparisonMessage } from './types';
-import { APP_VERSION_LABEL } from './appVersion';
 import { INITIAL_OCEAN, INITIAL_MIRROR_MESSAGE } from './constants';
 import { shouldPersistInterviewDraft } from './access/interviewDraft';
 import Mirror from './components/Mirror';
@@ -42,7 +40,8 @@ import { auth, db, logAnalyticsEvent } from './services/firebase';
 import { signOut, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import AccountAuthPanel, { VerifyEmailBanner } from './components/AccountAuthPanel';
-import { ACCOUNT_COPY } from './constants/accountCopy';
+import TopNav from './components/TopNav';
+import { openSignInWithoutPurchase } from './access/signInIntent';
 import { adoptGuestSession, sessionFromCloudData } from './services/sessionMigration';
 
 export default function App() {
@@ -60,7 +59,6 @@ export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isReleaseNotesOpen, setIsReleaseNotesOpen] = useState(false);
   const [ollamaConfig, setOllamaConfigState] = useState(() => getOllamaConfig());
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isAccountOpen, setIsAccountOpen] = useState(false);
   const [accountView, setAccountView] = useState<'sign-in' | 'verify'>('sign-in');
   const [, setAccountRevision] = useState(0);
@@ -68,8 +66,6 @@ export default function App() {
     pathname: window.location.pathname,
     search: window.location.search,
   }));
-  const menuRef = useRef<HTMLDivElement>(null);
-
   useEffect(() => {
     const sync = () => setHref({
       pathname: window.location.pathname,
@@ -77,18 +73,6 @@ export default function App() {
     });
     window.addEventListener('popstate', sync);
     return () => window.removeEventListener('popstate', sync);
-  }, []);
-
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setIsMenuOpen(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
   }, []);
 
   // Theme state initialized from localStorage
@@ -220,7 +204,6 @@ export default function App() {
   const openAccount = (view: 'sign-in' | 'verify') => {
     setAccountView(view);
     setIsAccountOpen(true);
-    setIsMenuOpen(false);
   };
 
   const handleLogout = async () => {
@@ -387,23 +370,119 @@ export default function App() {
     logProductEvent('report_viewed');
   }, [surface, activeModule]);
 
-  const currentStep = scores ? (activeModule === 'playground' ? 3 : 2) : 1;
+  const handleStartInterview = () => {
+    logProductEvent('demo_completed');
+    if (!liveUser) {
+      navigate('view=paywall');
+      return;
+    }
+    if (access?.paid && liveInterview) {
+      void beginInterview();
+      return;
+    }
+    if (access?.paid || (access?.legacy && scores)) {
+      navigate('view=app');
+      return;
+    }
+    navigate('view=paywall');
+  };
+
+  const handleNavSignIn = () => {
+    openSignInWithoutPurchase(purchaseIntent, () => openAccount('sign-in'));
+  };
+
+  const navAccount = liveUser
+    ? {
+        displayName: liveUser.displayName,
+        email: liveUser.email,
+        photoURL: liveUser.photoURL,
+        emailVerified: liveUser.emailVerified,
+      }
+    : null;
+
+  const renderNav = (mode: 'app' | 'gate') => (
+    <TopNav
+      mode={mode}
+      account={authReady ? navAccount : null}
+      authPending={!authReady}
+      isLightMode={isLightMode}
+      onToggleTheme={toggleTheme}
+      onSignOut={() => { void handleLogout(); }}
+      onSignIn={handleNavSignIn}
+      onVerifyEmail={() => openAccount('verify')}
+      onOpenFeedback={() => setIsFeedbackOpen(true)}
+      onOpenSettings={() => setIsSettingsOpen(true)}
+      showDevSettings={import.meta.env.DEV}
+      ollamaEnabled={ollamaConfig.enabled}
+      ollamaModel={ollamaConfig.model}
+      onStartInterview={mode === 'gate' ? handleStartInterview : undefined}
+      steps={mode === 'app' ? [
+        { id: 'mirror', label: '1. The Mirror', active: activeModule === 'mirror' },
+        { id: 'tailor', label: '2. The Tailor', active: activeModule === 'tailor', disabled: !scores },
+        { id: 'playground', label: '3. The Bridge', active: activeModule === 'playground', disabled: !scores },
+      ] : undefined}
+      onSelectStep={(id) => setActiveModule(id as ModuleId)}
+    />
+  );
+
+  const overlays = (
+    <>
+      <AccountAuthPanel
+        isOpen={isAccountOpen}
+        initialView={accountView}
+        onClose={() => setIsAccountOpen(false)}
+        onSignedIn={(accountUser) => {
+          setIsAccountOpen(false);
+          setAccountRevision((revision) => revision + 1);
+          if (!purchaseIntent.current) {
+            setFlowOverride(null);
+            return;
+          }
+          if (!accountUser.emailVerified) {
+            setFlowOverride('verify');
+            return;
+          }
+          void runCheckout();
+        }}
+        onAccountUpdated={() => setAccountRevision((revision) => revision + 1)}
+      />
+      <FeedbackModal isOpen={isFeedbackOpen} onClose={() => setIsFeedbackOpen(false)} />
+      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} onConfigChange={(config) => setOllamaConfigState(config)} />
+      <ReleaseNotesModal isOpen={isReleaseNotesOpen} onClose={() => setIsReleaseNotesOpen(false)} />
+    </>
+  );
+
   const route = parseLocation(href.pathname, href.search);
   if (route.name !== 'app' && !canceledCheckout) {
     return (
-      <StandaloneRoutes
-        pathname={href.pathname}
-        search={href.search}
-        loadStatus={loadCheckoutStatus}
-        restore={requestRestorePurchase}
-        app={null}
-      />
+      <>
+        <StandaloneRoutes
+          pathname={href.pathname}
+          search={href.search}
+          loadStatus={loadCheckoutStatus}
+          restore={requestRestorePurchase}
+          app={null}
+          header={route.name === 'checkout' ? (
+            <>
+              {renderNav('gate')}
+              {liveUser && !liveUser.emailVerified && (
+                <VerifyEmailBanner onVerify={() => openAccount('verify')} />
+              )}
+            </>
+          ) : undefined}
+        />
+        {route.name === 'checkout' ? overlays : null}
+      </>
     );
   }
 
   if (surface !== 'app') {
     return (
-      <div className="min-h-screen bg-bg-primary text-text-secondary flex flex-col font-sans">
+      <div className="min-h-screen overflow-x-hidden bg-bg-primary text-text-secondary flex flex-col font-sans">
+        {renderNav('gate')}
+        {liveUser && !liveUser.emailVerified && (
+          <VerifyEmailBanner onVerify={() => openAccount('verify')} />
+        )}
         <div className="flex-1">
         <AccessFlow
           phase={surface}
@@ -411,22 +490,7 @@ export default function App() {
           canceled={canceledCheckout}
           alertMessage={flowAlert}
           busy={checkoutBusy}
-          onStartInterview={() => {
-            logProductEvent('demo_completed');
-            if (!liveUser) {
-              navigate('view=paywall');
-              return;
-            }
-            if (access?.paid && liveInterview) {
-              void beginInterview();
-              return;
-            }
-            if (access?.paid || (access?.legacy && scores)) {
-              navigate('view=app');
-              return;
-            }
-            navigate('view=paywall');
-          }}
+          onStartInterview={handleStartInterview}
           onUnlock={() => {
             purchaseIntent.current = true;
             const step = phaseAfterUnlock({
@@ -465,189 +529,14 @@ export default function App() {
         />
         </div>
         <SiteFooter />
+        {overlays}
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-bg-primary text-text-secondary flex flex-col font-sans transition-colors duration-300">
-      {/* Navigation Header */}
-      <nav className="h-16 bg-bg-secondary border-b border-border-primary px-6 flex items-center justify-between z-50 sticky top-0 transition-colors duration-300">
-        <div className="flex items-center gap-2">
-          <img
-            src="/favicon.svg"
-            alt="Cognitive Bridge"
-            className="w-8 h-8 rounded shadow-lg shadow-orange-500/10"
-          />
-          <span className="font-bold tracking-tight text-sm sm:text-lg">COGNITIVE BRIDGE <span className="hidden sm:inline-block text-[10px] font-mono text-status-brand ml-1 border border-orange-500/30 px-1 rounded uppercase">{APP_VERSION_LABEL}</span></span>
-        </div>
-
-        <div className="flex items-center gap-4">
-          <div className="hidden md:flex items-center gap-8 mr-2">
-            {[
-              { id: 'mirror', label: '1. The Mirror', active: activeModule === 'mirror' },
-              { id: 'tailor', label: '2. The Tailor', active: activeModule === 'tailor', disabled: !scores },
-              { id: 'playground', label: '3. The Bridge', active: activeModule === 'playground', disabled: !scores },
-            ].map((step) => (
-              <button
-                key={step.id}
-                onClick={() => !step.disabled && setActiveModule(step.id as ModuleId)}
-                disabled={step.disabled}
-                className={`text-xs uppercase tracking-[0.2em] font-bold transition-all px-4 py-2 rounded-full cursor-pointer ${step.active
-                  ? 'text-text-primary bg-bg-surface border border-border-secondary'
-                  : step.disabled ? 'text-text-muted-darker cursor-not-allowed' : 'text-text-muted hover:text-text-primary'
-                  }`}
-              >
-                {step.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Combined Settings Menu Dropdown Container */}
-          <div className="relative" ref={menuRef}>
-            {liveUser ? (
-              <button
-                onClick={() => setIsMenuOpen(prev => !prev)}
-                className="flex items-center gap-2 bg-bg-tertiary border border-border-primary hover:border-orange-500/30 rounded-xl px-3 py-1.5 select-none shadow-sm cursor-pointer transition-all hover:bg-bg-surface group"
-                title="Open settings menu"
-              >
-                {liveUser.photoURL ? (
-                  <img src={liveUser.photoURL} alt="profile" className="w-5 h-5 rounded-md object-cover border border-border-secondary group-hover:border-orange-500/40" />
-                ) : (
-                  <div className="w-5 h-5 rounded-md bg-button-brand flex items-center justify-center text-white text-[10px] font-bold">
-                    {(liveUser.displayName || liveUser.email || '?')[0].toUpperCase()}
-                  </div>
-                )}
-                <span className="text-[10px] font-bold text-text-primary group-hover:text-status-brand transition-colors">
-                  {liveUser.displayName || liveUser.email?.split('@')[0]}
-                </span>
-                <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.6)]" />
-                <span className="text-[9px] uppercase tracking-wider text-status-success font-bold hidden md:inline">Synced</span>
-              </button>
-            ) : (
-              <button
-                onClick={() => setIsMenuOpen(prev => !prev)}
-                className="flex items-center justify-center gap-2 p-2 sm:px-3.5 sm:py-1.5 rounded-xl bg-button-brand hover:bg-button-brand-hover text-white text-[10px] font-bold uppercase tracking-wider transition-all shadow-lg shadow-orange-600/10 cursor-pointer border border-orange-500/20"
-                title="Open menu"
-              >
-                <UserIcon className="w-3.5 h-3.5 text-white sm:hidden" />
-                <Brain className="w-3.5 h-3.5 text-white hidden sm:inline" />
-                <span className="hidden sm:inline">Sign in</span>
-              </button>
-            )}
-
-            {/* Dropdown Menu Box */}
-            <AnimatePresence>
-              {isMenuOpen && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                  transition={{ duration: 0.15 }}
-                  className="absolute right-0 mt-2 w-56 rounded-xl border border-border-primary bg-bg-secondary p-2 shadow-2xl z-50 flex flex-col gap-1 transition-colors duration-300"
-                >
-                  {/* Log In / Log Out */}
-                  {liveUser ? (
-                    <>
-                      {!liveUser.emailVerified && (
-                        <button
-                          type="button"
-                          onClick={() => openAccount('verify')}
-                          className="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-status-brand hover:bg-orange-500/10 rounded-lg cursor-pointer transition-all text-left w-full border-0 bg-transparent"
-                        >
-                          <UserIcon className="w-4.5 h-4.5 shrink-0" />
-                          <span>{ACCOUNT_COPY.menuVerify}</span>
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          handleLogout();
-                          setIsMenuOpen(false);
-                        }}
-                        className="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-status-danger hover:bg-red-500/10 rounded-lg cursor-pointer transition-all text-left w-full border-0 bg-transparent"
-                      >
-                        <UserIcon className="w-4.5 h-4.5 shrink-0" />
-                        <span>Sign out</span>
-                      </button>
-                    </>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => openAccount('sign-in')}
-                      className="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-status-brand hover:bg-orange-500/10 rounded-lg cursor-pointer transition-all text-left w-full border-0 bg-transparent"
-                    >
-                      <Brain className="w-4.5 h-4.5 shrink-0" />
-                      <span>{ACCOUNT_COPY.menuSignIn}</span>
-                    </button>
-                  )}
-
-                  <div className="h-[1px] bg-border-primary my-1" />
-
-                  {/* Theme Mode Toggle */}
-                  <button
-                    type="button"
-                    onClick={toggleTheme}
-                    className="flex items-center justify-between px-3 py-2 text-xs font-semibold text-text-secondary hover:text-text-primary hover:bg-bg-tertiary rounded-lg cursor-pointer transition-all w-full border-0 bg-transparent"
-                  >
-                    <div className="flex items-center gap-2">
-                      {isLightMode ? (
-                        <svg className="w-4 h-4 text-text-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="M4.93 4.93l1.41 1.41"/><path d="M17.66 17.66l1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="M6.34 17.66l-1.41 1.41"/><path d="M19.07 4.93l-1.41 1.41"/></svg>
-                      ) : (
-                        <svg className="w-4 h-4 text-text-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
-                      )}
-                      <span>Theme Mode</span>
-                    </div>
-                    <span className="text-[9px] uppercase tracking-wider font-bold text-text-muted bg-bg-primary px-1.5 py-0.5 rounded">
-                      {isLightMode ? 'Light' : 'Dark'}
-                    </span>
-                  </button>
-
-                  {/* Local Inference Configuration (Dev-only) */}
-                  {import.meta.env.DEV && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsSettingsOpen(true);
-                        setIsMenuOpen(false);
-                      }}
-                      className={`flex items-center justify-between px-3 py-2 text-xs font-semibold rounded-lg cursor-pointer transition-all hover:bg-bg-tertiary w-full border-0 bg-transparent ${
-                        ollamaConfig.enabled 
-                          ? 'text-status-feature hover:text-accent-purple-hover' 
-                          : 'text-text-secondary hover:text-text-primary'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <Cpu className="w-4 h-4 shrink-0" />
-                        <span>Local Inference</span>
-                      </div>
-                      <span className={`text-[9px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded ${
-                        ollamaConfig.enabled ? 'bg-purple-500/20 text-status-feature' : 'bg-bg-primary text-text-muted'
-                      }`}>
-                        {ollamaConfig.enabled ? ollamaConfig.model : 'Cloud'}
-                      </span>
-                    </button>
-                  )}
-
-                  {/* Leave Feedback */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsFeedbackOpen(true);
-                      setIsMenuOpen(false);
-                    }}
-                    className="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-text-secondary hover:text-text-primary hover:bg-bg-tertiary rounded-lg cursor-pointer transition-all text-left w-full border-0 bg-transparent"
-                  >
-                    <svg className="w-4 h-4 text-text-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                    <span>Leave Feedback</span>
-                  </button>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        </div>
-
-      </nav>
+    <div className="min-h-screen overflow-x-hidden bg-bg-primary text-text-secondary flex flex-col font-sans transition-colors duration-300">
+      {renderNav('app')}
 
       {liveUser && !liveUser.emailVerified && (
         <VerifyEmailBanner onVerify={() => openAccount('verify')} />
@@ -787,19 +676,7 @@ export default function App() {
         onOpenReleaseNotes={() => setIsReleaseNotesOpen(true)}
       />
 
-      <AccountAuthPanel
-        isOpen={isAccountOpen}
-        initialView={accountView}
-        onClose={() => setIsAccountOpen(false)}
-        onSignedIn={() => {
-          setIsAccountOpen(false);
-          setAccountRevision((revision) => revision + 1);
-        }}
-        onAccountUpdated={() => setAccountRevision((revision) => revision + 1)}
-      />
-      <FeedbackModal isOpen={isFeedbackOpen} onClose={() => setIsFeedbackOpen(false)} />
-      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} onConfigChange={(config) => setOllamaConfigState(config)} />
-      <ReleaseNotesModal isOpen={isReleaseNotesOpen} onClose={() => setIsReleaseNotesOpen(false)} />
+      {overlays}
     </div>
   );
 }
