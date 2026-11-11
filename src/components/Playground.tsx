@@ -447,11 +447,12 @@ export default function Playground({
   );
 
   return (
-    <div className="h-full flex flex-col gap-6 overflow-y-auto overflow-x-hidden min-h-0">
+    <div className="h-full flex flex-col gap-6 overflow-y-auto overflow-x-hidden min-h-0 scroll-smooth">
       <OceanCards scores={scores} />
 
       {!leaderboardOpen && (
-      <div className="flex gap-6 relative min-h-[560px] h-[70vh] shrink-0">
+      <>
+      <div data-bridge-chat className="flex gap-6 relative h-[75vh] shrink-0 lg:h-[70vh] lg:min-h-[560px]">
         <AnimatePresence>
           {activeAnalysis && (
             <motion.div
@@ -837,6 +838,21 @@ export default function Playground({
           </div>
         </div>
       </div>
+      <a
+        href="#models-that-fit"
+        onClick={(event) => {
+          const target = document.getElementById('models-that-fit');
+          if (!target) return;
+          event.preventDefault();
+          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          target.focus({ preventScroll: true });
+          window.history.replaceState(null, '', '#models-that-fit');
+        }}
+        className="self-start text-sm font-medium text-text-primary underline underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-600"
+      >
+        See which models scored closest ↓
+      </a>
+      </>
       )}
 
       {leaderboardOpen ? (

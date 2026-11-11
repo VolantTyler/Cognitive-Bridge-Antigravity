@@ -77,7 +77,7 @@ export default function ModelMatchSection({ state, onRetry, onOpenLeaderboard, t
   if (state.status === 'empty') return null;
 
   return (
-    <section aria-labelledby="model-match-heading" role="region" className="model-match min-w-0 max-w-full" aria-busy={state.status === 'loading'}>
+    <section id="models-that-fit" tabIndex={-1} aria-labelledby="model-match-heading" role="region" className="model-match min-w-0 max-w-full scroll-mt-4 outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-600" aria-busy={state.status === 'loading'}>
       <h2 id="model-match-heading" className="text-2xl font-semibold tracking-tight text-text-primary">
         {SECTION_HEADING}
       </h2>

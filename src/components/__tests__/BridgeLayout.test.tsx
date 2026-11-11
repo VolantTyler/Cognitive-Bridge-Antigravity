@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import Playground from '../Playground';
 import type { ComparisonMessage, OceanScores } from '../../types';
@@ -46,5 +46,38 @@ describe('Bridge page section order', () => {
       expect(screen.getByRole('heading', { name: 'What you asked for' })).toBeInTheDocument();
     });
     expect(bridge.compareDocumentPosition(screen.getByRole('heading', { name: 'What you asked for' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('keeps the chat input in view at 360px and restores the desktop height', () => {
+    render(<Harness />);
+    const chat = document.querySelector('[data-bridge-chat]');
+    expect(chat).toBeTruthy();
+    expect(chat!.className).toContain('h-[75vh]');
+    expect(chat!.className).toContain('lg:h-[70vh]');
+    expect(chat!.className).toContain('lg:min-h-[560px]');
+    expect(chat!.className).not.toMatch(/(^|\s)min-h-\[560px\](\s|$)/);
+    expect(chat!.className).not.toMatch(/(^|\s)h-\[70vh\](\s|$)/);
+  });
+
+  it('jumps from under the chat to the models section', () => {
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
+    render(<Harness />);
+
+    const bridge = screen.getByRole('heading', { name: 'The Bridge' });
+    const link = screen.getByRole('link', { name: 'See which models scored closest ↓' });
+    const models = document.getElementById('models-that-fit');
+    expect(link.tagName).toBe('A');
+    expect(link).toHaveAttribute('href', '#models-that-fit');
+    expect(link).not.toHaveAttribute('tabindex', '-1');
+    expect(models).toBeTruthy();
+    expect(models).toHaveAttribute('tabindex', '-1');
+    expect(bridge.compareDocumentPosition(link) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(link.compareDocumentPosition(models!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    fireEvent.click(link);
+    expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
+    expect(document.activeElement).toBe(models);
+    expect(window.location.hash).toBe('#models-that-fit');
   });
 });
