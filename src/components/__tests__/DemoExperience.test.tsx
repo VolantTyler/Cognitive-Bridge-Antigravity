@@ -48,6 +48,8 @@ describe("demo experience", () => {
     expect(screen.getByText(DEMO_PROFILES.A.description)).toBeInTheDocument();
     expect(screen.getByText(DEMO_CARD_SENTENCE_A)).toBeInTheDocument();
     expect(screen.getByText("google/gemini-3.8-flash")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "A model that may fit" })).toBeInTheDocument();
+    expect(screen.getByTestId("demo-model-card").textContent ?? "").not.toMatch(/Strong fit/);
     expect(screen.getByText("Mean 80, runs 70 to 85")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "The Planner" }));
     expect(screen.getByText(DEMO_PROFILES.B.description)).toBeInTheDocument();
@@ -107,12 +109,13 @@ describe("demo experience", () => {
     const disclaimer = screen.getByTestId("example-disclaimer");
     const panel = screen.getByTestId("example-panel");
     expect(section).not.toBeNull();
-    expect(section?.className).toMatch(/max-md:max-h-\[calc\(100dvh-4rem\)\]/);
+    expect(section?.className).not.toMatch(/max-h-|overflow-y-auto/);
+    expect(panel.className).not.toMatch(/max-h-|overflow-y-auto/);
+    expect(body.className).not.toMatch(/max-h-|overflow-y-auto|max-md:flex-1/);
     expect(section?.contains(ribbon)).toBe(true);
     expect(section?.contains(disclaimer)).toBe(true);
     expect(body.contains(ribbon)).toBe(false);
     expect(body.contains(disclaimer)).toBe(false);
-    expect(body.className).toMatch(/max-md:overflow-y-auto/);
     expect(panel.contains(ribbon)).toBe(true);
     expect(panel.nextElementSibling).toBe(disclaimer);
     expect(disclaimer).toHaveTextContent(DEMO_FRAMING);

@@ -179,7 +179,7 @@ export default function DemoExperience({
       <section
         id="example"
         aria-labelledby={`${titleId}-example`}
-        className="mt-12 scroll-mt-16 border-t border-border-primary pt-10 max-md:flex max-md:max-h-[calc(100dvh-4rem)] max-md:flex-col"
+        className="mt-12 scroll-mt-16 border-t border-border-primary pt-10"
       >
         <div className="flex shrink-0 flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
@@ -211,11 +211,11 @@ export default function DemoExperience({
 
         <div
           data-testid="example-frame"
-          className="mt-4 flex flex-col max-md:min-h-0 max-md:flex-1 max-md:overflow-hidden"
+          className="mt-4"
         >
           <div
             data-testid="example-panel"
-            className="flex flex-col overflow-hidden rounded-t-2xl border border-b-0 border-border-secondary bg-bg-secondary max-md:min-h-0 max-md:flex-1"
+            className="overflow-hidden rounded-t-2xl border border-b-0 border-border-secondary bg-bg-secondary"
           >
             <div
               data-testid="example-ribbon"
@@ -228,7 +228,7 @@ export default function DemoExperience({
             </div>
             <div
               data-testid="example-panel-body"
-              className="space-y-6 px-3 py-4 max-md:min-h-0 max-md:flex-1 max-md:overflow-y-auto md:px-5 md:py-5"
+              className="space-y-6 px-3 py-4 md:px-5 md:py-5"
             >
               <div>
                 <h3 className="text-[13px] font-bold uppercase tracking-[0.08em] text-text-primary">
@@ -356,11 +356,7 @@ export default function DemoExperience({
                 >
                   <div>
                     <p className="text-sm font-semibold text-text-primary">{card.modelId}</p>
-                    <p className="mt-1 text-sm text-text-secondary">
-                      {card.tierLabel}
-                      {" · "}
-                      {card.testedOn}
-                    </p>
+                    <p className="mt-1 text-sm text-text-secondary">{card.testedOn}</p>
                     <p className="mt-3 text-sm leading-relaxed text-text-secondary">{card.sentence}</p>
                     <ul className="mt-3 flex flex-wrap gap-2">
                       {card.chips.map((chip) => (

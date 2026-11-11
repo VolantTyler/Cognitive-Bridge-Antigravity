@@ -42,6 +42,9 @@ describe('OceanCards strategy badge layout', () => {
 
     expect(badges[0].querySelector('button')?.textContent).toBe('Compensatory');
     expect(badges[1].querySelector('button')?.textContent).toBe('Congruent');
+    for (const badge of badges) {
+      expect(badge.querySelector('button')?.className).toMatch(/min-h-6/);
+    }
   });
 
   it('keeps strategy badge tooltips accessible below the badge', () => {
