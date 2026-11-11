@@ -176,21 +176,31 @@ describe("checkout session params", () => {
     expect(other.customer_email).toBeUndefined();
   });
 
-  it("turns on Managed Payments without tax or shipping params", () => {
+  it("builds Managed Payments params without receipt email, tax, or custom text", () => {
     const params = buildCheckoutSessionCreateParams({
       uid: "uid-1",
-      email: null,
+      email: "ada@example.com",
       priceId: "price_from_env",
       baseUrl: "https://cognitive-bridge-ai.web.app",
       managedPayments: true,
       automaticTax: true,
     });
-    expect(params.managed_payments).toEqual({ enabled: true });
+    expect(params).toEqual({
+      mode: "payment",
+      line_items: [{ price: "price_from_env", quantity: 1 }],
+      client_reference_id: "uid-1",
+      billing_address_collection: "required",
+      consent_collection: { terms_of_service: "required" },
+      success_url: "https://cognitive-bridge-ai.web.app/?checkout=success&session_id={CHECKOUT_SESSION_ID}",
+      cancel_url: "https://cognitive-bridge-ai.web.app/?checkout=cancel",
+      metadata: { uid: "uid-1" },
+      payment_intent_data: { metadata: { uid: "uid-1" } },
+      customer_email: "ada@example.com",
+      managed_payments: { enabled: true },
+    });
+    expect(params.payment_intent_data.receipt_email).toBeUndefined();
     expect(params.automatic_tax).toBeUndefined();
     expect(params.custom_text).toBeUndefined();
-    expect("custom_text" in params).toBe(false);
-    expect(params.consent_collection).toEqual({ terms_of_service: "required" });
-    expect("shipping_address_collection" in params).toBe(false);
   });
 
   it("refuses a non-https terms URL and live secret keys", () => {

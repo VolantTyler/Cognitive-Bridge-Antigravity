@@ -140,13 +140,13 @@ function buildCheckoutSessionCreateParams(input) {
     };
     if (input.email && input.email.includes("@")) {
         params.customer_email = input.email;
-        params.payment_intent_data.receipt_email = input.email;
     }
     if (input.managedPayments) {
-        // Managed Payments calculates tax itself and rejects custom_text.
-        // The one-time Checkout unsupported-parameter list does not include
-        // consent_collection.terms_of_service, and API 2026-10-28.endive still
-        // types that field, so the Stripe terms checkbox stays.
+        // Managed Payments calculates tax and sends the receipt itself.
+        // It rejects custom_text and payment_intent_data.receipt_email.
+        // The one-time unsupported list does not include billing_address_collection,
+        // client_reference_id, metadata, payment_intent_data.metadata, or
+        // consent_collection.terms_of_service, so those stay.
         params.managed_payments = { enabled: true };
     }
     else {
@@ -155,6 +155,9 @@ function buildCheckoutSessionCreateParams(input) {
         params.custom_text = {
             terms_of_service_acceptance: { message: termsAcceptanceMessage(termsUrl) },
         };
+        if (input.email && input.email.includes("@")) {
+            params.payment_intent_data.receipt_email = input.email;
+        }
         params.managed_payments = { enabled: false };
         if (input.automaticTax) {
             params.automatic_tax = { enabled: true };
