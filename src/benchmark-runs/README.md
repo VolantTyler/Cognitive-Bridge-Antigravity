@@ -6,7 +6,7 @@ The shipped run is `2026-11-02-frontier.json`, copied byte for byte from Tyler's
 
 An empty `runs` array turns the section off. The Bridge draws no heading until a score file and an index entry are both added.
 
-Earlier sample output and the 2026-10-29 10-repeat file live under `src/modelMatch/__fixtures__/`. That older file was written before the extroversion `exclusion_reason` was reworded, and `matchModels` rejects it. Do not copy it here, and do not edit it to make the check pass.
+Earlier sample output and the 2026-10-29 10-repeat file live under `src/modelMatch/__fixtures__/`. That older file was written before the extraversion `exclusion_reason` was reworded, and `matchModels` rejects it. Do not copy it here, and do not edit it to make the check pass.
 
 Stand-in frontier runs live in that same fixtures folder as `scores-frontier-a.json` (`run_label` `frontier-a`) and `scores-frontier-b.json` (`run_label` `frontier-b`). They are not shipped. Do not copy them into this folder.
 
@@ -54,10 +54,10 @@ One index entry is the replacement. A second entry does not merge. The newest `t
 
 Tests and fixtures:
 
-- `src/modelMatch/__tests__/shippedRun.test.tsx` reads whichever file `index.json` lists. It expects schema 4, four models, and a file `matchModels` accepts. It does not expect particular model ids. A complete model shows the configured repeat count in the header and no "N of M runs" tag. A model with `fewer_runs` shows that tag and not a second count in the header. The shipped frontier file stores the current extroversion exclusion sentence, not the legacy one.
+- `src/modelMatch/__tests__/shippedRun.test.tsx` reads whichever file `index.json` lists. It expects schema 4, four models, and a file `matchModels` accepts. It does not expect particular model ids. A complete model shows the configured repeat count in the header and no "N of M runs" tag. A model with `fewer_runs` shows that tag and not a second count in the header. The shipped frontier file stores the current extraversion exclusion sentence, not the legacy one.
 - Do not retarget tests at `gpt-5-nano`, `gemini-2.5-flash-lite`, `claude-haiku-4.5`, or `grok-4.3` inside the shipped file. Those ids stay in `src/modelMatch/__fixtures__/scores-10run-2026-10-29.json` and `match-samples.json`, which are fixtures.
 - Do not replace `src/modelMatch/__fixtures__/scores-frontier-a.json` or `scores-frontier-b.json`. Those stand-ins document fewer-runs tags, close calls, and the exact `exclusion_reason` check. They are not the shipped run.
-- If `matchModels` throws `strategy_table does not match the in-code STRATEGY_TABLE, including a changed exclusion_reason`, the file was written with a different extroversion exclusion sentence than the one in code. The section shows "We couldn't load benchmark scores" plus the sentence about a changed exclusion sentence. Re-run the benchmark so the file stores the current sentence. Do not edit the sentence in the JSON, and do not edit `EXTROVERSION_EXCLUSION_REASON` to match the file.
+- If `matchModels` throws `strategy_table does not match the in-code STRATEGY_TABLE, including a changed exclusion_reason`, the file was written with a different extraversion exclusion sentence than the one in code. The section shows "We couldn't load benchmark scores" plus the sentence about a changed exclusion sentence. Re-run the benchmark so the file stores the current sentence. Do not edit the sentence in the JSON, and do not edit `EXTROVERSION_EXCLUSION_REASON` to match the file.
 
 Verify:
 

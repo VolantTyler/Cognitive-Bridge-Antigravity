@@ -352,7 +352,7 @@ export default function Mirror({ messages, setMessages, onComplete, onSaveSessio
                     disabled={isLoading}
                     className="p-3 rounded-xl border border-border-card bg-bg-secondary/60 hover:bg-bg-tertiary hover:border-accent-orange text-left transition-all disabled:opacity-50 group flex flex-col justify-between cursor-pointer"
                   >
-                    <div className="text-[10px] font-bold text-accent-orange uppercase tracking-wide group-hover:text-accent-orange-hover transition-colors">High Extroversion and Neuroticism</div>
+                    <div className="text-[10px] font-bold text-accent-orange uppercase tracking-wide group-hover:text-accent-orange-hover transition-colors">High Extraversion and Neuroticism</div>
                     <div className="text-[9px] text-text-secondary mt-1 italic leading-tight">Dampens hyper-reactive anxiety. Provides steady, structural ground.</div>
                   </button>
 
@@ -366,7 +366,7 @@ export default function Mirror({ messages, setMessages, onComplete, onSaveSessio
                     disabled={isLoading}
                     className="p-3 rounded-xl border border-border-card bg-bg-secondary/60 hover:bg-bg-tertiary hover:border-accent-yellow text-left transition-all disabled:opacity-50 group flex flex-col justify-between cursor-pointer"
                   >
-                    <div className="text-[10px] font-bold text-accent-yellow uppercase tracking-wide group-hover:text-accent-yellow-hover transition-colors">Low Extroversion, High Neuroticism</div>
+                    <div className="text-[10px] font-bold text-accent-yellow uppercase tracking-wide group-hover:text-accent-yellow-hover transition-colors">Low Extraversion, High Neuroticism</div>
                     <div className="text-[9px] text-text-secondary mt-1 italic leading-tight">Concise, low-friction tone plus compensatory calm under anxiety.</div>
                   </button>
 

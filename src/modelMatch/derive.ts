@@ -21,6 +21,7 @@ import {
   BALANCED_PROFILE,
   CLOSE_CALL_NOTE,
   DECENT_SENTENCE,
+  EXTROVERSION_CHIP,
   EXTROVERSION_ONLY,
   NO_RECOMMENDATION,
   NO_TESTED_STRATEGY,
@@ -31,7 +32,7 @@ import {
 const TRAIT_NAME: Record<OceanTrait, string> = {
   openness: 'Openness',
   conscientiousness: 'Conscientiousness',
-  extroversion: 'Extroversion',
+  extroversion: 'Extraversion',
   agreeableness: 'Agreeableness',
   neuroticism: 'Neuroticism',
 };
@@ -306,7 +307,7 @@ function chipForTarget(target: MatchResult['targets'][number]): TargetChipModel 
   const muted = target.exclude_from_tiering || target.target_direction == null || target.confidence === 'not_scored';
   if (muted) {
     const primary = target.trait === 'extroversion'
-      ? 'Extroversion: not used'
+      ? EXTROVERSION_CHIP
       : target.trait === 'neuroticism'
         ? 'Neuroticism: not used'
         : `${name}: not used`;
