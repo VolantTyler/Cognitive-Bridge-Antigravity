@@ -450,21 +450,6 @@ export default function Playground({
     <div className="h-full flex flex-col gap-6 overflow-y-auto overflow-x-hidden min-h-0">
       <OceanCards scores={scores} />
 
-      {leaderboardOpen ? (
-        <LeaderboardPage
-          state={match.state}
-          onRetry={match.retry}
-          focusModelId={leaderboardModel ?? undefined}
-          onBack={() => setLeaderboardModel(null)}
-        />
-      ) : (
-      <ModelMatchSection
-        state={match.state}
-        onRetry={match.retry}
-        onOpenLeaderboard={(modelId) => setLeaderboardModel(modelId)}
-      />
-      )}
-
       {!leaderboardOpen && (
       <div className="flex gap-6 relative min-h-[560px] h-[70vh] shrink-0">
         <AnimatePresence>
@@ -852,6 +837,21 @@ export default function Playground({
           </div>
         </div>
       </div>
+      )}
+
+      {leaderboardOpen ? (
+        <LeaderboardPage
+          state={match.state}
+          onRetry={match.retry}
+          focusModelId={leaderboardModel ?? undefined}
+          onBack={() => setLeaderboardModel(null)}
+        />
+      ) : (
+        <ModelMatchSection
+          state={match.state}
+          onRetry={match.retry}
+          onOpenLeaderboard={(modelId) => setLeaderboardModel(modelId)}
+        />
       )}
     </div>
   );
