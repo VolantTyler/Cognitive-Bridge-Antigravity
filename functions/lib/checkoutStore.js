@@ -127,6 +127,17 @@ function createFirestoreBillingStore(dbPromise = adminStore_1.getAdminFirestore)
             }
             await ref.set(payload, { merge: true });
         },
+        async writeCheckoutConsent(consent) {
+            const db = await dbPromise();
+            const { FieldValue } = await Promise.resolve().then(() => __importStar(require("firebase-admin/firestore")));
+            await db.collection("checkout_consents").doc(consent.sessionId).set({
+                uid: consent.uid,
+                acceptedAt: FieldValue.serverTimestamp(),
+                termsVersion: consent.termsVersion,
+                attested18OrOlder: true,
+                sessionId: consent.sessionId,
+            });
+        },
         async writeCheckoutRecord(record) {
             const db = await dbPromise();
             const { FieldValue } = await Promise.resolve().then(() => __importStar(require("firebase-admin/firestore")));

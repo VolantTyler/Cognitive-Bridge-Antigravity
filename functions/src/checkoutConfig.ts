@@ -21,6 +21,16 @@ export const INTERVIEWS_ALLOWED = 2;
 
 export const CHECKOUT_IDEMPOTENCY_WINDOW_MS = 15_000;
 
+/**
+ * Terms page has no displayed last-updated line. This is the date of the
+ * last edit to that page (LegalPages.tsx, 2026-11-09). Bump it when the
+ * Terms text changes. The client must send the same value.
+ */
+export const TERMS_VERSION = "2026-11-09";
+
+export const CHECKOUT_CONSENT_REQUIRED =
+  "Please agree to the Terms and confirm you are 18 or older.";
+
 const stripePriceId = defineString("STRIPE_PRICE_ID", {
   default: "",
   description: "Stripe Price ID for the one-time purchase. Test-mode price until launch.",
@@ -118,13 +128,23 @@ export function checkoutIdempotencyKey(uid: string, nowMs: number): string {
   return `cb-checkout-${uid}-${bucket}`;
 }
 
+/** Rejects a checkout body that did not accept the current Terms and the 18+ attestation. */
+export function assertCheckoutConsent(body: unknown): void {
+  const record = body && typeof body === "object" && !Array.isArray(body)
+    ? body as Record<string, unknown>
+    : null;
+  if (record?.termsAccepted !== true || record.termsVersion !== TERMS_VERSION) {
+    throw new GateError(400, "terms_not_accepted", CHECKOUT_CONSENT_REQUIRED);
+  }
+}
+
 export interface CheckoutSessionCreateParams {
   mode: "payment";
   line_items: Array<{ price: string; quantity: number }>;
   client_reference_id: string;
   billing_address_collection: "required";
   consent_collection: { terms_of_service: "required" };
-  custom_text: { terms_of_service_acceptance: { message: string } };
+  custom_text?: { terms_of_service_acceptance: { message: string } };
   success_url: string;
   cancel_url: string;
   metadata: { uid: string };
@@ -152,9 +172,6 @@ export function buildCheckoutSessionCreateParams(input: {
     // shipping_address_collection is for physical goods and is intentionally omitted.
     billing_address_collection: "required",
     consent_collection: { terms_of_service: "required" },
-    custom_text: {
-      terms_of_service_acceptance: { message: termsAcceptanceMessage(termsUrl) },
-    },
     success_url: `${base}/?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${base}/?checkout=cancel`,
     metadata: { uid: input.uid },
@@ -165,11 +182,17 @@ export function buildCheckoutSessionCreateParams(input: {
     params.payment_intent_data.receipt_email = input.email;
   }
   if (input.managedPayments) {
-    // Managed Payments calculates tax itself and rejects shipping collection.
+    // Managed Payments calculates tax itself and rejects custom_text.
+    // The one-time Checkout unsupported-parameter list does not include
+    // consent_collection.terms_of_service, and API 2026-10-28.endive still
+    // types that field, so the Stripe terms checkbox stays.
     params.managed_payments = { enabled: true };
   } else {
     // New accounts turn Managed Payments on at the account level. Omitting the
     // field lets that default win, and Stripe then rejects custom_text.
+    params.custom_text = {
+      terms_of_service_acceptance: { message: termsAcceptanceMessage(termsUrl) },
+    };
     params.managed_payments = { enabled: false };
     if (input.automaticTax) {
       params.automatic_tax = { enabled: true };

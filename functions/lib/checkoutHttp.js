@@ -68,6 +68,7 @@ async function handleCreateCheckout(req, res, deps) {
         if (entitlement?.paid) {
             throw new gate_1.GateError(409, "already_entitled", "This account already has access.");
         }
+        (0, checkoutConfig_1.assertCheckoutConsent)(req.body);
         const params = (0, checkoutConfig_1.buildCheckoutSessionCreateParams)({
             uid: user.uid,
             email: user.email,
@@ -80,6 +81,12 @@ async function handleCreateCheckout(req, res, deps) {
         if (!session.url) {
             throw new gate_1.GateError(502, "checkout_unavailable", "Couldn't open checkout. You haven't been charged.");
         }
+        await deps.store.writeCheckoutConsent({
+            uid: user.uid,
+            termsVersion: checkoutConfig_1.TERMS_VERSION,
+            attested18OrOlder: true,
+            sessionId: session.id,
+        });
         await deps.store.writeCheckoutRecord({
             sessionId: session.id,
             uid: user.uid,

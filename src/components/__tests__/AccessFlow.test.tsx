@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import AccessFlow from "../AccessFlow";
 import {
   CHECKOUT_CANCELED_BANNER,
+  CHECKOUT_CONSENT_ERROR,
   FINAL_SALE,
   PAYWALL_BUTTON,
   PAYWALL_PRICE,
@@ -40,6 +41,20 @@ describe("paywall", () => {
     expect(sale?.textContent).toContain("Terms");
     const button = screen.getByRole("button", { name: PAYWALL_BUTTON });
     expect(button).toHaveAttribute("aria-describedby", "final-sale");
+    expect(button).toBeDisabled();
+    const consent = screen.getByRole("checkbox", { name: "I agree to the Terms and I am 18 or older." });
+    expect(consent).not.toBeChecked();
+    expect(consent).toHaveAttribute("id", "checkout-terms");
+    expect(document.querySelector('label[for="checkout-terms"]')).toBeInTheDocument();
+    expect(consent.className).toMatch(/focus-visible:outline/);
+    expect(consent).toHaveAttribute("aria-invalid", "true");
+    expect(consent).toHaveAttribute("aria-describedby", "checkout-terms-error");
+    expect(screen.getByText(CHECKOUT_CONSENT_ERROR)).toBeInTheDocument();
+    fireEvent.click(button);
+    expect(props.onUnlock).not.toHaveBeenCalled();
+    fireEvent.click(consent);
+    expect(button).toBeEnabled();
+    expect(screen.queryByText(CHECKOUT_CONSENT_ERROR)).not.toBeInTheDocument();
     const testMode = screen.getByText(PAYWALL_TEST_MODE);
     expect(testMode.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
     expect(screen.getByRole("status")).toHaveTextContent(CHECKOUT_CANCELED_BANNER);

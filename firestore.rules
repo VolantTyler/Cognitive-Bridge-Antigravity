@@ -85,6 +85,11 @@ service cloud.firestore {
     // Server-only purchase outcome, including manualRefundRequired when a
     // non-US refund call fails. Clients cannot read or write.
     //
+    // Collection: checkout_consents
+    // Document ID: Stripe Checkout Session id
+    // Server-only Terms and 18+ attestation: uid, acceptedAt, termsVersion,
+    // attested18OrOlder, sessionId. Clients cannot read or write.
+    //
     // ===============================================================
 
     // Server-only billing, quota, and cost records.
@@ -103,6 +108,9 @@ service cloud.firestore {
       allow read, write: if false;
     }
     match /checkout_sessions/{document=**} {
+      allow read, write: if false;
+    }
+    match /checkout_consents/{document=**} {
       allow read, write: if false;
     }
     match /daily_cost/{document=**} {

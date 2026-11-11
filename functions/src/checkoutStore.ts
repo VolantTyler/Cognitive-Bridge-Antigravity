@@ -2,6 +2,7 @@ import type { DocumentData, Firestore } from "firebase-admin/firestore";
 import { getAdminFirestore } from "./adminStore";
 import {
   BillingStore,
+  CheckoutConsent,
   CheckoutRecord,
   EntitlementState,
   EntitlementStamps,
@@ -99,6 +100,17 @@ export function createFirestoreBillingStore(dbPromise: () => Promise<Firestore> 
         payload.refundedAt = FieldValue.serverTimestamp();
       }
       await ref.set(payload, { merge: true });
+    },
+    async writeCheckoutConsent(consent: CheckoutConsent) {
+      const db = await dbPromise();
+      const { FieldValue } = await import("firebase-admin/firestore");
+      await db.collection("checkout_consents").doc(consent.sessionId).set({
+        uid: consent.uid,
+        acceptedAt: FieldValue.serverTimestamp(),
+        termsVersion: consent.termsVersion,
+        attested18OrOlder: true,
+        sessionId: consent.sessionId,
+      });
     },
     async writeCheckoutRecord(record) {
       const db = await dbPromise();

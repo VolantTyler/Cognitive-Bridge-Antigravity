@@ -2,6 +2,8 @@ import { requireEmailVerified, verifyBearerToken, TokenVerifier, asGateError } f
 import { appCheckError, readHeader, GateError } from "./gate";
 import {
   CheckoutConfig,
+  TERMS_VERSION,
+  assertCheckoutConsent,
   assertStripeTestKey,
   buildCheckoutSessionCreateParams,
   checkoutIdempotencyKey,
@@ -21,6 +23,7 @@ export interface IncomingHttp {
   header?: (name: string) => string | undefined;
   rawBody?: Buffer | string;
   query?: Record<string, unknown>;
+  body?: unknown;
 }
 
 export interface CheckoutHttpDeps {
@@ -102,6 +105,7 @@ export async function handleCreateCheckout(
     if (entitlement?.paid) {
       throw new GateError(409, "already_entitled", "This account already has access.");
     }
+    assertCheckoutConsent(req.body);
     const params = buildCheckoutSessionCreateParams({
       uid: user.uid,
       email: user.email,
@@ -114,6 +118,12 @@ export async function handleCreateCheckout(
     if (!session.url) {
       throw new GateError(502, "checkout_unavailable", "Couldn't open checkout. You haven't been charged.");
     }
+    await deps.store.writeCheckoutConsent({
+      uid: user.uid,
+      termsVersion: TERMS_VERSION,
+      attested18OrOlder: true,
+      sessionId: session.id,
+    });
     await deps.store.writeCheckoutRecord({
       sessionId: session.id,
       uid: user.uid,

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import AccountAuthPanel from "./AccountAuthPanel";
 import DemoExperience from "./DemoExperience";
 import { AccountUser } from "../services/accountAuth";
@@ -17,6 +17,7 @@ import {
   FINAL_SALE,
   LOADING_ACCOUNT,
   PAYWALL_AGE,
+  CHECKOUT_CONSENT_ERROR,
   PAYWALL_BUTTON,
   PAYWALL_BUTTON_BUSY,
   PAYWALL_CAPTION,
@@ -64,6 +65,7 @@ export default function AccessFlow({
   onRetryCheckout: () => void;
 }) {
   const headingRef = useRef<HTMLHeadingElement>(null);
+  const [termsAccepted, setTermsAccepted] = useState(false);
   useEffect(() => {
     headingRef.current?.focus();
   }, [phase]);
@@ -149,13 +151,37 @@ export default function AccessFlow({
         {" "}
         <a href="/terms" className="underline">Terms</a>
       </div>
+      <div className="mt-4 flex items-start gap-3">
+        <input
+          id="checkout-terms"
+          type="checkbox"
+          checked={termsAccepted}
+          onChange={(event) => setTermsAccepted(event.target.checked)}
+          aria-invalid={!termsAccepted}
+          aria-describedby={termsAccepted ? undefined : "checkout-terms-error"}
+          className="mt-1 h-4 w-4 shrink-0 accent-orange-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-600"
+        />
+        <label htmlFor="checkout-terms" className="text-sm leading-relaxed text-text-primary">
+          I agree to the{" "}
+          <a href="/terms" className="underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-600">Terms</a>
+          {" "}and I am 18 or older.
+        </label>
+      </div>
+      {!termsAccepted && (
+        <p id="checkout-terms-error" className="mt-2 text-sm text-status-danger">
+          {CHECKOUT_CONSENT_ERROR}
+        </p>
+      )}
       <div className="mt-3 flex flex-col items-start gap-2">
         <button
           type="button"
           className={primaryClass}
           aria-describedby="final-sale"
-          disabled={busy}
-          onClick={onUnlock}
+          disabled={busy || !termsAccepted}
+          onClick={() => {
+            if (!termsAccepted || busy) return;
+            onUnlock();
+          }}
         >
           {busy ? PAYWALL_BUTTON_BUSY : PAYWALL_BUTTON}
         </button>
