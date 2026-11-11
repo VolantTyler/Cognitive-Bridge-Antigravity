@@ -263,7 +263,7 @@ export function generatePortableMetadata(scores: OceanScores): string {
 ## User Profile: OCEAN Scores
 * **Openness:** ${scores.openness}/100
 * **Conscientiousness:** ${scores.conscientiousness}/100
-* **Extraversion:** ${scores.extroversion}/100
+* **Extroversion:** ${scores.extroversion}/100
 * **Agreeableness:** ${scores.agreeableness}/100
 * **Neuroticism:** ${scores.neuroticism}/100
 

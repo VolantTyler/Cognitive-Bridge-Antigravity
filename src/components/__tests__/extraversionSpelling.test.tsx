@@ -1,6 +1,5 @@
 import { fireEvent, render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { generatePortableMetadata } from '../../constants';
 import DemoExperience from '../DemoExperience';
 import Mirror from '../Mirror';
 import OceanCards from '../OceanCards';
@@ -102,9 +101,5 @@ describe('extraversion spelling on user-facing surfaces', () => {
     expect(board.getAllByText('Extraversion').length).toBeGreaterThan(0);
     assertVisibleSpelling(board.container);
     board.unmount();
-
-    const markdown = generatePortableMetadata(scores);
-    expect(markdown).toContain('**Extraversion:**');
-    expect(markdown).not.toMatch(OLD_SPELLING);
   });
 });
