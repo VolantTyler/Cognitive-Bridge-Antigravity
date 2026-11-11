@@ -151,7 +151,7 @@ describe("checkout session params", () => {
     expect(params.custom_text.terms_of_service_acceptance.message).toBe(termsAcceptanceMessage(termsUrl));
     expect("shipping_address_collection" in params).toBe(false);
     expect(params.automatic_tax).toBeUndefined();
-    expect(params.managed_payments).toBeUndefined();
+    expect(params.managed_payments).toEqual({ enabled: false });
 
     const other = buildCheckoutSessionCreateParams({
       uid: "uid-1",
@@ -162,6 +162,7 @@ describe("checkout session params", () => {
       automaticTax: true,
     });
     expect(other.line_items[0].price).toBe("price_other");
+    expect(other.managed_payments).toEqual({ enabled: false });
     expect(other.automatic_tax).toEqual({ enabled: true });
     expect(other.customer_email).toBeUndefined();
   });
@@ -511,6 +512,7 @@ describe("createCheckout", () => {
       billing_address_collection: "required",
       consent_collection: { terms_of_service: "required" },
       line_items: [{ price: "price_from_env", quantity: 1 }],
+      managed_payments: { enabled: false },
     });
     expect(store.sessions.get("cs_123")?.outcome).toBe("open");
   });

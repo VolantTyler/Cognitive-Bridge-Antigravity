@@ -41,7 +41,7 @@ const paymentsEnabled = (0, params_1.defineString)("PAYMENTS_ENABLED", {
 });
 const managedPayments = (0, params_1.defineString)("STRIPE_MANAGED_PAYMENTS", {
     default: "false",
-    description: "When true, Checkout sets managed_payments.enabled and does not set automatic_tax or shipping.",
+    description: "When true, Checkout sets managed_payments.enabled and does not set automatic_tax or shipping. When false, Checkout sets managed_payments.enabled to false.",
 });
 const automaticTax = (0, params_1.defineString)("STRIPE_AUTOMATIC_TAX", {
     default: "false",
@@ -132,8 +132,13 @@ function buildCheckoutSessionCreateParams(input) {
         // Managed Payments calculates tax itself and rejects shipping collection.
         params.managed_payments = { enabled: true };
     }
-    else if (input.automaticTax) {
-        params.automatic_tax = { enabled: true };
+    else {
+        // New accounts turn Managed Payments on at the account level. Omitting the
+        // field lets that default win, and Stripe then rejects custom_text.
+        params.managed_payments = { enabled: false };
+        if (input.automaticTax) {
+            params.automatic_tax = { enabled: true };
+        }
     }
     return params;
 }
