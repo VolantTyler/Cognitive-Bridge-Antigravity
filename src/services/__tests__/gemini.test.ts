@@ -216,6 +216,7 @@ describe('Gemini Service Unit Tests', () => {
     it('yields chunks successfully', async () => {
       const mockStream = new ReadableStream({
         start(controller) {
+          controller.enqueue(new TextEncoder().encode(': keep-alive\n\n'));
           controller.enqueue(new TextEncoder().encode('data: {"text":"Part 1, "}\n'));
           controller.enqueue(new TextEncoder().encode('data: {"text":"Part 2."}\n'));
           controller.enqueue(new TextEncoder().encode('data: [DONE]\n'));

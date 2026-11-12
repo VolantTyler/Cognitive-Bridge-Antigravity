@@ -45,6 +45,9 @@ export interface HttpResponse {
   writeHead(status: number, headers: Record<string, string>): void;
   write(chunk: string): void;
   end(): void;
+  /** Optional. Node and the Functions response can flush headers past a proxy buffer. */
+  flushHeaders?(): void;
+  flush?(): void;
 }
 
 export interface ChatDeps {
@@ -74,6 +77,18 @@ function sendTerminalError(res: HttpResponse, failures: ModelFailure[], error: u
     return;
   }
   res.status(status).json(body);
+}
+
+function beginSse(res: HttpResponse) {
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    Connection: "keep-alive",
+  });
+  res.flushHeaders?.();
+  // A body byte so Hosting's 60s request cap is not spent waiting on the model.
+  res.write(": keep-alive\n\n");
+  res.flush?.();
 }
 
 function sendGate(res: HttpResponse, error: GateError) {
@@ -163,7 +178,6 @@ export async function handleChat(req: GuardRequest, res: HttpResponse, deps: Cha
       let opened: {
         model: string;
         iterator: AsyncIterator<GeminiChunk>;
-        first: IteratorResult<GeminiChunk>;
         thinkingBudget: number | null;
       } | null = null;
 
@@ -175,12 +189,9 @@ export async function handleChat(req: GuardRequest, res: HttpResponse, deps: Cha
             contents,
             config: generationConfig(body.systemInstruction, decision),
           });
-          const iterator = responseStream[Symbol.asyncIterator]();
-          const first = await iterator.next();
           opened = {
             model,
-            iterator,
-            first,
+            iterator: responseStream[Symbol.asyncIterator](),
             thinkingBudget: decision.thinkingBudget ?? null,
           };
           break;
@@ -200,13 +211,7 @@ export async function handleChat(req: GuardRequest, res: HttpResponse, deps: Cha
         return;
       }
 
-      await noteInterviewStarted(deps, ctx);
-
-      res.writeHead(200, {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache",
-        Connection: "keep-alive",
-      });
+      beginSse(res);
 
       if (opened.model !== requestedModel) {
         res.write(`data: ${JSON.stringify({
@@ -223,13 +228,21 @@ export async function handleChat(req: GuardRequest, res: HttpResponse, deps: Cha
         }
       };
 
+      let noted = false;
+      const noteOnce = async () => {
+        if (noted) return;
+        noted = true;
+        await noteInterviewStarted(deps, ctx);
+      };
+
       try {
-        if (!opened.first.done) writeChunk(opened.first.value);
         while (true) {
           const next = await opened.iterator.next();
           if (next.done) break;
+          await noteOnce();
           writeChunk(next.value);
         }
+        await noteOnce();
         const usage = usageFromChunks(seen);
         await safeLog(deps, ctx, opened.model, usage, opened.thinkingBudget);
         res.write("data: [DONE]\n\n");

@@ -29,6 +29,12 @@ function mockRes() {
       statusCode = code;
       headersSent = true;
     },
+    flushHeaders() {
+      chunks.push("FLUSH_HEADERS");
+    },
+    flush() {
+      chunks.push("FLUSH");
+    },
     write(chunk: string) {
       chunks.push(chunk);
     },
@@ -283,6 +289,85 @@ describe("handleChat", () => {
       if (previous === undefined) delete process.env.MIRROR_FINAL_THINKING_BUDGET;
       else process.env.MIRROR_FINAL_THINKING_BUDGET = previous;
     }
+  });
+
+  it("flushes SSE headers before the first model chunk", async () => {
+    const res = mockRes();
+    let headersBeforeChunk = false;
+    const iterator = {
+      async next() {
+        headersBeforeChunk = res.snapshot().headersSent;
+        calls += 1;
+        if (calls === 1) {
+          return { value: { text: "Hi" }, done: false as const };
+        }
+        return { value: undefined, done: true as const };
+      },
+    };
+    let calls = 0;
+    await handleChat({
+      method: "POST",
+      body: { stream: true, messages: [{ role: "user", content: "hi" }], modelName: "gemini-2.5-flash" },
+    }, res, {
+      guard: async () => ({
+        uid: "user-1",
+        email: null,
+        email_verified: false,
+        feature: "chat",
+        sessionId: null,
+        reservationId: null,
+      }),
+      ai: {
+        models: {
+          generateContent: vi.fn(),
+          generateContentStream: vi.fn(async () => ({
+            [Symbol.asyncIterator]: () => iterator,
+          })),
+        },
+      },
+      logUsage: vi.fn(async () => {}),
+    });
+    expect(headersBeforeChunk).toBe(true);
+    const body = res.snapshot().chunks.join("");
+    expect(body.indexOf("FLUSH_HEADERS")).toBeLessThan(body.indexOf("Hi"));
+    expect(body).toContain(": keep-alive");
+    expect(body).toContain("[DONE]");
+  });
+
+  it("emits an SSE error when the model fails after headers are sent", async () => {
+    const res = mockRes();
+    const iterator = {
+      async next() {
+        throw Object.assign(new Error("503 high demand"), { status: 503 });
+      },
+    };
+    await handleChat({
+      method: "POST",
+      body: { stream: true, messages: [{ role: "user", content: "hi" }], modelName: "gemini-2.5-flash" },
+    }, res, {
+      guard: async () => ({
+        uid: "user-1",
+        email: null,
+        email_verified: false,
+        feature: "chat",
+        sessionId: null,
+        reservationId: null,
+      }),
+      ai: {
+        models: {
+          generateContent: vi.fn(),
+          generateContentStream: vi.fn(async () => ({
+            [Symbol.asyncIterator]: () => iterator,
+          })),
+        },
+      },
+      logUsage: vi.fn(async () => {}),
+    });
+    expect(res.snapshot().headersSent).toBe(true);
+    const payload = res.snapshot().chunks.join("");
+    expect(payload).toContain("\"error\"");
+    expect(payload).toContain("high demand");
+    expect(res.snapshot().statusCode).toBe(200);
   });
 });
 
