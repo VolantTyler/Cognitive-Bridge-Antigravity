@@ -9,6 +9,16 @@ import { Send, User, Bot, Sparkles, Brain, Loader2, ListTodo, ArrowRight } from 
 import { Message, OceanScores } from '../types';
 import { MIRROR_SYSTEM_PROMPT } from '../constants';
 import { chatWithGeminiStream } from '../services/gemini';
+import {
+  MIRROR_QUESTION_COUNT,
+  continuationInstruction,
+  parseScoreBlock,
+  questionNumberAt,
+  scoresReady,
+  stampQuestionLabel,
+  stripJsonScores,
+  userAnswerCount,
+} from '../mirror/interviewTurns';
 import { AiAccessError } from '../services/aiAccess';
 import { DEFAULT_MAX_MESSAGE_CHARS } from '../constants/aiAccess';
 import { AI_DISCLOSURE } from '../constants/paywallCopy';
@@ -69,6 +79,10 @@ function formatMirrorContent(content: string): string {
   return text;
 }
 
+function presentMirrorMessage(content: string, questionNumber: number | null): string {
+  return stampQuestionLabel(formatMirrorContent(content), questionNumber);
+}
+
 export default function Mirror({ messages, setMessages, onComplete, onSaveSession }: MirrorProps) {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -82,22 +96,15 @@ export default function Mirror({ messages, setMessages, onComplete, onSaveSessio
   const messagesRef = useRef(messages);
   messagesRef.current = messages;
 
-  // Scan messages to check if mapping is already complete on mount or messages change
+  // Scores in history count only after five user answers. Presets set scores
+  // directly and do not go through this path.
   useEffect(() => {
+    if (!scoresReady(messages)) return;
     const lastModelMessage = [...messages].reverse().find(m => m.role === 'model');
-    if (lastModelMessage && lastModelMessage.content.includes('JSON_SCORES:')) {
-      const jsonMatch = lastModelMessage.content.match(/JSON_SCORES:\s*(?:```json)?\s*({[\s\S]*?})\s*(?:```)?/);
-      if (jsonMatch) {
-        try {
-          const scoresStr = jsonMatch[1].trim();
-            const scores = JSON.parse(scoresStr);
-            setCompletedScores(scores);
-            setScoreOrigin(messages.some((message) => message.role === 'user' && message.content.trim()) ? 'dialogue' : 'preset');
-          } catch (e) {
-          console.error("Failed to parse scores from historical message:", e);
-        }
-      }
-    }
+    const scores = lastModelMessage ? parseScoreBlock(lastModelMessage.content) : null;
+    if (!scores) return;
+    setCompletedScores(scores as unknown as OceanScores);
+    setScoreOrigin(messages.some((message) => message.role === 'user' && message.content.trim()) ? 'dialogue' : 'preset');
   }, [messages]);
 
   useEffect(() => {
@@ -165,6 +172,16 @@ export default function Mirror({ messages, setMessages, onComplete, onSaveSessio
       setMessages(prev => [...prev, userMessage, { role: 'model', content: '' }]);
     };
 
+    const answerCount = userAnswerCount([...messages, userMessage]);
+    const acceptScores = answerCount >= MIRROR_QUESTION_COUNT;
+    const showModel = (content: string) => {
+      setMessages(prev => {
+        const last = prev[prev.length - 1];
+        if (!last || last.role !== 'model') return prev;
+        return [...prev.slice(0, -1), { ...last, content }];
+      });
+    };
+
     try {
       const stream = chatWithGeminiStream(
         [...messages, userMessage],
@@ -180,24 +197,40 @@ export default function Mirror({ messages, setMessages, onComplete, onSaveSessio
       for await (const chunk of stream) {
         commitTurn();
         modelResponse += chunk;
-        setMessages(prev => {
-          const last = prev[prev.length - 1];
-          return [...prev.slice(0, -1), { ...last, content: modelResponse }];
-        });
+        const visible = acceptScores ? modelResponse : stripJsonScores(modelResponse);
+        showModel(visible);
 
-        if (modelResponse.includes('JSON_SCORES:')) {
-          const jsonMatch = modelResponse.match(/JSON_SCORES:\s*(?:```json)?\s*({[\s\S]*?})\s*(?:```)?/);
-          if (jsonMatch) {
-            try {
-              const scoresStr = jsonMatch[1].trim();
-              const scores = JSON.parse(scoresStr);
-              setCompletedScores(scores);
-              setScoreOrigin('dialogue');
-              break;
-            } catch (e) {
-              console.error("Failed to parse scores:", e);
-            }
-          }
+        if (acceptScores && parseScoreBlock(modelResponse)) {
+          setCompletedScores(parseScoreBlock(modelResponse) as unknown as OceanScores);
+          setScoreOrigin('dialogue');
+          break;
+        }
+      }
+
+      if (!acceptScores && modelResponse.includes('JSON_SCORES:')) {
+        const commentary = stripJsonScores(modelResponse).trim();
+        const followSystem = `${MIRROR_SYSTEM_PROMPT}\n\n${continuationInstruction(answerCount)}`;
+        let followUp = '';
+        const followStream = chatWithGeminiStream(
+          [...messages, userMessage],
+          followSystem,
+          undefined,
+          'mirror',
+          () => {
+            setLoadingText('Still working on it…');
+          },
+          commitTurn
+        );
+        for await (const chunk of followStream) {
+          commitTurn();
+          followUp += chunk;
+          const question = stripJsonScores(followUp).trim();
+          modelResponse = commentary && question ? `${commentary}\n\n${question}` : (question || commentary);
+          showModel(modelResponse);
+        }
+        if (!followUp.trim()) {
+          modelResponse = commentary;
+          showModel(modelResponse);
         }
       }
 
@@ -252,7 +285,10 @@ export default function Mirror({ messages, setMessages, onComplete, onSaveSessio
           className="flex-1 overflow-y-auto p-6 space-y-6 scroll-smooth pt-6 custom-scrollbar"
         >
           <AnimatePresence initial={false}>
-            {messages.map((m, i) => (
+            {messages.map((m, i) => {
+              const questionNumber = m.role === 'model' ? questionNumberAt(messages, i) : null;
+              const scoringTurn = m.role === 'model' && questionNumber === null && m.content.includes('JSON_SCORES:');
+              return (
               <motion.div
                 key={i}
                 initial={{ opacity: 0, y: 10 }}
@@ -268,8 +304,8 @@ export default function Mirror({ messages, setMessages, onComplete, onSaveSessio
                       ? 'bg-bg-chat-user text-white rounded-tr-none'
                       : 'bg-bg-chat-model text-text-chat-model rounded-tl-none border border-border-chat-model'
                     }`}>
-                    {m.role === 'user' ? m.content : formatMirrorContent(m.content)}
-                    {m.role === 'model' && m.content.includes('JSON_SCORES:') && (
+                    {m.role === 'user' ? m.content : presentMirrorMessage(m.content, questionNumber)}
+                    {scoringTurn && (
                       <div className="mt-4 p-3 bg-green-900/20 border border-green-500/30 rounded-lg flex items-center gap-3 animate-pulse">
                         <Sparkles className="text-status-success w-4 h-4" />
                         <span className="text-status-success font-medium">Cognitive mapping complete.</span>
@@ -278,7 +314,8 @@ export default function Mirror({ messages, setMessages, onComplete, onSaveSessio
                   </div>
                 </div>
               </motion.div>
-            ))}
+              );
+            })}
           </AnimatePresence>
           {isLoading && (
             <div className="flex justify-start">
