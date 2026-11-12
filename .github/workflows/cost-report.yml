@@ -1,0 +1,72 @@
+# Manual read-only cost report against production Firestore (usage_server).
+# Does not write to Firestore or Hosting.
+#
+# Auth: secrets.FIREBASE_SERVICE_ACCOUNT_COGNITIVE_BRIDGE_AI
+# (same JSON the Deploy to Firebase Hosting on Merge workflow uses).
+# Project: cognitive-bridge-ai, the same project id that workflow passes
+# as its Firebase project.
+#
+# If authentication succeeds but the read fails with PERMISSION_DENIED, the
+# deploy service account likely lacks roles/datastore.viewer on this project.
+
+name: Production interview cost report
+
+on:
+  workflow_dispatch:
+    inputs:
+      since:
+        description: "Include rows at or after this ISO timestamp or YYYY-MM-DD date"
+        required: false
+        type: string
+      until:
+        description: "Include rows at or before this ISO timestamp or YYYY-MM-DD date"
+        required: false
+        type: string
+      reservation_ids:
+        description: "Comma-separated reservation ids"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  cost-report:
+    name: Read usage_server and print per-interview cost
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            functions/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Functions dependencies
+        working-directory: functions
+        run: npm ci
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_COGNITIVE_BRIDGE_AI }}
+          project_id: cognitive-bridge-ai
+
+      - name: Read usage_server cost report
+        env:
+          GOOGLE_CLOUD_PROJECT: cognitive-bridge-ai
+          GCLOUD_PROJECT: cognitive-bridge-ai
+          FIRESTORE_DATABASE_ID: ai-studio-10d489d8-3b32-488a-9698-e415f2608028
+          COST_REPORT_SINCE: ${{ inputs.since }}
+          COST_REPORT_UNTIL: ${{ inputs.until }}
+          COST_REPORT_RESERVATION_IDS: ${{ inputs.reservation_ids }}
+        run: npx tsx scripts/cost-report.ts
