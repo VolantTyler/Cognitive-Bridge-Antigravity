@@ -44,6 +44,6 @@ export function interviewScenarios(): Scenario[] {
     { id: 'novelty-rewrite', text: NOVELTY_SCENARIO },
     { id: 'solo-or-room', text: SOCIAL_ENERGY_SCENARIO },
     { id: 'plain-challenge', text: CANDOR_SCENARIO },
-    { id: 'waived-deadline', text: canonicalDisambiguation() },
+    { id: 'loop-or-teammate', text: canonicalDisambiguation() },
   ];
 }

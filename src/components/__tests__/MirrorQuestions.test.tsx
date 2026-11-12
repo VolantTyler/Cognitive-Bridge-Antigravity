@@ -101,6 +101,35 @@ describe('Mirror question gate', () => {
     expect(chatWithGeminiStream.mock.calls[0][6]).toEqual({ turnIndex: 5, isFinalTurn: true });
   });
 
+  it('does not finish when the fifth answer echoes the <0-100> placeholder', async () => {
+    const echoed = `Mapping complete.\nJSON_SCORES:\n${JSON.stringify({
+      openness: '<0-100>',
+      conscientiousness: '<0-100>',
+      extroversion: '<0-100>',
+      agreeableness: '<0-100>',
+      neuroticism: '<0-100>',
+    })}`;
+    chatWithGeminiStream.mockImplementation(async function* () {
+      yield echoed;
+    });
+    const initial: Message[] = [{ role: 'model', content: 'Welcome (Question 1/5)' }];
+    for (let i = 1; i <= 4; i += 1) {
+      initial.push({ role: 'user', content: `Answer ${i} is specific.` });
+      initial.push({ role: 'model', content: `Scenario (Question ${i + 1}/5)` });
+    }
+    render(<Host initial={initial} />);
+    fireEvent.change(screen.getByPlaceholderText('Respond to the scenario...'), {
+      target: { value: 'I check on my teammate.' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Send response' }));
+
+    await waitFor(() => expect(chatWithGeminiStream).toHaveBeenCalledTimes(1));
+    expect(chatWithGeminiStream.mock.calls[0][6]).toEqual({ turnIndex: 5, isFinalTurn: true });
+    expect(screen.queryByText(/Cognitive mapping complete/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Proceed to Phase 2/i })).not.toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Respond to the scenario...')).toBeInTheDocument();
+  });
+
   it('ignores a second Enter while the first reply is still running', async () => {
     let release: (() => void) | undefined;
     const started = new Promise<void>((resolve) => {

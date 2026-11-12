@@ -153,11 +153,32 @@ describe('portable exports', () => {
   });
 });
 
+describe('MIRROR_SYSTEM_PROMPT score example', () => {
+  it('keeps the five OCEAN keys and uses neutral placeholders instead of sample numbers', () => {
+    expect(MIRROR_SYSTEM_PROMPT).toContain('"openness": <0-100>');
+    expect(MIRROR_SYSTEM_PROMPT).toContain('"conscientiousness": <0-100>');
+    expect(MIRROR_SYSTEM_PROMPT).toContain('"extroversion": <0-100>');
+    expect(MIRROR_SYSTEM_PROMPT).toContain('"agreeableness": <0-100>');
+    expect(MIRROR_SYSTEM_PROMPT).toContain('"neuroticism": <0-100>');
+    expect(MIRROR_SYSTEM_PROMPT).not.toMatch(/"(openness|conscientiousness|extroversion|agreeableness|neuroticism)":\s*\d+/);
+  });
+});
+
 describe('MIRROR_SYSTEM_PROMPT bleed rules', () => {
-  it('includes dual-attribution rules and waived-deadline probe', () => {
+  it('scores agreeableness and conscientiousness in both directions and asks a balanced probe', () => {
     expect(MIRROR_SYSTEM_PROMPT).toContain('TRAIT BLEED / ASPECT DISAMBIGUATION');
     expect(MIRROR_SYSTEM_PROMPT).toContain('Working overnight / taking on extra work');
-    expect(MIRROR_SYSTEM_PROMPT).toContain('Management officially waives the deadline');
+    expect(MIRROR_SYSTEM_PROMPT).toContain('Each can inflate or deflate the other');
+    expect(MIRROR_SYSTEM_PROMPT).toContain('Conscientiousness affecting Agreeableness');
+    expect(MIRROR_SYSTEM_PROMPT).toContain(
+      "Bluntness and putting the task ahead of people's feelings are low-Agreeableness cues",
+    );
+    expect(MIRROR_SYSTEM_PROMPT).toContain(
+      "The deadline moved to tomorrow. You can spend the rest of today finishing the piece you started, because you like closing a loop, or you can spend it with a teammate who's had a stressful week, because you want them to feel supported. Which fits you, and why?",
+    );
+    expect(MIRROR_SYSTEM_PROMPT).not.toContain('staying in sync with people');
+    expect(MIRROR_SYSTEM_PROMPT).not.toContain('keep grinding anyway');
+    expect(MIRROR_SYSTEM_PROMPT).not.toContain('falls sick');
     expect(MIRROR_SYSTEM_PROMPT).toContain('bleed_risk: agreeableness_vs_conscientiousness');
     expect(MIRROR_SYSTEM_PROMPT).toContain('exactly 5 scenarios/questions');
   });

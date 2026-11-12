@@ -3,6 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { parseMirrorScores } from '../services/mirrorScores';
+import type { OceanScores } from '../types';
+
 /**
  * The welcome message is question 1. Scores are valid only after the 5th
  * user answer. Question labels in the model text are not a source of truth.
@@ -20,7 +23,6 @@ export interface MirrorTurn {
   isFinalTurn: boolean;
 }
 
-const SCORE_BLOCK = /JSON_SCORES:\s*(?:```json)?\s*(\{[\s\S]*?\})\s*(?:```)?/;
 const QUESTION_LABEL = /\(\s*Question\s+\d+\s*\/\s*5\s*\)/gi;
 
 export function userAnswerCount(messages: TurnMessage[]): number {
@@ -53,13 +55,10 @@ export function stripJsonScores(content: string): string {
   return content.slice(0, index).trimEnd();
 }
 
-export function parseScoreBlock(content: string): Record<string, unknown> | null {
-  const match = content.match(SCORE_BLOCK);
-  if (!match) return null;
+/** Null for a missing block, the literal `<0-100>` placeholder, or any non-numeric or out-of-range score. */
+export function parseScoreBlock(content: string): OceanScores | null {
   try {
-    const scores = JSON.parse(match[1].trim()) as unknown;
-    if (!scores || typeof scores !== "object" || Array.isArray(scores)) return null;
-    return scores as Record<string, unknown>;
+    return parseMirrorScores(content);
   } catch {
     return null;
   }

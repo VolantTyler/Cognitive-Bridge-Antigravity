@@ -107,7 +107,7 @@ export default function Mirror({ messages, setMessages, onComplete, onSaveSessio
     const lastModelMessage = [...messages].reverse().find(m => m.role === 'model');
     const scores = lastModelMessage ? parseScoreBlock(lastModelMessage.content) : null;
     if (!scores) return;
-    setCompletedScores(scores as unknown as OceanScores);
+    setCompletedScores(scores);
     setScoreOrigin(messages.some((message) => message.role === 'user' && message.content.trim()) ? 'dialogue' : 'preset');
   }, [messages]);
 
@@ -208,10 +208,13 @@ export default function Mirror({ messages, setMessages, onComplete, onSaveSessio
         const visible = acceptScores ? modelResponse : stripJsonScores(modelResponse);
         showModel(visible);
 
-        if (acceptScores && parseScoreBlock(modelResponse)) {
-          setCompletedScores(parseScoreBlock(modelResponse) as unknown as OceanScores);
-          setScoreOrigin('dialogue');
-          break;
+        if (acceptScores) {
+          const scores = parseScoreBlock(modelResponse);
+          if (scores) {
+            setCompletedScores(scores);
+            setScoreOrigin('dialogue');
+            break;
+          }
         }
       }
 
@@ -297,7 +300,7 @@ export default function Mirror({ messages, setMessages, onComplete, onSaveSessio
           <AnimatePresence initial={false}>
             {messages.map((m, i) => {
               const questionNumber = m.role === 'model' ? questionNumberAt(messages, i) : null;
-              const scoringTurn = m.role === 'model' && questionNumber === null && m.content.includes('JSON_SCORES:');
+              const scoringTurn = m.role === 'model' && questionNumber === null && parseScoreBlock(m.content) !== null;
               return (
               <motion.div
                 key={i}
@@ -448,8 +451,8 @@ export default function Mirror({ messages, setMessages, onComplete, onSaveSessio
                     disabled={isLoading}
                     className="p-3 rounded-xl border border-border-card bg-bg-secondary/60 hover:bg-bg-tertiary hover:border-accent-green text-left transition-all disabled:opacity-50 group flex flex-col justify-between cursor-pointer"
                   >
-                    <div className="text-[10px] font-bold text-accent-green uppercase tracking-wide group-hover:text-accent-green-hover transition-colors">High Agreeableness (bleed resolved)</div>
-                    <div className="text-[9px] text-text-secondary mt-1 italic leading-tight">Compassion over industriousness after A↔C disambiguation (A=85, C=45).</div>
+                    <div className="text-[10px] font-bold text-accent-green uppercase tracking-wide group-hover:text-accent-green-hover transition-colors">High Agreeableness, Moderate Conscientiousness</div>
+                    <div className="text-[9px] text-text-secondary mt-1 italic leading-tight">Agreeableness 85 and Conscientiousness 45, read as two separate scores.</div>
                   </button>
                 </div>
               </div>
