@@ -62,6 +62,7 @@ export async function writeUsageRecord(record: UsageRecord): Promise<void> {
     completionTokens: record.completionTokens,
     thoughtsTokenCount: record.thoughtsTokenCount,
     thinkingBudget: record.thinkingBudget,
+    aborted: record.aborted === true,
     costMicros,
     ts: record.ts ?? FieldValue.serverTimestamp(),
   });

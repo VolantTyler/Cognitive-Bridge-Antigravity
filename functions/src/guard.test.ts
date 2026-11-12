@@ -442,6 +442,7 @@ describe("admin store", () => {
       completionTokens: 4,
       thoughtsTokenCount: 1,
       thinkingBudget: 0,
+      aborted: false,
       costMicros,
     });
     expect(memory.added[0]).toEqual({
@@ -454,6 +455,7 @@ describe("admin store", () => {
       completionTokens: 4,
       thoughtsTokenCount: 1,
       thinkingBudget: 0,
+      aborted: false,
       costMicros,
       ts: "SERVER_TS",
     });

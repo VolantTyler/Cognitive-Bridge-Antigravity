@@ -62,6 +62,7 @@ describe("usage records", () => {
       completionTokens: 4,
     });
     expect(Object.keys(record).sort()).toEqual([
+      "aborted",
       "completionTokens",
       "costMicros",
       "feature",
@@ -75,6 +76,7 @@ describe("usage records", () => {
     ]);
     expect(record.thoughtsTokenCount).toBe(0);
     expect(record.thinkingBudget).toBeNull();
+    expect(record.aborted).toBe(false);
     expect(record.costMicros).toBe(costMicrosForUsage({
       model: "gemini-2.5-flash",
       promptTokens: 9,
@@ -88,6 +90,7 @@ describe("usage records", () => {
     } as UsageRecord;
     const line = usageLogLine(dirty);
     expect(Object.keys(line).sort()).toEqual([
+      "aborted",
       "completionTokens",
       "costMicros",
       "feature",
@@ -153,11 +156,13 @@ describe("handleChat", () => {
     expect(res.snapshot().payload).toMatchObject({ text: "answered", model: "gemini-2.5-flash" });
     expect(generateContent).toHaveBeenNthCalledWith(1, expect.objectContaining({
       model: "gemini-2.5-pro",
-      config: { systemInstruction: undefined },
+      config: expect.objectContaining({ systemInstruction: undefined }),
     }));
+    expect(generateContent.mock.calls[0][0].config.thinkingConfig).toBeUndefined();
+    expect(generateContent.mock.calls[0][0].config.abortSignal).toBeInstanceOf(AbortSignal);
     expect(generateContent).toHaveBeenNthCalledWith(2, expect.objectContaining({
       model: "gemini-2.5-flash",
-      config: { systemInstruction: undefined, thinkingConfig: { thinkingBudget: 0 } },
+      config: expect.objectContaining({ thinkingConfig: { thinkingBudget: 0 } }),
     }));
     expect(logUsage).toHaveBeenCalledWith({
       uid: "user-1",
@@ -169,6 +174,7 @@ describe("handleChat", () => {
       completionTokens: 3,
       thoughtsTokenCount: 0,
       thinkingBudget: 0,
+      aborted: false,
       costMicros: costMicrosForUsage({
         model: "gemini-2.5-flash",
         promptTokens: 12,
@@ -368,6 +374,89 @@ describe("handleChat", () => {
     expect(payload).toContain("\"error\"");
     expect(payload).toContain("high demand");
     expect(res.snapshot().statusCode).toBe(200);
+  });
+
+  it("aborts the Gemini stream on req close and logs chunks seen so far", async () => {
+    const res = mockRes();
+    const listeners: Array<() => void> = [];
+    let signal: AbortSignal | undefined;
+    let returned = false;
+    let blocked = false;
+    let calls = 0;
+    const iterator = {
+      async next() {
+        calls += 1;
+        if (calls === 1) {
+          return {
+            value: {
+              text: "Hi",
+              usageMetadata: { promptTokenCount: 4, candidatesTokenCount: 2, thoughtsTokenCount: 3 },
+            },
+            done: false as const,
+          };
+        }
+        await new Promise((_resolve, reject) => {
+          blocked = true;
+          signal?.addEventListener("abort", () => {
+            reject(Object.assign(new Error("This operation was aborted"), { name: "AbortError" }));
+          });
+        });
+        return { value: undefined, done: true as const };
+      },
+      async return() {
+        returned = true;
+        return { value: undefined, done: true as const };
+      },
+    };
+    const logUsage = vi.fn(async () => {});
+    const pending = handleChat({
+      method: "POST",
+      on(event, listener) {
+        if (event === "close") listeners.push(listener);
+      },
+      body: {
+        stream: true,
+        messages: [{ role: "user", content: "hi" }],
+        modelName: "gemini-2.5-flash",
+      },
+    }, res, {
+      guard: async () => ({
+        uid: "user-1",
+        email: null,
+        email_verified: false,
+        feature: "chat",
+        sessionId: null,
+        reservationId: null,
+      }),
+      ai: {
+        models: {
+          generateContent: vi.fn(),
+          generateContentStream: vi.fn(async (request: { config?: { abortSignal?: AbortSignal } }) => {
+            signal = request.config?.abortSignal;
+            return { [Symbol.asyncIterator]: () => iterator };
+          }),
+        },
+      },
+      logUsage,
+    });
+
+    await vi.waitUntil(() => blocked);
+    expect(listeners).toHaveLength(1);
+    listeners[0]();
+    await pending;
+
+    expect(signal?.aborted).toBe(true);
+    expect(returned).toBe(true);
+    expect(logUsage).toHaveBeenCalledTimes(1);
+    expect(logUsage).toHaveBeenCalledWith(expect.objectContaining({
+      aborted: true,
+      promptTokens: 4,
+      completionTokens: 5,
+      thoughtsTokenCount: 3,
+      thinkingBudget: null,
+    }));
+    expect(res.snapshot().chunks.join("")).not.toContain("[DONE]");
+    expect(res.snapshot().chunks.join("")).toContain("Hi");
   });
 });
 

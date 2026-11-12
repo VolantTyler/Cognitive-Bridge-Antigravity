@@ -29,6 +29,7 @@ export interface GenerateRequest {
   config: {
     systemInstruction?: unknown;
     thinkingConfig?: { thinkingBudget: number };
+    abortSignal?: AbortSignal;
   };
 }
 
@@ -45,6 +46,7 @@ export interface HttpResponse {
   writeHead(status: number, headers: Record<string, string>): void;
   write(chunk: string): void;
   end(): void;
+  writableEnded?: boolean;
   /** Optional. Node and the Functions response can flush headers past a proxy buffer. */
   flushHeaders?(): void;
   flush?(): void;
@@ -109,12 +111,14 @@ async function noteInterviewStarted(deps: ChatDeps, ctx: GuardContext) {
 function generationConfig(
   systemInstruction: unknown,
   decision: ThinkingDecision,
+  abortSignal?: AbortSignal,
 ): GenerateRequest["config"] {
-  if (decision.thinkingBudget === undefined) return { systemInstruction };
-  return {
-    systemInstruction,
-    thinkingConfig: { thinkingBudget: decision.thinkingBudget },
-  };
+  const config: GenerateRequest["config"] = { systemInstruction };
+  if (abortSignal) config.abortSignal = abortSignal;
+  if (decision.thinkingBudget !== undefined) {
+    config.thinkingConfig = { thinkingBudget: decision.thinkingBudget };
+  }
+  return config;
 }
 
 async function safeLog(
@@ -123,6 +127,7 @@ async function safeLog(
   model: string,
   usage: { promptTokens: number; completionTokens: number; thoughtsTokenCount: number },
   thinkingBudget: number | null,
+  aborted = false,
 ) {
   if (!ctx.uid) return;
   try {
@@ -136,13 +141,42 @@ async function safeLog(
       completionTokens: usage.completionTokens,
       thoughtsTokenCount: usage.thoughtsTokenCount,
       thinkingBudget,
+      aborted,
     }));
   } catch {
     console.error("usage_server write failed");
   }
 }
 
-export async function handleChat(req: GuardRequest, res: HttpResponse, deps: ChatDeps): Promise<void> {
+interface ClosableRequest extends GuardRequest {
+  on?(event: "close", listener: () => void): void;
+  off?(event: "close", listener: () => void): void;
+}
+
+function watchClient(req: ClosableRequest, res: HttpResponse, abort: AbortController) {
+  let settled = false;
+  let disconnected = false;
+  const onClose = () => {
+    if (settled || res.writableEnded) return;
+    disconnected = true;
+    abort.abort();
+  };
+  req.on?.("close", onClose);
+  return {
+    get disconnected() {
+      return disconnected;
+    },
+    settle() {
+      settled = true;
+    },
+    stop() {
+      settled = true;
+      req.off?.("close", onClose);
+    },
+  };
+}
+
+export async function handleChat(req: ClosableRequest, res: HttpResponse, deps: ChatDeps): Promise<void> {
   const failures: ModelFailure[] = [];
   try {
     const ctx = await deps.guard(req);
@@ -166,6 +200,8 @@ export async function handleChat(req: GuardRequest, res: HttpResponse, deps: Cha
       parts: [{ text: message.content }],
     }));
     const chain = buildModelChain(requestedModel);
+    const abort = new AbortController();
+    const client = watchClient(req, res, abort);
     const thinkingInput = {
       feature: ctx.feature,
       messages,
@@ -187,7 +223,7 @@ export async function handleChat(req: GuardRequest, res: HttpResponse, deps: Cha
           const responseStream = await deps.ai.models.generateContentStream({
             model,
             contents,
-            config: generationConfig(body.systemInstruction, decision),
+            config: generationConfig(body.systemInstruction, decision, abort.signal),
           });
           opened = {
             model,
@@ -196,10 +232,22 @@ export async function handleChat(req: GuardRequest, res: HttpResponse, deps: Cha
           };
           break;
         } catch (error) {
+          if (client.disconnected) {
+            client.settle();
+            await safeLog(deps, ctx, model, {
+              promptTokens: 0,
+              completionTokens: 0,
+              thoughtsTokenCount: 0,
+            }, decision.thinkingBudget ?? null, true);
+            client.stop();
+            return;
+          }
           const kind = classifyModelError(error);
           failures.push({ model, kind });
           console.warn(`chatProxy stream open failed for ${model} (${kind})`);
           if (kind === "quota" || kind === "auth" || kind === "other") {
+            client.settle();
+            client.stop();
             sendTerminalError(res, failures, error);
             return;
           }
@@ -207,6 +255,7 @@ export async function handleChat(req: GuardRequest, res: HttpResponse, deps: Cha
       }
 
       if (!opened) {
+        client.stop();
         sendTerminalError(res, failures, new Error("No Gemini model accepted the stream."));
         return;
       }
@@ -235,23 +284,48 @@ export async function handleChat(req: GuardRequest, res: HttpResponse, deps: Cha
         await noteInterviewStarted(deps, ctx);
       };
 
+      const finishAborted = async () => {
+        client.settle();
+        try {
+          await opened?.iterator.return?.();
+        } catch {
+          // The abort already stopped the iterator.
+        }
+        await safeLog(deps, ctx, opened.model, usageFromChunks(seen), opened.thinkingBudget, true);
+      };
+
       try {
-        while (true) {
+        while (!client.disconnected) {
           const next = await opened.iterator.next();
+          if (client.disconnected) {
+            if (!next.done) writeChunk(next.value);
+            break;
+          }
           if (next.done) break;
           await noteOnce();
           writeChunk(next.value);
         }
+        if (client.disconnected) {
+          await finishAborted();
+          return;
+        }
         await noteOnce();
-        const usage = usageFromChunks(seen);
-        await safeLog(deps, ctx, opened.model, usage, opened.thinkingBudget);
+        client.settle();
+        await safeLog(deps, ctx, opened.model, usageFromChunks(seen), opened.thinkingBudget, false);
         res.write("data: [DONE]\n\n");
         res.end();
       } catch (error) {
+        if (client.disconnected) {
+          await finishAborted();
+          return;
+        }
+        client.settle();
         const kind = classifyModelError(error);
         failures.push({ model: opened.model, kind });
         console.warn(`chatProxy stream failed mid-response for ${opened.model} (${kind})`);
         sendTerminalError(res, failures, error);
+      } finally {
+        client.stop();
       }
       return;
     }
@@ -270,7 +344,7 @@ export async function handleChat(req: GuardRequest, res: HttpResponse, deps: Cha
         const response = await deps.ai.models.generateContent({
           model,
           contents,
-          config: generationConfig(body.systemInstruction, decision),
+          config: generationConfig(body.systemInstruction, decision, abort.signal),
         });
         responseText = response.text || "";
         activeModel = model;
@@ -282,10 +356,21 @@ export async function handleChat(req: GuardRequest, res: HttpResponse, deps: Cha
         succeeded = true;
         break;
       } catch (error) {
+        if (client.disconnected) {
+          client.settle();
+          await safeLog(deps, ctx, model, {
+            promptTokens: 0,
+            completionTokens: 0,
+            thoughtsTokenCount: 0,
+          }, decision.thinkingBudget ?? null, true);
+          client.stop();
+          return;
+        }
         const kind = classifyModelError(error);
         failures.push({ model, kind });
         console.warn(`chatProxy generate failed for ${model} (${kind})`);
         if (kind === "quota" || kind === "auth" || kind === "other") {
+          client.stop();
           sendTerminalError(res, failures, error);
           return;
         }
@@ -293,12 +378,15 @@ export async function handleChat(req: GuardRequest, res: HttpResponse, deps: Cha
     }
 
     if (!succeeded) {
+      client.stop();
       sendTerminalError(res, failures, new Error("No Gemini model accepted the request."));
       return;
     }
 
     await noteInterviewStarted(deps, ctx);
-    await safeLog(deps, ctx, activeModel, { promptTokens, completionTokens, thoughtsTokenCount }, thinkingBudget);
+    client.settle();
+    client.stop();
+    await safeLog(deps, ctx, activeModel, { promptTokens, completionTokens, thoughtsTokenCount }, thinkingBudget, false);
     res.status(200).json({
       text: responseText,
       model: activeModel,

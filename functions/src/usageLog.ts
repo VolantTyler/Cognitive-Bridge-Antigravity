@@ -19,6 +19,8 @@ export interface UsageRecord {
   thoughtsTokenCount: number;
   /** Budget sent on this call. Null when thinkingConfig was not set. */
   thinkingBudget: number | null;
+  /** True when the client disconnected before the model stream finished. */
+  aborted: boolean;
   costMicros: number;
   ts?: unknown;
 }
@@ -32,6 +34,7 @@ export interface UsageLogLine {
   completionTokens: number;
   thoughtsTokenCount: number;
   thinkingBudget: number | null;
+  aborted: boolean;
   costMicros: number;
 }
 
@@ -45,6 +48,7 @@ const USAGE_FIELDS = [
   "completionTokens",
   "thoughtsTokenCount",
   "thinkingBudget",
+  "aborted",
   "costMicros",
   "ts",
 ] as const;
@@ -89,6 +93,7 @@ export function buildUsageRecord(input: {
   completionTokens: number;
   thoughtsTokenCount?: number;
   thinkingBudget?: number | null;
+  aborted?: boolean;
   ts?: unknown;
 }): UsageRecord {
   const promptTokens = tokenCount(input.promptTokens);
@@ -107,6 +112,7 @@ export function buildUsageRecord(input: {
     completionTokens,
     thoughtsTokenCount,
     thinkingBudget,
+    aborted: input.aborted === true,
     costMicros: costMicrosForUsage({
       model: input.model,
       promptTokens,
@@ -135,6 +141,7 @@ export function usageLogLine(record: UsageRecord): UsageLogLine {
     thinkingBudget: typeof record.thinkingBudget === "number" && Number.isFinite(record.thinkingBudget)
       ? Math.max(0, Math.floor(record.thinkingBudget))
       : null,
+    aborted: record.aborted === true,
     costMicros,
   };
 }
