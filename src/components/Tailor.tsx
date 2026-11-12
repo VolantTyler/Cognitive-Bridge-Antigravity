@@ -62,7 +62,7 @@ export default function Tailor({ scores, onNext }: TailorProps) {
         <div className="flex-1 flex flex-col gap-6 p-6 min-h-0 overflow-hidden">
           {showBleedChip && (
             <div className="px-4 py-2 bg-amber-500/10 border border-amber-500/30 rounded-lg text-[11px] text-status-warning font-medium shrink-0">
-              Your helpfulness and your diligence scores may overlap, so read them together.
+              Your Agreeableness and Conscientiousness scores may overlap, so read them together.
             </div>
           )}
 

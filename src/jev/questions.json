@@ -4,7 +4,7 @@
     "traitMatchConfidence": 0.6,
     "alignmentNoul": 0.7
   },
-  "bleedNote": "Working overnight or taking on extra work is not automatically high Conscientiousness. That behavior can be Agreeableness: helping others or avoiding conflict. Judge Conscientiousness from order, follow-through, and standards. Judge Agreeableness from concern for other people.",
+  "bleedNote": "Score Agreeableness and Conscientiousness separately. Extra work is not automatically high Conscientiousness; it can be Agreeableness, such as helping others or avoiding conflict. Finishing a spec or holding a standard can also look like helpfulness without being Agreeableness. Bluntness or putting the task ahead of people's feelings is a low-Agreeableness cue and says nothing about Conscientiousness by itself. Judge Conscientiousness from order, follow-through, and standards. Judge Agreeableness from concern for other people.",
   "bands": {
     "low": "below 30",
     "mid": "30 to 70",

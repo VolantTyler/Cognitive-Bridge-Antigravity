@@ -16,10 +16,10 @@ const base: OceanScores = {
   neuroticism: 50,
 };
 
-const NOTICE = 'Your helpfulness and your diligence scores may overlap, so read them together.';
+const NOTICE = 'Your Agreeableness and Conscientiousness scores may overlap, so read them together.';
 
 describe('Tailor overlap notice', () => {
-  it('shows plain overlap copy when helpfulness and diligence are both above 70', () => {
+  it('shows plain overlap copy when Agreeableness and Conscientiousness are both above 70', () => {
     render(
       <Tailor
         scores={{ ...base, agreeableness: 71, conscientiousness: 71 }}

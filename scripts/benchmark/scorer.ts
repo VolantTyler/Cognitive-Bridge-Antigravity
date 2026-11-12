@@ -8,10 +8,10 @@
  */
 
 import { MIRROR_SYSTEM_PROMPT } from '../../src/constants';
-import type { OceanScores } from '../../src/types';
-import { OCEAN_TRAITS, type ChatMessage, type Scenario } from './types';
+import { parseMirrorScores } from '../../src/services/mirrorScores';
+import type { ChatMessage, Scenario } from './types';
 
-const SCORE_PATTERN = /JSON_SCORES:\s*(?:```json)?\s*({[\s\S]*?})\s*(?:```)?/;
+export { parseMirrorScores };
 
 export function mirrorScoringRubric(): string {
   const marker = 'Format for final output:';
@@ -56,28 +56,3 @@ export function judgeMessages(transcript: string): ChatMessage[] {
   ];
 }
 
-export function parseMirrorScores(content: string): OceanScores {
-  const match = content.match(SCORE_PATTERN);
-  if (!match) {
-    throw new Error('Mirror score response is missing a JSON_SCORES block');
-  }
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(match[1].trim());
-  } catch (error) {
-    throw new Error(`JSON_SCORES block is not valid JSON: ${(error as Error).message}`);
-  }
-  if (typeof parsed !== 'object' || parsed === null) {
-    throw new Error('JSON_SCORES block must be an object');
-  }
-  const record = parsed as Record<string, unknown>;
-  const scores = {} as OceanScores;
-  for (const trait of OCEAN_TRAITS) {
-    const value = Number(record[trait]);
-    if (!Number.isFinite(value) || value < 0 || value > 100) {
-      throw new Error(`JSON_SCORES.${trait} must be a number from 0 to 100`);
-    }
-    scores[trait] = value;
-  }
-  return scores;
-}

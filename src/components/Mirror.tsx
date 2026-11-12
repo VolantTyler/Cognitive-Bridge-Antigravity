@@ -9,6 +9,7 @@ import { Send, User, Bot, Sparkles, Brain, Loader2, ListTodo, ArrowRight } from 
 import { Message, OceanScores } from '../types';
 import { MIRROR_SYSTEM_PROMPT } from '../constants';
 import { chatWithGeminiStream } from '../services/gemini';
+import { parseMirrorScores } from '../services/mirrorScores';
 import { AiAccessError } from '../services/aiAccess';
 import { DEFAULT_MAX_MESSAGE_CHARS } from '../constants/aiAccess';
 import { AI_DISCLOSURE } from '../constants/paywallCopy';
@@ -86,16 +87,12 @@ export default function Mirror({ messages, setMessages, onComplete, onSaveSessio
   useEffect(() => {
     const lastModelMessage = [...messages].reverse().find(m => m.role === 'model');
     if (lastModelMessage && lastModelMessage.content.includes('JSON_SCORES:')) {
-      const jsonMatch = lastModelMessage.content.match(/JSON_SCORES:\s*(?:```json)?\s*({[\s\S]*?})\s*(?:```)?/);
-      if (jsonMatch) {
-        try {
-          const scoresStr = jsonMatch[1].trim();
-            const scores = JSON.parse(scoresStr);
-            setCompletedScores(scores);
-            setScoreOrigin(messages.some((message) => message.role === 'user' && message.content.trim()) ? 'dialogue' : 'preset');
-          } catch (e) {
-          console.error("Failed to parse scores from historical message:", e);
-        }
+      try {
+        const scores = parseMirrorScores(lastModelMessage.content);
+        setCompletedScores(scores);
+        setScoreOrigin(messages.some((message) => message.role === 'user' && message.content.trim()) ? 'dialogue' : 'preset');
+      } catch (e) {
+        console.error("Failed to parse scores from historical message:", e);
       }
     }
   }, [messages]);
@@ -186,17 +183,15 @@ export default function Mirror({ messages, setMessages, onComplete, onSaveSessio
         });
 
         if (modelResponse.includes('JSON_SCORES:')) {
-          const jsonMatch = modelResponse.match(/JSON_SCORES:\s*(?:```json)?\s*({[\s\S]*?})\s*(?:```)?/);
-          if (jsonMatch) {
-            try {
-              const scoresStr = jsonMatch[1].trim();
-              const scores = JSON.parse(scoresStr);
-              setCompletedScores(scores);
-              setScoreOrigin('dialogue');
-              break;
-            } catch (e) {
-              console.error("Failed to parse scores:", e);
-            }
+          try {
+            const scores = parseMirrorScores(modelResponse);
+            setCompletedScores(scores);
+            setScoreOrigin('dialogue');
+            break;
+          } catch (e) {
+            // Keep reading the stream. A placeholder, non-numeric, or
+            // out-of-range block is not a finished mapping.
+            console.error("Failed to parse scores:", e);
           }
         }
       }
@@ -399,8 +394,8 @@ export default function Mirror({ messages, setMessages, onComplete, onSaveSessio
                     disabled={isLoading}
                     className="p-3 rounded-xl border border-border-card bg-bg-secondary/60 hover:bg-bg-tertiary hover:border-accent-green text-left transition-all disabled:opacity-50 group flex flex-col justify-between cursor-pointer"
                   >
-                    <div className="text-[10px] font-bold text-accent-green uppercase tracking-wide group-hover:text-accent-green-hover transition-colors">High Agreeableness, Moderate Diligence</div>
-                    <div className="text-[9px] text-text-secondary mt-1 italic leading-tight">Helpfulness 85 and diligence 45, read as two separate scores.</div>
+                    <div className="text-[10px] font-bold text-accent-green uppercase tracking-wide group-hover:text-accent-green-hover transition-colors">High Agreeableness, Moderate Conscientiousness</div>
+                    <div className="text-[9px] text-text-secondary mt-1 italic leading-tight">Agreeableness 85 and Conscientiousness 45, read as two separate scores.</div>
                   </button>
                 </div>
               </div>

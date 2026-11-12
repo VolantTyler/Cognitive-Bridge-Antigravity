@@ -8,6 +8,7 @@ OCEAN profiling accuracy, and playground alignment behavior.
 import asyncio
 from contextlib import asynccontextmanager
 import json
+import math
 import re
 import os
 import sys
@@ -490,6 +491,14 @@ def validate_steering_matrix_regressions():
     assert "high-density" in c_text or "precision" in c_text, c_text
     assert "flexible" not in c_text and "spontaneous" not in c_text, c_text
 
+    probe = (
+        "The deadline moved to tomorrow. You can spend the rest of today finishing the piece you started, "
+        "because you like closing a loop, or you can spend it with a teammate who's had a stressful week, "
+        "because you want them to feel supported. Which fits you, and why?"
+    )
+    assert probe in MIRROR_SYSTEM_PROMPT, "disambiguation probe drifted"
+    assert "staying in sync with people" not in MIRROR_SYSTEM_PROMPT
+
     print("[Matrix regression checks: PASS]")
 
 MIRROR_SYSTEM_PROMPT = """
@@ -530,7 +539,7 @@ Conscientiousness affecting Agreeableness:
 When a response is ambiguous between helping and duty, including when duty could be misread as helpfulness or helpfulness as duty, ask this disambiguation probe as one of the remaining scenario slots (prefer as Question 4/5 or 5/5 if bleed is already visible):
 
 DISAMBIGUATION SCENARIO (use verbatim when needed):
-"The deadline moved to tomorrow. You can spend the rest of today finishing the piece you started, because you like closing a loop, or you can spend it talking with a teammate about how the week went, because you like staying in sync with people. Which fits you, and why?"
+"The deadline moved to tomorrow. You can spend the rest of today finishing the piece you started, because you like closing a loop, or you can spend it with a teammate who's had a stressful week, because you want them to feel supported. Which fits you, and why?"
 
 - In your internal scoring notes, record: bleed_risk: agreeableness_vs_conscientiousness = true|false
 - Final JSON_SCORES stays the five OCEAN keys only for this milestone (no new required fields).
@@ -644,6 +653,62 @@ PERSONAS = [
     }
 ]
 
+class MirrorScoreError(ValueError):
+    """A JSON_SCORES block was present but not a usable 0–100 profile."""
+
+
+OCEAN_SCORE_TRAITS = (
+    "openness",
+    "conscientiousness",
+    "extroversion",
+    "agreeableness",
+    "neuroticism",
+)
+_SCORE_BLOCK = re.compile(r"JSON_SCORES:\s*(?:```json)?\s*({[\s\S]*?})\s*(?:```)?")
+
+
+def parse_mirror_scores(content):
+    """Return the five OCEAN scores, or raise MirrorScoreError.
+
+    Rejects the literal `<0-100>` placeholder, any non-numeric value, and any
+    score outside 0–100. Callers that catch this use the existing finalize retry.
+    """
+    match = _SCORE_BLOCK.search(content or "")
+    if not match:
+        raise MirrorScoreError("Mirror score response is missing a JSON_SCORES block")
+    try:
+        parsed = json.loads(match.group(1).strip())
+    except json.JSONDecodeError as exc:
+        raise MirrorScoreError(f"JSON_SCORES block is not valid JSON: {exc}") from exc
+    if not isinstance(parsed, dict):
+        raise MirrorScoreError("JSON_SCORES block must be an object")
+    scores = {}
+    for trait in OCEAN_SCORE_TRAITS:
+        value = parsed.get(trait)
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0 or value > 100:
+            raise MirrorScoreError(f"JSON_SCORES.{trait} must be a number from 0 to 100")
+        scores[trait] = value
+    return scores
+
+
+def needs_score_retry(dialogue):
+    """True when the finalize request should run.
+
+    Missing blocks already took this path. A present block that the parser
+    rejects (placeholder, non-numeric, or out of range) takes it too.
+    """
+    for message in reversed(dialogue or []):
+        content = message.get("content") or ""
+        if "JSON_SCORES:" not in content:
+            continue
+        try:
+            parse_mirror_scores(content)
+        except MirrorScoreError:
+            return True
+        return False
+    return True
+
+
 async def run_interview(persona):
     print(f"\n[Starting Interview for: {persona['name']}]", flush=True)
 
@@ -681,29 +746,30 @@ async def run_interview(persona):
             dialogue.append({"role": "model", "content": mirror_query})
             print(f"Mirror: {mirror_query}\n")
             
-            # Check if scores are in the response
+            # A score block ends the scenario loop. Unusable scores still
+            # fall through to the finalize retry below.
             if "JSON_SCORES:" in mirror_query:
                 break
-                
-        # If Mirror didn't output scores yet, explicitly request them
-        if not any("JSON_SCORES:" in m["content"] for m in dialogue):
+
+        # Missing scores, or a block the parser rejected, get one corrected request.
+        if needs_score_retry(dialogue):
             final_request = await safe_chat(mirror_agent, "Excellent. Please finalize the assessment and output the JSON_SCORES block now.")
             final_text = await final_request.text()
             dialogue.append({"role": "model", "content": final_text})
             print(f"Mirror (Final): {final_text}\n")
-            
-        # Parse the JSON scores
-        for m in reversed(dialogue):
-            if "JSON_SCORES:" in m["content"]:
-                match = re.search(r"JSON_SCORES:\s*(?:```json)?\s*({[\s\S]*?})\s*(?:```)?", m["content"])
-                if match:
-                    try:
-                        scores = json.loads(match.group(1).strip())
-                        print(f"Parsed Scores for {persona['name']}: {scores}\n")
-                        break
-                    except Exception as e:
-                        print(f"Failed to parse JSON scores: {e}")
-                        
+
+        try:
+            for message in reversed(dialogue):
+                content = message.get("content") or ""
+                if "JSON_SCORES:" not in content:
+                    continue
+                scores = parse_mirror_scores(content)
+                print(f"Parsed Scores for {persona['name']}: {scores}\n")
+                break
+        except MirrorScoreError as exc:
+            print(f"Failed to parse JSON scores: {exc}")
+            scores = None
+
     return dialogue, scores
 
 async def evaluate_scores(dialogue, scores, persona):

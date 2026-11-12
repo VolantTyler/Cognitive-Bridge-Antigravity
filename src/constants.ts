@@ -199,7 +199,7 @@ Conscientiousness affecting Agreeableness:
 When a response is ambiguous between helping and duty, including when duty could be misread as helpfulness or helpfulness as duty, ask this disambiguation probe as one of the remaining scenario slots (prefer as Question 4/5 or 5/5 if bleed is already visible):
 
 DISAMBIGUATION SCENARIO (use verbatim when needed):
-"The deadline moved to tomorrow. You can spend the rest of today finishing the piece you started, because you like closing a loop, or you can spend it talking with a teammate about how the week went, because you like staying in sync with people. Which fits you, and why?"
+"The deadline moved to tomorrow. You can spend the rest of today finishing the piece you started, because you like closing a loop, or you can spend it with a teammate who's had a stressful week, because you want them to feel supported. Which fits you, and why?"
 
 - In your internal scoring notes, record: bleed_risk: agreeableness_vs_conscientiousness = true|false
 - Final JSON_SCORES stays the five OCEAN keys only for this milestone (no new required fields).

@@ -15,6 +15,7 @@ from agent_eval import (
     GeminiModelChainError,
     GeminiQuotaError,
     MIXED_MODEL_HINT,
+    MirrorScoreError,
     QUOTA_ERROR_HINT,
     RETIRED_EVAL_MODELS,
     UNAVAILABLE_MODEL_HINT,
@@ -27,6 +28,8 @@ from agent_eval import (
     _ModelCapacityError,
     _ModelUnavailableError,
     _unique_models,
+    needs_score_retry,
+    parse_mirror_scores,
 )
 
 
@@ -276,6 +279,43 @@ class FallbackAgentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(await response.text(), "hello from live model")
         self.assertEqual(opened, ["gemini-2.5-pro", "gemini-3.1-pro-preview"])
         self.assertTrue(issubclass(GeminiModelChainError, RuntimeError))
+
+
+PLACEHOLDER_SCORES = """JSON_SCORES:
+{
+  "openness": <0-100>,
+  "conscientiousness": <0-100>,
+  "extroversion": <0-100>,
+  "agreeableness": <0-100>,
+  "neuroticism": <0-100>
+}"""
+
+
+class MirrorScoreParserTests(unittest.TestCase):
+    def test_literal_placeholder_is_rejected_and_retried(self):
+        with self.assertRaises(MirrorScoreError):
+            parse_mirror_scores(PLACEHOLDER_SCORES)
+        self.assertTrue(needs_score_retry([{"role": "model", "content": PLACEHOLDER_SCORES}]))
+
+    def test_non_numeric_and_out_of_range_scores_are_rejected(self):
+        quoted = PLACEHOLDER_SCORES.replace("<0-100>", '"<0-100>"')
+        with self.assertRaises(MirrorScoreError):
+            parse_mirror_scores(quoted)
+        out_of_range = (
+            'JSON_SCORES:\n{"openness": 140, "conscientiousness": 1, '
+            '"extroversion": 1, "agreeableness": 1, "neuroticism": 1}'
+        )
+        with self.assertRaises(MirrorScoreError):
+            parse_mirror_scores(out_of_range)
+        self.assertTrue(needs_score_retry([{"role": "model", "content": quoted}]))
+
+    def test_valid_scores_skip_the_finalize_retry(self):
+        content = (
+            'JSON_SCORES:\n{"openness": 50, "conscientiousness": 45, '
+            '"extroversion": 50, "agreeableness": 85, "neuroticism": 30}'
+        )
+        self.assertEqual(parse_mirror_scores(content)["agreeableness"], 85)
+        self.assertFalse(needs_score_retry([{"role": "model", "content": content}]))
 
 
 if __name__ == "__main__":

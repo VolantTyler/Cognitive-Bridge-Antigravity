@@ -173,8 +173,10 @@ describe('MIRROR_SYSTEM_PROMPT bleed rules', () => {
     expect(MIRROR_SYSTEM_PROMPT).toContain(
       "Bluntness and putting the task ahead of people's feelings are low-Agreeableness cues",
     );
-    expect(MIRROR_SYSTEM_PROMPT).toContain('because you like closing a loop');
-    expect(MIRROR_SYSTEM_PROMPT).toContain('because you like staying in sync with people');
+    expect(MIRROR_SYSTEM_PROMPT).toContain(
+      "The deadline moved to tomorrow. You can spend the rest of today finishing the piece you started, because you like closing a loop, or you can spend it with a teammate who's had a stressful week, because you want them to feel supported. Which fits you, and why?",
+    );
+    expect(MIRROR_SYSTEM_PROMPT).not.toContain('staying in sync with people');
     expect(MIRROR_SYSTEM_PROMPT).not.toContain('keep grinding anyway');
     expect(MIRROR_SYSTEM_PROMPT).not.toContain('falls sick');
     expect(MIRROR_SYSTEM_PROMPT).toContain('bleed_risk: agreeableness_vs_conscientiousness');

@@ -55,6 +55,10 @@ describe('Mirror Jev score check', () => {
       />
     );
 
+    expect(screen.getByRole('button', { name: /High Agreeableness, Moderate Conscientiousness/i })).toBeInTheDocument();
+    expect(screen.getByText('Agreeableness 85 and Conscientiousness 45, read as two separate scores.')).toBeInTheDocument();
+    expect(screen.queryByText(/helpfulness|diligence/i)).not.toBeInTheDocument();
+
     fireEvent.click(screen.getByRole('button', { name: /High Extraversion and Neuroticism/i }));
 
     expect(fetch).not.toHaveBeenCalled();
