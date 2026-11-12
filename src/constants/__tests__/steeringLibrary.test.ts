@@ -165,10 +165,18 @@ describe('MIRROR_SYSTEM_PROMPT score example', () => {
 });
 
 describe('MIRROR_SYSTEM_PROMPT bleed rules', () => {
-  it('includes dual-attribution rules and waived-deadline probe', () => {
+  it('scores agreeableness and conscientiousness in both directions and asks a balanced probe', () => {
     expect(MIRROR_SYSTEM_PROMPT).toContain('TRAIT BLEED / ASPECT DISAMBIGUATION');
     expect(MIRROR_SYSTEM_PROMPT).toContain('Working overnight / taking on extra work');
-    expect(MIRROR_SYSTEM_PROMPT).toContain('Management officially waives the deadline');
+    expect(MIRROR_SYSTEM_PROMPT).toContain('Each can inflate or deflate the other');
+    expect(MIRROR_SYSTEM_PROMPT).toContain('Conscientiousness affecting Agreeableness');
+    expect(MIRROR_SYSTEM_PROMPT).toContain(
+      "Bluntness and putting the task ahead of people's feelings are low-Agreeableness cues",
+    );
+    expect(MIRROR_SYSTEM_PROMPT).toContain('because you like closing a loop');
+    expect(MIRROR_SYSTEM_PROMPT).toContain('because you like staying in sync with people');
+    expect(MIRROR_SYSTEM_PROMPT).not.toContain('keep grinding anyway');
+    expect(MIRROR_SYSTEM_PROMPT).not.toContain('falls sick');
     expect(MIRROR_SYSTEM_PROMPT).toContain('bleed_risk: agreeableness_vs_conscientiousness');
     expect(MIRROR_SYSTEM_PROMPT).toContain('exactly 5 scenarios/questions');
   });

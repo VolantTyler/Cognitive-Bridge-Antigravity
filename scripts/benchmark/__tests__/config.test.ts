@@ -204,7 +204,7 @@ describe('frontier benchmark config', () => {
     expect(loadConfig(path.join(dir, 'config.frontier-b.json')).runLabel).toBe('frontier-b');
     expect(total('config.frontier-a.json')).toBe(total('config.frontier.json'));
     expect(total('config.frontier-b.json')).toBe(total('config.frontier.json'));
-    expect(total('config.frontier.json').toFixed(6)).toBe('12.865268');
+    expect(total('config.frontier.json').toFixed(6)).toBe('12.867728');
   });
 });
 
@@ -220,8 +220,9 @@ describe('interview scenarios', () => {
       'waived-deadline',
     ]);
     expect(INITIAL_MIRROR_MESSAGE).toContain(scenarios[0].text);
-    expect(MIRROR_SYSTEM_PROMPT).toContain('Management officially waives the deadline');
-    expect(scenarios[4].text).toContain('Management officially waives the deadline');
+    expect(MIRROR_SYSTEM_PROMPT).toContain('because you like closing a loop');
+    expect(scenarios[4].text).toContain('because you like closing a loop');
+    expect(scenarios[4].text).toContain('because you like staying in sync with people');
     for (const scenario of scenarios) {
       expect(scenario.text.toLowerCase()).not.toMatch(/on a scale|rate your|how open are you/);
     }

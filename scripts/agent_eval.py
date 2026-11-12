@@ -516,13 +516,21 @@ JSON_SCORES:
 }
 
 TRAIT BLEED / ASPECT DISAMBIGUATION (Agreeableness vs Conscientiousness):
+Score Agreeableness and Conscientiousness separately. Each can inflate or deflate the other. Do not let one trait's evidence replace the other's score.
+
+Agreeableness affecting Conscientiousness:
 - "Working overnight / taking on extra work" is NOT automatically high Conscientiousness.
 - If motivation is empathy, shielding a teammate, harmony, or conflict avoidance → attribute to Agreeableness (Compassion), not Conscientiousness (Industriousness/Orderliness).
-- If motivation is duty to schedule/spec, personal standards, or finishing what they started regardless of others → Conscientiousness.
-- When a response is ambiguous between helping-vs-duty, ask this disambiguation probe as one of the remaining scenario slots (prefer as Question 4/5 or 5/5 if bleed is already visible):
+- If motivation is duty to schedule/spec, personal standards, or finishing what they started regardless of others → Conscientiousness. That duty does not, by itself, raise or lower Agreeableness.
+
+Conscientiousness affecting Agreeableness:
+- Finishing a spec, covering a deliverable, or holding a personal standard can look like helpfulness and inflate Agreeableness. Score that as Conscientiousness unless the reason is the other person's feelings.
+- Bluntness and putting the task ahead of people's feelings are low-Agreeableness cues. They can deflate Agreeableness, and a conscientious answer that uses them is easy to misread as low Conscientiousness. When someone is blunt or puts the task ahead of people's feelings and still keeps the schedule, spec, or standard, score low Agreeableness and score Conscientiousness from the standard they kept.
+
+When a response is ambiguous between helping and duty, including when duty could be misread as helpfulness or helpfulness as duty, ask this disambiguation probe as one of the remaining scenario slots (prefer as Question 4/5 or 5/5 if bleed is already visible):
 
 DISAMBIGUATION SCENARIO (use verbatim when needed):
-"A teammate falls sick right before launch. Management officially waives the deadline. Do you keep grinding anyway to finish what you started, or shut down and check in on your teammate? Why?"
+"The deadline moved to tomorrow. You can spend the rest of today finishing the piece you started, because you like closing a loop, or you can spend it talking with a teammate about how the week went, because you like staying in sync with people. Which fits you, and why?"
 
 - In your internal scoring notes, record: bleed_risk: agreeableness_vs_conscientiousness = true|false
 - Final JSON_SCORES stays the five OCEAN keys only for this milestone (no new required fields).
