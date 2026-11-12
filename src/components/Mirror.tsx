@@ -33,6 +33,8 @@ interface MirrorProps {
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
   onComplete: (scores: OceanScores) => void;
   onSaveSession?: (updatedMessages: Message[]) => void;
+  /** True while App is saving the completed interview. */
+  completePending?: boolean;
 }
 
 function formatMirrorContent(content: string): string {
@@ -83,7 +85,7 @@ function presentMirrorMessage(content: string, questionNumber: number | null): s
   return stampQuestionLabel(formatMirrorContent(content), questionNumber);
 }
 
-export default function Mirror({ messages, setMessages, onComplete, onSaveSession }: MirrorProps) {
+export default function Mirror({ messages, setMessages, onComplete, onSaveSession, completePending = false }: MirrorProps) {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [completedScores, setCompletedScores] = useState<OceanScores | null>(null);
@@ -343,6 +345,7 @@ export default function Mirror({ messages, setMessages, onComplete, onSaveSessio
               {judgeStatus === 'ready' && judgment && (
                 <OceanJudgmentPanel
                   judgment={judgment}
+                  pending={completePending}
                   onKeep={() => onComplete(completedScores)}
                   onAcceptCorrections={() => onComplete(judgment.correctedScores)}
                 />
@@ -350,7 +353,8 @@ export default function Mirror({ messages, setMessages, onComplete, onSaveSessio
               {judgeStatus !== 'ready' && (
                 <button
                   onClick={() => onComplete(completedScores)}
-                  className="flex items-center gap-2 px-8 py-4 rounded-full bg-gradient-to-r from-button-brand to-red-800 hover:from-button-brand-hover hover:to-red-900 text-white font-bold text-sm uppercase tracking-widest transition-all shadow-lg shadow-orange-500/20 hover:shadow-orange-500/40 cursor-pointer border border-orange-500/30 hover:scale-105 active:scale-95 duration-150"
+                  disabled={completePending}
+                  className="flex items-center gap-2 px-8 py-4 rounded-full bg-gradient-to-r from-button-brand to-red-800 hover:from-button-brand-hover hover:to-red-900 text-white font-bold text-sm uppercase tracking-widest transition-all shadow-lg shadow-orange-500/20 hover:shadow-orange-500/40 cursor-pointer border border-orange-500/30 hover:scale-105 active:scale-95 duration-150 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                 >
                   <span>Proceed to Phase 2: The Tailor</span>
                   <ArrowRight className="w-4 h-4" />

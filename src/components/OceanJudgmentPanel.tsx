@@ -9,9 +9,10 @@ interface OceanJudgmentPanelProps {
   judgment: OceanJudgment;
   onKeep: () => void;
   onAcceptCorrections: () => void;
+  pending?: boolean;
 }
 
-export default function OceanJudgmentPanel({ judgment, onKeep, onAcceptCorrections }: OceanJudgmentPanelProps) {
+export default function OceanJudgmentPanel({ judgment, onKeep, onAcceptCorrections, pending = false }: OceanJudgmentPanelProps) {
   return (
     <div className="w-full max-w-xl flex flex-col gap-3 text-left">
       <div className="text-[10px] uppercase font-bold tracking-widest text-text-secondary text-center">
@@ -44,7 +45,8 @@ export default function OceanJudgmentPanel({ judgment, onKeep, onAcceptCorrectio
         <button
           type="button"
           onClick={onKeep}
-          className="px-5 py-3 rounded-full border border-border-primary bg-bg-secondary hover:bg-bg-tertiary text-text-primary font-bold text-[11px] uppercase tracking-widest cursor-pointer"
+          disabled={pending}
+          className="px-5 py-3 rounded-full border border-border-primary bg-bg-secondary hover:bg-bg-tertiary text-text-primary font-bold text-[11px] uppercase tracking-widest cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {judgment.hasMismatch ? 'Keep Mirror scores' : 'Proceed to Phase 2: The Tailor'}
         </button>
@@ -52,7 +54,8 @@ export default function OceanJudgmentPanel({ judgment, onKeep, onAcceptCorrectio
           <button
             type="button"
             onClick={onAcceptCorrections}
-            className="px-5 py-3 rounded-full bg-button-brand hover:bg-button-brand-hover text-white font-bold text-[11px] uppercase tracking-widest cursor-pointer"
+            disabled={pending}
+            className="px-5 py-3 rounded-full bg-button-brand hover:bg-button-brand-hover text-white font-bold text-[11px] uppercase tracking-widest cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Accept band corrections
           </button>
