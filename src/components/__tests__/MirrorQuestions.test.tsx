@@ -79,6 +79,29 @@ describe('Mirror question gate', () => {
     expect(chatWithGeminiStream).toHaveBeenCalledTimes(2);
   });
 
+  it('ignores a second Enter while the first reply is still running', async () => {
+    let release: (() => void) | undefined;
+    const started = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    chatWithGeminiStream.mockImplementation(async function* () {
+      await started;
+      yield 'A colleague wants to replace the stable tool (Question 2/5)';
+    });
+
+    render(<Host initial={[{ role: 'model', content: 'Welcome. Dirty hack or cancel? (Question 1/5)' }]} />);
+    const input = screen.getByPlaceholderText('Respond to the scenario...');
+    fireEvent.change(input, { target: { value: 'I cancel the demo.' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    fireEvent.click(screen.getByRole('button', { name: 'Send response' }));
+
+    expect(chatWithGeminiStream).toHaveBeenCalledTimes(1);
+    release?.();
+    expect(await screen.findByText(/\(Question 2\/5\)/)).toBeInTheDocument();
+    expect(chatWithGeminiStream).toHaveBeenCalledTimes(1);
+  });
+
   it('normalizes a skipped question label from the user-turn count, including restored messages', () => {
     render(
       <Host

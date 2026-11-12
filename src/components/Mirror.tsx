@@ -93,6 +93,7 @@ export default function Mirror({ messages, setMessages, onComplete, onSaveSessio
   const [loadingText, setLoadingText] = useState('Analyzing...');
   const [accessError, setAccessError] = useState<AiAccessError | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const sendingRef = useRef(false);
   const messagesRef = useRef(messages);
   messagesRef.current = messages;
 
@@ -150,13 +151,15 @@ export default function Mirror({ messages, setMessages, onComplete, onSaveSessio
   }, [messages]);
 
   const handleSend = async () => {
+    if (sendingRef.current) return;
     const draft = input;
-    if (!draft.trim() || isLoading) return;
+    if (!draft.trim()) return;
     if (draft.length > DEFAULT_MAX_MESSAGE_CHARS) {
       setAccessError(new AiAccessError('input_too_long'));
       return;
     }
 
+    sendingRef.current = true;
     setAccessError(null);
     setIsLoading(true);
     setLoadingText('Analyzing...');
@@ -244,6 +247,7 @@ export default function Mirror({ messages, setMessages, onComplete, onSaveSessio
       }
       console.error("Mirror request failed:", error);
     } finally {
+      sendingRef.current = false;
       setIsLoading(false);
     }
   };
