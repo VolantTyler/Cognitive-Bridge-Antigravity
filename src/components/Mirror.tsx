@@ -399,8 +399,8 @@ export default function Mirror({ messages, setMessages, onComplete, onSaveSessio
                     disabled={isLoading}
                     className="p-3 rounded-xl border border-border-card bg-bg-secondary/60 hover:bg-bg-tertiary hover:border-accent-green text-left transition-all disabled:opacity-50 group flex flex-col justify-between cursor-pointer"
                   >
-                    <div className="text-[10px] font-bold text-accent-green uppercase tracking-wide group-hover:text-accent-green-hover transition-colors">High Agreeableness (bleed resolved)</div>
-                    <div className="text-[9px] text-text-secondary mt-1 italic leading-tight">Compassion over industriousness after A↔C disambiguation (A=85, C=45).</div>
+                    <div className="text-[10px] font-bold text-accent-green uppercase tracking-wide group-hover:text-accent-green-hover transition-colors">High Agreeableness, Moderate Diligence</div>
+                    <div className="text-[9px] text-text-secondary mt-1 italic leading-tight">Helpfulness 85 and diligence 45, read as two separate scores.</div>
                   </button>
                 </div>
               </div>

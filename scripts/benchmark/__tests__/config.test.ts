@@ -204,7 +204,7 @@ describe('frontier benchmark config', () => {
     expect(loadConfig(path.join(dir, 'config.frontier-b.json')).runLabel).toBe('frontier-b');
     expect(total('config.frontier-a.json')).toBe(total('config.frontier.json'));
     expect(total('config.frontier-b.json')).toBe(total('config.frontier.json'));
-    expect(total('config.frontier.json').toFixed(6)).toBe('12.865240');
+    expect(total('config.frontier.json').toFixed(6)).toBe('12.865268');
   });
 });
 

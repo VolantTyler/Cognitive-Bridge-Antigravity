@@ -508,11 +508,11 @@ CRITICAL INSTRUCTIONS:
 Format for final output:
 JSON_SCORES:
 {
-  "openness": 85,
-  "conscientiousness": 40,
-  "extroversion": 60,
-  "agreeableness": 90,
-  "neuroticism": 30
+  "openness": <0-100>,
+  "conscientiousness": <0-100>,
+  "extroversion": <0-100>,
+  "agreeableness": <0-100>,
+  "neuroticism": <0-100>
 }
 
 TRAIT BLEED / ASPECT DISAMBIGUATION (Agreeableness vs Conscientiousness):

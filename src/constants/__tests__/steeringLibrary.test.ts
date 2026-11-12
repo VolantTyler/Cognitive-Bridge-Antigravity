@@ -153,6 +153,17 @@ describe('portable exports', () => {
   });
 });
 
+describe('MIRROR_SYSTEM_PROMPT score example', () => {
+  it('keeps the five OCEAN keys and uses neutral placeholders instead of sample numbers', () => {
+    expect(MIRROR_SYSTEM_PROMPT).toContain('"openness": <0-100>');
+    expect(MIRROR_SYSTEM_PROMPT).toContain('"conscientiousness": <0-100>');
+    expect(MIRROR_SYSTEM_PROMPT).toContain('"extroversion": <0-100>');
+    expect(MIRROR_SYSTEM_PROMPT).toContain('"agreeableness": <0-100>');
+    expect(MIRROR_SYSTEM_PROMPT).toContain('"neuroticism": <0-100>');
+    expect(MIRROR_SYSTEM_PROMPT).not.toMatch(/"(openness|conscientiousness|extroversion|agreeableness|neuroticism)":\s*\d+/);
+  });
+});
+
 describe('MIRROR_SYSTEM_PROMPT bleed rules', () => {
   it('includes dual-attribution rules and waived-deadline probe', () => {
     expect(MIRROR_SYSTEM_PROMPT).toContain('TRAIT BLEED / ASPECT DISAMBIGUATION');
