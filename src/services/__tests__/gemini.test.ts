@@ -138,6 +138,25 @@ describe('Gemini Service Unit Tests', () => {
       expect(body.feature).toBe('mirror');
       expect(body.reservationId).toBe('iv_mirror_1');
       expect(body.sessionId).toMatch(/^[A-Za-z0-9_-]{1,128}$/);
+      expect(body.turnIndex).toBeUndefined();
+      expect(body.isFinalTurn).toBeUndefined();
+    });
+
+    it('sends the mirror turn fields when the caller provides them', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ text: 'Hello!' })
+      });
+      await chatWithGemini(
+        [{ role: 'user', content: 'Hi' }],
+        undefined,
+        undefined,
+        'mirror',
+        { turnIndex: 5, isFinalTurn: true },
+      );
+      const body = JSON.parse(String(mockFetch.mock.calls[0][1].body));
+      expect(body.turnIndex).toBe(5);
+      expect(body.isFinalTurn).toBe(true);
     });
 
     it('handles HTTP error gracefully', async () => {
@@ -197,6 +216,7 @@ describe('Gemini Service Unit Tests', () => {
     it('yields chunks successfully', async () => {
       const mockStream = new ReadableStream({
         start(controller) {
+          controller.enqueue(new TextEncoder().encode(': keep-alive\n\n'));
           controller.enqueue(new TextEncoder().encode('data: {"text":"Part 1, "}\n'));
           controller.enqueue(new TextEncoder().encode('data: {"text":"Part 2."}\n'));
           controller.enqueue(new TextEncoder().encode('data: [DONE]\n'));
