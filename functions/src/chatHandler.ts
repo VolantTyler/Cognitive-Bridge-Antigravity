@@ -8,7 +8,7 @@ import {
   isRequestableModel,
   normalizeModelName,
 } from "./modelRouter";
-import { GuardContext, GuardRequest } from "./guard";
+import { GuardContext, GuardRequest, sanitizeReservationId } from "./guard";
 import { GateError } from "./gate";
 import { UsageRecord, buildUsageRecord, usageFromChunks } from "./usageLog";
 
@@ -92,6 +92,7 @@ async function safeLog(deps: ChatDeps, ctx: GuardContext, model: string, promptT
     await deps.logUsage(buildUsageRecord({
       uid: ctx.uid,
       sessionId: ctx.sessionId,
+      reservationId: sanitizeReservationId(ctx.reservationId),
       feature: ctx.feature,
       model,
       promptTokens,

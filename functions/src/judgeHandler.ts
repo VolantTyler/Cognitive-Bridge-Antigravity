@@ -1,4 +1,4 @@
-import { GuardContext, GuardRequest } from "./guard";
+import { GuardContext, GuardRequest, sanitizeReservationId } from "./guard";
 import { GateError } from "./gate";
 import { UsageRecord, judgeUsageRecord } from "./usageLog";
 import { HttpResponse } from "./chatHandler";
@@ -130,7 +130,12 @@ export async function handleJudge(req: GuardRequest, res: HttpResponse, deps: Ju
     const model = typeof payload.model === "string" ? payload.model : JEV_MODEL;
     if (ctx.uid) {
       try {
-        await deps.logUsage(judgeUsageRecord({ uid: ctx.uid, sessionId: ctx.sessionId, model }));
+        await deps.logUsage(judgeUsageRecord({
+          uid: ctx.uid,
+          sessionId: ctx.sessionId,
+          reservationId: sanitizeReservationId(ctx.reservationId),
+          model,
+        }));
       } catch {
         console.error("usage_server write failed");
       }

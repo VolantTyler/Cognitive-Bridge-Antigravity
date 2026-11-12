@@ -13,6 +13,7 @@ const interviewStore_1 = require("./interviewStore");
 const interviewHttp_1 = require("./interviewHttp");
 const params_2 = require("./params");
 const adminStore_1 = require("./adminStore");
+const usageLog_1 = require("./usageLog");
 const auth_1 = require("./auth");
 const checkoutConfig_1 = require("./checkoutConfig");
 const checkoutHttp_1 = require("./checkoutHttp");
@@ -25,6 +26,7 @@ const ai = new genai_1.GoogleGenAI({
 });
 const cors = (0, cors_1.allowedCorsOrigins)();
 async function logUsage(record) {
+    console.log(JSON.stringify((0, usageLog_1.usageLogLine)(record)));
     try {
         await (0, adminStore_1.writeUsageRecord)(record);
     }

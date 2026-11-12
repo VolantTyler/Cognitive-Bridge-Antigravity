@@ -2,7 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import { handleChat, GeminiClient } from "./chatHandler";
 import { handleJudge } from "./judgeHandler";
 import { GateError } from "./gate";
-import { usageFromChunks, buildUsageRecord } from "./usageLog";
+import { costMicrosForUsage } from "./pricing";
+import { usageFromChunks, buildUsageRecord, usageLogLine, UsageRecord } from "./usageLog";
 
 function mockRes() {
   let statusCode = 0;
@@ -48,6 +49,7 @@ describe("usage records", () => {
     const record = buildUsageRecord({
       uid: "u",
       sessionId: "s",
+      reservationId: "iv_1",
       feature: "mirror",
       model: "gemini-2.5-flash",
       promptTokens: 9,
@@ -55,13 +57,39 @@ describe("usage records", () => {
     });
     expect(Object.keys(record).sort()).toEqual([
       "completionTokens",
+      "costMicros",
       "feature",
       "model",
       "promptTokens",
+      "reservationId",
       "sessionId",
       "uid",
     ]);
+    expect(record.costMicros).toBe(costMicrosForUsage({
+      model: "gemini-2.5-flash",
+      promptTokens: 9,
+      completionTokens: 4,
+    }));
     expect(JSON.stringify(record)).not.toContain("secret");
+    const dirty = {
+      ...record,
+      apiKey: "typesafe-test-key",
+      content: "secret prompt",
+    } as UsageRecord;
+    const line = usageLogLine(dirty);
+    expect(Object.keys(line).sort()).toEqual([
+      "completionTokens",
+      "costMicros",
+      "feature",
+      "model",
+      "promptTokens",
+      "reservationId",
+      "uid",
+    ]);
+    const serialized = JSON.stringify(line);
+    expect(serialized).not.toContain("secret");
+    expect(serialized).not.toContain("typesafe-test-key");
+    expect(serialized).not.toContain("\n");
   });
 });
 
@@ -105,6 +133,7 @@ describe("handleChat", () => {
         email_verified: true,
         feature: "mirror",
         sessionId: "sess-1",
+        reservationId: "iv_mirror_1",
       }),
       ai: { models: { generateContent, generateContentStream: vi.fn() } } as GeminiClient,
       logUsage,
@@ -113,10 +142,16 @@ describe("handleChat", () => {
     expect(logUsage).toHaveBeenCalledWith({
       uid: "user-1",
       sessionId: "sess-1",
+      reservationId: "iv_mirror_1",
       feature: "mirror",
       model: "gemini-2.5-flash",
       promptTokens: 12,
       completionTokens: 3,
+      costMicros: costMicrosForUsage({
+        model: "gemini-2.5-flash",
+        promptTokens: 12,
+        completionTokens: 3,
+      }),
     });
     expect(JSON.stringify(logUsage.mock.calls)).not.toContain("private diary");
   });
@@ -138,6 +173,7 @@ describe("handleChat", () => {
         email_verified: false,
         feature: "playground-aligned",
         sessionId: null,
+        reservationId: "bad id",
       }),
       ai: {
         models: {
@@ -154,6 +190,7 @@ describe("handleChat", () => {
       completionTokens: 6,
       feature: "playground-aligned",
       sessionId: null,
+      reservationId: null,
     }));
   });
 });
@@ -182,6 +219,7 @@ describe("handleJudge", () => {
         email_verified: true,
         feature: "mirror",
         sessionId: "sess-9",
+        reservationId: "iv_mirror_1",
       }),
       fetchImpl: fetchImpl as unknown as typeof fetch,
       apiKey: "typesafe-test-key",
@@ -193,7 +231,9 @@ describe("handleJudge", () => {
       model: "jev-latest",
       promptTokens: 0,
       completionTokens: 0,
+      costMicros: 0,
       sessionId: "sess-9",
+      reservationId: "iv_mirror_1",
       uid: "user-1",
     }));
     expect(JSON.stringify(logUsage.mock.calls)).not.toContain("private");

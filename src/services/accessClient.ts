@@ -62,6 +62,13 @@ export function readStoredReservation(): string | null {
   }
 }
 
+/** Present only when this tab has an interview reservation. Callers spread it onto proxy bodies. */
+export function reservationRequestField(): { reservationId?: string } {
+  const reservationId = readStoredReservation();
+  if (!reservationId) return {};
+  return { reservationId };
+}
+
 export function storeReservation(id: string): void {
   try {
     sessionStorage.setItem(RESERVATION_KEY, id);

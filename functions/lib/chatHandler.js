@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.handleChat = handleChat;
 const modelRouter_1 = require("./modelRouter");
+const guard_1 = require("./guard");
 const gate_1 = require("./gate");
 const usageLog_1 = require("./usageLog");
 function sendTerminalError(res, failures, error) {
@@ -46,6 +47,7 @@ async function safeLog(deps, ctx, model, promptTokens, completionTokens) {
         await deps.logUsage((0, usageLog_1.buildUsageRecord)({
             uid: ctx.uid,
             sessionId: ctx.sessionId,
+            reservationId: (0, guard_1.sanitizeReservationId)(ctx.reservationId),
             feature: ctx.feature,
             model,
             promptTokens,

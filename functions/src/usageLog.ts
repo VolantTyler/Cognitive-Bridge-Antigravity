@@ -1,3 +1,5 @@
+import { costMicrosForUsage } from "./pricing";
+
 export interface UsageMetadata {
   promptTokenCount?: number;
   candidatesTokenCount?: number;
@@ -7,20 +9,34 @@ export interface UsageMetadata {
 export interface UsageRecord {
   uid: string;
   sessionId: string | null;
+  reservationId: string | null;
   feature: string;
   model: string;
   promptTokens: number;
   completionTokens: number;
+  costMicros: number;
   ts?: unknown;
+}
+
+export interface UsageLogLine {
+  reservationId: string | null;
+  uid: string;
+  feature: string;
+  model: string;
+  promptTokens: number;
+  completionTokens: number;
+  costMicros: number;
 }
 
 const USAGE_FIELDS = [
   "uid",
   "sessionId",
+  "reservationId",
   "feature",
   "model",
   "promptTokens",
   "completionTokens",
+  "costMicros",
   "ts",
 ] as const;
 
@@ -50,22 +66,49 @@ export function usageFromChunks(chunks: Array<{
 export function buildUsageRecord(input: {
   uid: string;
   sessionId: string | null;
+  reservationId?: string | null;
   feature: string;
   model: string;
   promptTokens: number;
   completionTokens: number;
   ts?: unknown;
 }): UsageRecord {
+  const promptTokens = tokenCount(input.promptTokens);
+  const completionTokens = tokenCount(input.completionTokens);
   const record: UsageRecord = {
     uid: input.uid,
     sessionId: input.sessionId,
+    reservationId: input.reservationId ?? null,
     feature: input.feature,
     model: input.model,
-    promptTokens: tokenCount(input.promptTokens),
-    completionTokens: tokenCount(input.completionTokens),
+    promptTokens,
+    completionTokens,
+    costMicros: costMicrosForUsage({
+      model: input.model,
+      promptTokens,
+      completionTokens,
+    }),
   };
   if (input.ts !== undefined) record.ts = input.ts;
   return record;
+}
+
+/** One secret-free line. Message text, prompts, and keys are not fields on this object. */
+export function usageLogLine(record: UsageRecord): UsageLogLine {
+  const costMicros = typeof record.costMicros === "number" && Number.isFinite(record.costMicros) && record.costMicros >= 0
+    ? Math.round(record.costMicros)
+    : costMicrosForUsage(record);
+  return {
+    reservationId: typeof record.reservationId === "string" && record.reservationId.length > 0
+      ? record.reservationId
+      : null,
+    uid: record.uid,
+    feature: record.feature,
+    model: record.model,
+    promptTokens: tokenCount(record.promptTokens),
+    completionTokens: tokenCount(record.completionTokens),
+    costMicros,
+  };
 }
 
 export function usageRecordKeys(record: UsageRecord): string[] {
@@ -75,12 +118,14 @@ export function usageRecordKeys(record: UsageRecord): string[] {
 export function judgeUsageRecord(input: {
   uid: string;
   sessionId: string | null;
+  reservationId?: string | null;
   model: string;
   ts?: unknown;
 }): UsageRecord {
   return buildUsageRecord({
     uid: input.uid,
     sessionId: input.sessionId,
+    reservationId: input.reservationId ?? null,
     feature: "judge",
     model: input.model,
     promptTokens: 0,

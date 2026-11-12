@@ -153,9 +153,10 @@ export function PrivacyPage() {
           </li>
           <li>
             <span className="font-medium text-text-primary">Usage records:</span> for each AI request we record your account ID, a
-            random session ID, which feature you used, which AI model ran, how many word pieces ("tokens") went in and out, and the
-            time. We also keep a daily estimate of AI cost per account and a daily count of chats. These records do not include your
-            message text.
+            random session ID, the interview reservation id for this browser tab when one is stored, which feature you used
+            (the Mirror conversation and the judge step are recorded separately), which AI model ran, how many word pieces
+            ("tokens") went in and out, an estimated cost for that call, and the time. We also keep a daily estimate of AI cost
+            per account and a daily count of chats. These records do not include your message text.
           </li>
           <li>
             <span className="font-medium text-text-primary">Feedback:</span> if you send feedback, we save the name (or "Anonymous"),

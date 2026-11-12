@@ -20,7 +20,7 @@ import {
 } from "./interviewHttp";
 import { loadGateConfig } from "./params";
 import { verifyAppCheckToken, writeUsageRecord, addDailyCostFromUsage } from "./adminStore";
-import { UsageRecord } from "./usageLog";
+import { UsageRecord, usageLogLine } from "./usageLog";
 import { verifyIdTokenWithAdmin } from "./auth";
 import { loadCheckoutConfig } from "./checkoutConfig";
 import {
@@ -42,6 +42,7 @@ const ai = new GoogleGenAI({
 const cors = allowedCorsOrigins();
 
 async function logUsage(record: UsageRecord): Promise<void> {
+  console.log(JSON.stringify(usageLogLine(record)));
   try {
     await writeUsageRecord(record);
   } catch {

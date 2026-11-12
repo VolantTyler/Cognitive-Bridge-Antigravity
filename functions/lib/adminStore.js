@@ -86,13 +86,18 @@ async function reserveBridgeChatSlot(uid, day, cap) {
 async function writeUsageRecord(record) {
     const { FieldValue } = await Promise.resolve().then(() => __importStar(require("firebase-admin/firestore")));
     const db = await getAdminFirestore();
+    const costMicros = typeof record.costMicros === "number" && Number.isFinite(record.costMicros) && record.costMicros >= 0
+        ? Math.round(record.costMicros)
+        : (0, pricing_1.costMicrosForUsage)(record);
     await db.collection("usage_server").add({
         uid: record.uid,
         sessionId: record.sessionId,
+        reservationId: record.reservationId ?? null,
         feature: record.feature,
         model: record.model,
         promptTokens: record.promptTokens,
         completionTokens: record.completionTokens,
+        costMicros,
         ts: record.ts ?? FieldValue.serverTimestamp(),
     });
 }
