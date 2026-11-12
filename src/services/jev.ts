@@ -17,6 +17,7 @@ import {
   oceanQuestions,
 } from '../jev/questions';
 import { OceanScores } from '../types';
+import { reservationRequestField } from './accessClient';
 import { AiAccessError, aiAccessErrorFromResponse, authorizedAiHeaders, getAiSessionId } from './aiAccess';
 
 const JUDGE_TIMEOUT_MS = 12000;
@@ -50,6 +51,7 @@ export async function requestJudgment(
         questions,
         feature,
         sessionId: getAiSessionId(),
+        ...reservationRequestField(),
       }),
       signal: controller.signal,
     });
@@ -80,7 +82,7 @@ export async function judgeOcean(
   messages: DialogueTurn[],
   scores: OceanScores
 ): Promise<OceanJudgment | null> {
-  const answers = await requestJudgment(buildOceanState(messages, scores), oceanQuestions(scores), 'mirror');
+  const answers = await requestJudgment(buildOceanState(messages, scores), oceanQuestions(scores), 'judge');
   if (!answers) return null;
   return interpretOceanAnswers(scores, answers);
 }

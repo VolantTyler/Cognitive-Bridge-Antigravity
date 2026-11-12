@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { guardChat, guardJudge, GuardDeps } from "./guard";
+import { guardChat, guardJudge, sanitizeReservationId, GuardDeps } from "./guard";
 import { GateError, configFromEnv } from "./gate";
 import { AI_ACCESS_MESSAGES, costCapMessage, dailyCapMessage } from "./accessCopy";
 
@@ -62,6 +62,7 @@ vi.mock("firebase-admin/firestore", () => ({
 }));
 
 import { readEntitlementPaid, reserveBridgeChatSlot, writeUsageRecord } from "./adminStore";
+import { costMicrosForUsage } from "./pricing";
 
 function deps(env: NodeJS.ProcessEnv, overrides: Partial<GuardDeps> = {}): GuardDeps {
   return {
@@ -251,8 +252,16 @@ describe("guard modes", () => {
     await expect(guardJudge({
       method: "POST",
       headers: { authorization: "Bearer token" },
+      body: { feature: "judge", sessionId: "sess" },
+    }, paused)).rejects.toMatchObject({
+      status: 503,
+      code: "interviews_paused",
+    });
+    await expect(guardJudge({
+      method: "POST",
+      headers: { authorization: "Bearer token" },
       body: { feature: "bridge", sessionId: "sess" },
-    }, paused)).resolves.toMatchObject({ feature: "bridge" });
+    }, paused)).resolves.toMatchObject({ feature: "bridge", reservationId: null });
 
     const checked = deps({ AI_GATE_MODE: "auth", ENFORCE_APP_CHECK: "true" }, {
       verifyAppCheck: vi.fn(async () => {
@@ -273,6 +282,42 @@ describe("guard modes", () => {
   });
 });
 
+describe("reservation ids", () => {
+  beforeEach(() => {
+    memory.store.clear();
+    memory.added.length = 0;
+  });
+
+  it("keeps a bounded safe id and ignores anything else", async () => {
+    expect(sanitizeReservationId(" iv_m5k_abc123 ")).toBe("iv_m5k_abc123");
+    expect(sanitizeReservationId("a".repeat(80))).toHaveLength(80);
+    expect(sanitizeReservationId("a".repeat(81))).toBeNull();
+    expect(sanitizeReservationId("bad id")).toBeNull();
+    expect(sanitizeReservationId("bad\nid")).toBeNull();
+    expect(sanitizeReservationId("../etc/passwd")).toBeNull();
+    expect(sanitizeReservationId(12)).toBeNull();
+
+    const gate = deps({ AI_GATE_MODE: "auth" });
+    const kept = await guardChat({
+      method: "POST",
+      headers: { authorization: "Bearer token" },
+      body: { ...chatBody, reservationId: " iv_m5k_abc123 " },
+    }, gate);
+    expect(kept.reservationId).toBe("iv_m5k_abc123");
+    expect(kept.feature).toBe("playground-aligned");
+    expect(kept.sessionId).toBe("session_1");
+
+    const dropped = await guardJudge({
+      method: "POST",
+      headers: { authorization: "Bearer token" },
+      body: { feature: "mirror", sessionId: "sess", reservationId: "not a reservation" },
+    }, gate);
+    expect(dropped.reservationId).toBeNull();
+    expect(dropped.feature).toBe("mirror");
+    expect(dropped.sessionId).toBe("sess");
+  });
+});
+
 describe("admin store", () => {
   beforeEach(() => {
     memory.store.clear();
@@ -289,23 +334,33 @@ describe("admin store", () => {
     await reserveBridgeChatSlot("user-1", "2026-11-04", 1);
     await expect(reserveBridgeChatSlot("user-1", "2026-11-04", 1)).rejects.toMatchObject({ code: "rate_limited" });
 
+    const costMicros = costMicrosForUsage({
+      model: "gemini-2.5-flash",
+      promptTokens: 3,
+      completionTokens: 4,
+    });
     await writeUsageRecord({
       uid: "user-1",
       sessionId: "sess",
+      reservationId: "iv_1",
       feature: "mirror",
       model: "gemini-2.5-flash",
       promptTokens: 3,
       completionTokens: 4,
+      costMicros,
     });
     expect(memory.added[0]).toEqual({
       uid: "user-1",
       sessionId: "sess",
+      reservationId: "iv_1",
       feature: "mirror",
       model: "gemini-2.5-flash",
       promptTokens: 3,
       completionTokens: 4,
+      costMicros,
       ts: "SERVER_TS",
     });
     expect(JSON.stringify(memory.added[0])).not.toContain("message");
+    expect(costMicros).toBeGreaterThan(0);
   });
 });

@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.handleJudge = handleJudge;
+const guard_1 = require("./guard");
 const gate_1 = require("./gate");
 const usageLog_1 = require("./usageLog");
 const TYPESAFE_DECIDE_URL = "https://api.typesafe.ai/v1/systemone";
@@ -110,7 +111,12 @@ async function handleJudge(req, res, deps) {
         const model = typeof payload.model === "string" ? payload.model : JEV_MODEL;
         if (ctx.uid) {
             try {
-                await deps.logUsage((0, usageLog_1.judgeUsageRecord)({ uid: ctx.uid, sessionId: ctx.sessionId, model }));
+                await deps.logUsage((0, usageLog_1.judgeUsageRecord)({
+                    uid: ctx.uid,
+                    sessionId: ctx.sessionId,
+                    reservationId: (0, guard_1.sanitizeReservationId)(ctx.reservationId),
+                    model,
+                }));
             }
             catch {
                 console.error("usage_server write failed");

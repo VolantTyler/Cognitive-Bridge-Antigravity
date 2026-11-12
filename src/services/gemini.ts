@@ -4,6 +4,7 @@
  */
 
 import { Message } from "../types";
+import { reservationRequestField } from "./accessClient";
 import { AiAccessError, aiAccessErrorFromResponse, authorizedAiHeaders, getAiSessionId } from "./aiAccess";
 import {
   DEFAULT_GEMINI_MODEL,
@@ -465,6 +466,7 @@ async function postChat(
       stream,
       feature: feature || "chat",
       sessionId: getAiSessionId(),
+      ...reservationRequestField(),
     }),
     signal: typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function"
       ? AbortSignal.timeout(ATTEMPT_TIMEOUT_MS)

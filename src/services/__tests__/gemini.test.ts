@@ -21,6 +21,7 @@ vi.mock('../firebase', () => ({
 }));
 
 // Import the module after mocking
+import { storeReservation } from '../accessClient';
 import {
   parseModelName,
   getDynamicModelFallbacks,
@@ -36,6 +37,7 @@ describe('Gemini Service Unit Tests', () => {
     vi.clearAllMocks();
     mockFetch.mockReset();
     activeModelsCache.length = 0;
+    sessionStorage.removeItem('cb.interviewReservation');
     authState.currentUser = {
       uid: 'user-1',
       getIdToken: vi.fn(async () => 'id-token-test'),
@@ -120,7 +122,22 @@ describe('Gemini Service Unit Tests', () => {
       const body = JSON.parse(String(init.body));
       expect(body.feature).toBe('chat');
       expect(body.sessionId).toMatch(/^[A-Za-z0-9_-]{1,128}$/);
+      expect(body.reservationId).toBeUndefined();
       expect(JSON.stringify(init.headers)).not.toContain('id-token-test-logged');
+    });
+
+    it('sends the stored interview reservation and keeps the mirror feature', async () => {
+      storeReservation('iv_mirror_1');
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ text: 'Hello!' })
+      });
+
+      await chatWithGemini([{ role: 'user', content: 'Hi' }], undefined, undefined, 'mirror');
+      const body = JSON.parse(String(mockFetch.mock.calls[0][1].body));
+      expect(body.feature).toBe('mirror');
+      expect(body.reservationId).toBe('iv_mirror_1');
+      expect(body.sessionId).toMatch(/^[A-Za-z0-9_-]{1,128}$/);
     });
 
     it('handles HTTP error gracefully', async () => {

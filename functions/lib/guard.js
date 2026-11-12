@@ -33,6 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.sanitizeReservationId = sanitizeReservationId;
 exports.guardChat = guardChat;
 exports.guardJudge = guardJudge;
 exports.defaultGuardDeps = defaultGuardDeps;
@@ -40,6 +41,19 @@ const auth_1 = require("./auth");
 const interviewStore_1 = require("./interviewStore");
 const modelRouter_1 = require("./modelRouter");
 const gate_1 = require("./gate");
+/**
+ * Interview reservation ids are `iv_<base36>_<base36>` and the ledger rejects
+ * anything longer than 80 characters. Drop the field when it is not that shape.
+ */
+const RESERVATION_RE = /^[A-Za-z0-9_-]{1,80}$/;
+function sanitizeReservationId(value) {
+    if (typeof value !== "string")
+        return null;
+    const trimmed = value.trim();
+    if (!RESERVATION_RE.test(trimmed))
+        return null;
+    return trimmed;
+}
 function asRecord(body) {
     if (!body || typeof body !== "object" || Array.isArray(body))
         return {};
@@ -79,6 +93,7 @@ async function guardChat(req, deps) {
     const body = asRecord(req.body);
     const feature = (0, gate_1.sanitizeFeature)(body.feature);
     const sessionId = (0, gate_1.sanitizeSessionId)(body.sessionId);
+    const reservationId = sanitizeReservationId(body.reservationId);
     if (config.interviewsPaused && (0, gate_1.isInterviewFeature)(feature)) {
         throw (0, gate_1.interviewsPausedError)();
     }
@@ -108,6 +123,7 @@ async function guardChat(req, deps) {
         email_verified: user?.email_verified ?? false,
         feature,
         sessionId,
+        reservationId,
     };
 }
 async function guardJudge(req, deps) {
@@ -119,7 +135,9 @@ async function guardJudge(req, deps) {
     const user = await enforceIdentity(req, config, deps);
     const body = asRecord(req.body);
     const feature = (0, gate_1.sanitizeFeature)(body.feature);
-    if (config.interviewsPaused && (0, gate_1.isInterviewFeature)(feature)) {
+    // Mirror chat sends "mirror". The mirror judge step sends "judge".
+    // Both stay paused together. Bridge judgment sends "bridge" and stays up.
+    if (config.interviewsPaused && ((0, gate_1.isInterviewFeature)(feature) || feature.toLowerCase() === "judge")) {
         throw (0, gate_1.interviewsPausedError)();
     }
     if (user) {
@@ -131,6 +149,7 @@ async function guardJudge(req, deps) {
         email_verified: user?.email_verified ?? false,
         feature,
         sessionId: (0, gate_1.sanitizeSessionId)(body.sessionId),
+        reservationId: sanitizeReservationId(body.reservationId),
     };
 }
 function defaultGuardDeps(overrides = {}) {
