@@ -114,15 +114,6 @@ export function termsUrlForBase(baseUrl: string): string {
   return url;
 }
 
-/**
- * Replaces Stripe's default terms checkbox sentence.
- * Stripe shows this in place of its own agreement text. Keep a markdown terms link.
- * The 18+ clause is additive. It does not say sales are final or promise a refund.
- */
-export function termsAcceptanceMessage(termsUrl: string): string {
-  return `I agree to the [Terms](${termsUrl}) and I am 18 or older.`;
-}
-
 export function checkoutIdempotencyKey(uid: string, nowMs: number): string {
   const bucket = Math.floor(nowMs / CHECKOUT_IDEMPOTENCY_WINDOW_MS);
   return `cb-checkout-${uid}-${bucket}`;
@@ -143,7 +134,6 @@ export interface CheckoutSessionCreateParams {
   line_items: Array<{ price: string; quantity: number }>;
   client_reference_id: string;
   billing_address_collection: "required";
-  custom_text?: { terms_of_service_acceptance: { message: string } };
   success_url: string;
   cancel_url: string;
   metadata: { uid: string };
@@ -161,7 +151,8 @@ export function buildCheckoutSessionCreateParams(input: {
   managedPayments: boolean;
   automaticTax: boolean;
 }): CheckoutSessionCreateParams {
-  const termsUrl = termsUrlForBase(input.baseUrl);
+  // The paywall links to this origin's /terms page. Reject a base that cannot form that https URL.
+  termsUrlForBase(input.baseUrl);
   const base = input.baseUrl.replace(/\/$/, "");
   const params: CheckoutSessionCreateParams = {
     mode: "payment",
@@ -178,18 +169,18 @@ export function buildCheckoutSessionCreateParams(input: {
   if (input.email && input.email.includes("@")) {
     params.customer_email = input.email;
   }
+  // Neither branch sends consent_collection or custom_text. The in-app Terms
+  // and 18+ checkbox, stored by writeCheckoutConsent, is the consent of record.
+  // Stripe only allows custom_text.terms_of_service_acceptance when
+  // consent_collection.terms_of_service is required.
   if (input.managedPayments) {
     // Managed Payments calculates tax and sends the receipt itself.
-    // It rejects custom_text and payment_intent_data.receipt_email.
-    // consent_collection is omitted in both modes: Stripe rejects it unless a
-    // public Terms URL is set, and the in-app checkbox is the consent record.
+    // It rejects payment_intent_data.receipt_email and automatic_tax.
     params.managed_payments = { enabled: true };
   } else {
     // New accounts turn Managed Payments on at the account level. Omitting the
-    // field lets that default win, and Stripe then rejects custom_text.
-    params.custom_text = {
-      terms_of_service_acceptance: { message: termsAcceptanceMessage(termsUrl) },
-    };
+    // field lets that default win, and Stripe then rejects receipt_email and
+    // automatic_tax.
     if (input.email && input.email.includes("@")) {
       params.payment_intent_data.receipt_email = input.email;
     }

@@ -10,7 +10,6 @@ import {
   checkoutIdempotencyKey,
   isStripeTestKey,
   loadCheckoutConfig,
-  termsAcceptanceMessage,
   termsUrlForBase,
 } from "./checkoutConfig";
 import { createFirestoreBillingStore } from "./checkoutStore";
@@ -148,7 +147,6 @@ function jsonRes() {
 
 describe("checkout session params", () => {
   it("builds one payment-mode session from the configured price", () => {
-    const termsUrl = "https://cognitive-bridge-ai.web.app/terms";
     const params = buildCheckoutSessionCreateParams({
       uid: "uid-1",
       email: "ada@example.com",
@@ -168,12 +166,9 @@ describe("checkout session params", () => {
       success_url: "https://cognitive-bridge-ai.web.app/?checkout=success&session_id={CHECKOUT_SESSION_ID}",
       cancel_url: "https://cognitive-bridge-ai.web.app/?checkout=cancel",
     });
-    expect(params.custom_text.terms_of_service_acceptance.message).toBe(
-      `I agree to the [Terms](${termsUrl}) and I am 18 or older.`
-    );
-    expect(params.custom_text.terms_of_service_acceptance.message).toBe(termsAcceptanceMessage(termsUrl));
-    expect("shipping_address_collection" in params).toBe(false);
+    expect("custom_text" in params).toBe(false);
     expect("consent_collection" in params).toBe(false);
+    expect("shipping_address_collection" in params).toBe(false);
     expect(params.automatic_tax).toBeUndefined();
     expect(params.managed_payments).toEqual({ enabled: false });
 
@@ -189,6 +184,8 @@ describe("checkout session params", () => {
     expect(other.managed_payments).toEqual({ enabled: false });
     expect(other.automatic_tax).toEqual({ enabled: true });
     expect(other.customer_email).toBeUndefined();
+    expect("custom_text" in other).toBe(false);
+    expect("consent_collection" in other).toBe(false);
   });
 
   it("builds Managed Payments params without receipt email, tax, or custom text", () => {
@@ -214,7 +211,7 @@ describe("checkout session params", () => {
     });
     expect(params.payment_intent_data.receipt_email).toBeUndefined();
     expect(params.automatic_tax).toBeUndefined();
-    expect(params.custom_text).toBeUndefined();
+    expect("custom_text" in params).toBe(false);
     expect("consent_collection" in params).toBe(false);
   });
 
@@ -564,12 +561,9 @@ describe("createCheckout", () => {
       billing_address_collection: "required",
       line_items: [{ price: "price_from_env", quantity: 1 }],
       managed_payments: { enabled: false },
-      custom_text: {
-        terms_of_service_acceptance: {
-          message: "I agree to the [Terms](https://cognitive-bridge-ai.web.app/terms) and I am 18 or older.",
-        },
-      },
     });
+    expect(seen && typeof seen === "object" && "custom_text" in seen).toBe(false);
+    expect(seen && typeof seen === "object" && "consent_collection" in seen).toBe(false);
     expect(store.sessions.get("cs_123")?.outcome).toBe("open");
     expect(store.consents).toEqual([{
       uid: "uid-1",
@@ -754,7 +748,8 @@ describe("createCheckout", () => {
     expect(details.branch).toBe("managedPayments off");
     expect(details.paramKeys).toEqual(Object.keys(seen ?? {}).sort());
     expect(details.paramKeys).toContain("customer_email");
-    expect(details.paramKeys).toContain("custom_text");
+    expect(details.paramKeys).not.toContain("custom_text");
+    expect(details.paramKeys).not.toContain("consent_collection");
     expect(details.paramKeys).not.toContain("automatic_tax");
     expect(details.stripe).toEqual({
       type: "StripeInvalidRequestError",
