@@ -10,6 +10,7 @@ import { Message, OceanScores } from '../types';
 import { MIRROR_SYSTEM_PROMPT } from '../constants';
 import { chatWithGeminiStream } from '../services/gemini';
 import { AiAccessError } from '../services/aiAccess';
+import { DEFAULT_MAX_MESSAGE_CHARS } from '../constants/aiAccess';
 import { AI_DISCLOSURE } from '../constants/paywallCopy';
 import { OceanJudgment } from '../jev/questions';
 import { judgeOcean } from '../services/jev';
@@ -144,6 +145,10 @@ export default function Mirror({ messages, setMessages, onComplete, onSaveSessio
   const handleSend = async () => {
     const draft = input;
     if (!draft.trim() || isLoading) return;
+    if (draft.length > DEFAULT_MAX_MESSAGE_CHARS) {
+      setAccessError(new AiAccessError('input_too_long'));
+      return;
+    }
 
     setAccessError(null);
     setIsLoading(true);

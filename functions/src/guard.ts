@@ -8,8 +8,10 @@ import {
   VerifiedUser,
   appCheckError,
   configFromEnv,
+  conversationTooLongError,
   inputCharCount,
   inputTooLongError,
+  latestUserCharCount,
   interviewsPausedError,
   isBridgeChatFeature,
   isInterviewFeature,
@@ -107,8 +109,14 @@ export async function guardChat(req: GuardRequest, deps: GuardDeps): Promise<Gua
   if (!isRequestableModel(requestedModel)) {
     throw new GateError(400, "bad_request", `Bad Request: Model '${requestedModel}' is not allowed.`);
   }
-  if (inputCharCount(body.messages, body.systemInstruction) > config.maxInputChars) {
+  // Per-message cap is only the latest user turn. The total cap is the
+  // whole request (system instruction plus every message) and uses a
+  // different code so a long interview is not "that message is too long".
+  if (latestUserCharCount(body.messages) > config.maxMessageChars) {
     throw inputTooLongError();
+  }
+  if (inputCharCount(body.messages, body.systemInstruction) > config.maxInputChars) {
+    throw conversationTooLongError();
   }
 
   // Allowlist skips entitlements only. The dollar cap applies to every signed-in uid.

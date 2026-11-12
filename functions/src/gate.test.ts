@@ -3,6 +3,7 @@ import { allowedCorsOrigins, isFunctionsEmulator, PRODUCTION_ORIGINS } from "./c
 import {
   configFromEnv,
   inputCharCount,
+  latestUserCharCount,
   isBridgeChatFeature,
   isInterviewFeature,
   nextBridgeUsage,
@@ -12,7 +13,7 @@ import {
   usEasternDay,
   GateError,
 } from "./gate";
-import { DEFAULT_BRIDGE_CHAT_DAILY_CAP, dailyCapMessage } from "./accessCopy";
+import { DEFAULT_BRIDGE_CHAT_DAILY_CAP, DEFAULT_MAX_INPUT_CHARS, DEFAULT_MAX_MESSAGE_CHARS, dailyCapMessage } from "./accessCopy";
 
 describe("gate config", () => {
   it("defaults to auth and ignores unknown modes", () => {
@@ -22,6 +23,10 @@ describe("gate config", () => {
       "You've reached today's chat limit (up to 50 messages a day). Chat opens again at midnight US Eastern. Your results are still here."
     );
     expect(configFromEnv({}).dailyUserCostCapUsd).toBe(1);
+    expect(configFromEnv({}).maxMessageChars).toBe(DEFAULT_MAX_MESSAGE_CHARS);
+    expect(configFromEnv({}).maxInputChars).toBe(DEFAULT_MAX_INPUT_CHARS);
+    expect(DEFAULT_MAX_MESSAGE_CHARS).toBe(4000);
+    expect(DEFAULT_MAX_INPUT_CHARS).toBe(400000);
     expect(parseGateMode(undefined)).toBe("auth");
     expect(parseGateMode("paid")).toBe("paid");
     expect(parseGateMode(" OFF ")).toBe("off");
@@ -35,6 +40,7 @@ describe("gate config", () => {
       ENFORCE_APP_CHECK: "true",
       INTERVIEWS_PAUSED: "false",
       BRIDGE_CHAT_DAILY_CAP: "12",
+      MAX_MESSAGE_CHARS: "50",
       MAX_INPUT_CHARS: "100",
     });
     expect(config.mode).toBe("paid");
@@ -42,6 +48,7 @@ describe("gate config", () => {
     expect(config.enforceAppCheck).toBe(true);
     expect(config.interviewsPaused).toBe(false);
     expect(config.bridgeDailyCap).toBe(12);
+    expect(config.maxMessageChars).toBe(50);
     expect(config.maxInputChars).toBe(100);
   });
 });
@@ -87,6 +94,13 @@ describe("request fields", () => {
       [{ content: "abcd" }, { content: "ef" }],
       "sys"
     )).toBe(9);
+    expect(latestUserCharCount([
+      { role: "user", content: "old" },
+      { role: "model", content: "a much longer model reply" },
+      { role: "user", content: "now" },
+    ])).toBe(3);
+    expect(latestUserCharCount([{ content: "plain" }])).toBe(5);
+    expect(latestUserCharCount([{ role: "model", content: "only the model" }])).toBe(0);
   });
 });
 

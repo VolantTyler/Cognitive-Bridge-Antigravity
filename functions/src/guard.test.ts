@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { guardChat, guardJudge, sanitizeReservationId, GuardDeps } from "./guard";
 import { GateError, configFromEnv } from "./gate";
-import { AI_ACCESS_MESSAGES, costCapMessage, dailyCapMessage } from "./accessCopy";
+import { AI_ACCESS_MESSAGES, DEFAULT_MAX_INPUT_CHARS, DEFAULT_MAX_MESSAGE_CHARS, costCapMessage, dailyCapMessage } from "./accessCopy";
+import { INITIAL_MIRROR_MESSAGE, MIRROR_SYSTEM_PROMPT } from "../../src/constants";
 
 const memory = vi.hoisted(() => ({
   store: new Map<string, Record<string, unknown>>(),
@@ -207,14 +208,20 @@ describe("guard modes", () => {
     expect(gate.reserveBridgeChat).not.toHaveBeenCalled();
   });
 
-  it("enforces the character cap and the bridge daily cap without counting interviews", async () => {
-    const gate = deps({ AI_GATE_MODE: "auth", BRIDGE_CHAT_DAILY_CAP: "1", MAX_INPUT_CHARS: "5" });
+  it("enforces the per-message cap and the bridge daily cap without counting interviews", async () => {
+    const gate = deps({ AI_GATE_MODE: "auth", BRIDGE_CHAT_DAILY_CAP: "1", MAX_MESSAGE_CHARS: "5" });
     await expect(guardChat({
       method: "POST",
       headers: { authorization: "Bearer token" },
       body: { messages: [{ content: "123456" }], feature: "bridge" },
-    }, gate)).rejects.toMatchObject({ status: 429, code: "input_too_long" });
+    }, gate)).rejects.toMatchObject({
+      status: 429,
+      code: "input_too_long",
+      message: AI_ACCESS_MESSAGES.input_too_long,
+    });
     expect(gate.reserveBridgeChat).not.toHaveBeenCalled();
+    expect(gate.reserveInterview).not.toHaveBeenCalled();
+    expect(gate.assertUnderCostCap).not.toHaveBeenCalled();
 
     const roomy = deps({ AI_GATE_MODE: "auth", BRIDGE_CHAT_DAILY_CAP: "1" });
     await guardChat({
@@ -236,6 +243,92 @@ describe("guard modes", () => {
     }, interview);
     expect(interview.reserveBridgeChat).not.toHaveBeenCalled();
     expect(interview.reserveInterview).toHaveBeenCalledWith("user-1", "mirror");
+  });
+
+  it("lets four long Mirror turns through and rejects one oversized message or an oversized thread", async () => {
+    const answer = "a".repeat(DEFAULT_MAX_MESSAGE_CHARS);
+    const reply = "m".repeat(2500);
+    const messages: Array<{ role: string; content: string }> = [
+      { role: "model", content: INITIAL_MIRROR_MESSAGE },
+    ];
+    for (let turn = 0; turn < 4; turn += 1) {
+      messages.push({ role: "user", content: answer });
+      if (turn < 3) messages.push({ role: "model", content: reply });
+    }
+    const total = MIRROR_SYSTEM_PROMPT.length + messages.reduce((sum, message) => sum + message.content.length, 0);
+    expect(total).toBeGreaterThan(8000);
+    expect(total).toBeLessThan(DEFAULT_MAX_INPUT_CHARS);
+
+    const gate = deps({ AI_GATE_MODE: "auth" });
+    await expect(guardChat({
+      method: "POST",
+      headers: { authorization: "Bearer token" },
+      body: {
+        messages,
+        systemInstruction: MIRROR_SYSTEM_PROMPT,
+        feature: "mirror",
+      },
+    }, gate)).resolves.toMatchObject({ feature: "mirror", uid: "user-1" });
+
+    const fifth = [
+      ...messages,
+      { role: "model", content: reply },
+      { role: "user", content: answer },
+    ];
+    await expect(guardChat({
+      method: "POST",
+      headers: { authorization: "Bearer token" },
+      body: {
+        messages: fifth,
+        systemInstruction: MIRROR_SYSTEM_PROMPT,
+        feature: "mirror",
+      },
+    }, gate)).resolves.toMatchObject({ uid: "user-1" });
+
+    const oversizedMessage = deps({ AI_GATE_MODE: "auth" });
+    await expect(guardChat({
+      method: "POST",
+      headers: { authorization: "Bearer token" },
+      body: {
+        messages: [
+          { role: "user", content: "short" },
+          { role: "model", content: reply },
+          { role: "user", content: "z".repeat(DEFAULT_MAX_MESSAGE_CHARS + 1) },
+        ],
+        systemInstruction: MIRROR_SYSTEM_PROMPT,
+        feature: "mirror",
+      },
+    }, oversizedMessage)).rejects.toMatchObject({
+      status: 429,
+      code: "input_too_long",
+      message: AI_ACCESS_MESSAGES.input_too_long,
+    });
+    expect(oversizedMessage.reserveInterview).not.toHaveBeenCalled();
+    expect(oversizedMessage.assertUnderCostCap).not.toHaveBeenCalled();
+
+    const packed = "u".repeat(DEFAULT_MAX_MESSAGE_CHARS);
+    const tooMany = Array.from({ length: Math.floor(DEFAULT_MAX_INPUT_CHARS / DEFAULT_MAX_MESSAGE_CHARS) + 1 }, () => ({
+      role: "user",
+      content: packed,
+    }));
+    const oversizedThread = deps({ AI_GATE_MODE: "auth" });
+    await expect(guardChat({
+      method: "POST",
+      headers: { authorization: "Bearer token" },
+      body: {
+        messages: tooMany,
+        systemInstruction: "x",
+        feature: "bridge",
+      },
+    }, oversizedThread)).rejects.toMatchObject({
+      status: 429,
+      code: "conversation_too_long",
+      message: AI_ACCESS_MESSAGES.conversation_too_long,
+    });
+    expect(oversizedThread.reserveBridgeChat).not.toHaveBeenCalled();
+    expect(oversizedThread.reserveInterview).not.toHaveBeenCalled();
+    expect(oversizedThread.assertUnderCostCap).not.toHaveBeenCalled();
+    expect(AI_ACCESS_MESSAGES.conversation_too_long).not.toBe(AI_ACCESS_MESSAGES.input_too_long);
   });
 
   it("pauses interview features with 503 and can require App Check", async () => {

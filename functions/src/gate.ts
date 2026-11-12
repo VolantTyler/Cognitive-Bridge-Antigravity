@@ -3,6 +3,7 @@ import {
   DEFAULT_BRIDGE_CHAT_DAILY_CAP,
   DEFAULT_DAILY_USER_COST_CAP_USD,
   DEFAULT_MAX_INPUT_CHARS,
+  DEFAULT_MAX_MESSAGE_CHARS,
   dailyCapMessage,
   AI_ACCESS_MESSAGES,
 } from "./accessCopy";
@@ -33,6 +34,9 @@ export interface GateConfig {
   enforceAppCheck: boolean;
   interviewsPaused: boolean;
   bridgeDailyCap: number;
+  /** Latest user message only. See DEFAULT_MAX_MESSAGE_CHARS. */
+  maxMessageChars: number;
+  /** System instruction plus every message. See DEFAULT_MAX_INPUT_CHARS. */
   maxInputChars: number;
   dailyUserCostCapUsd: number;
 }
@@ -91,6 +95,7 @@ export function configFromEnv(env: NodeJS.ProcessEnv = process.env): GateConfig 
     enforceAppCheck: parseFlag(env.ENFORCE_APP_CHECK, false),
     interviewsPaused: parseFlag(env.INTERVIEWS_PAUSED, false),
     bridgeDailyCap: parsePositiveInt(env.BRIDGE_CHAT_DAILY_CAP, DEFAULT_BRIDGE_CHAT_DAILY_CAP),
+    maxMessageChars: parsePositiveInt(env.MAX_MESSAGE_CHARS, DEFAULT_MAX_MESSAGE_CHARS),
     maxInputChars: parsePositiveInt(env.MAX_INPUT_CHARS, DEFAULT_MAX_INPUT_CHARS),
     dailyUserCostCapUsd: parsePositiveUsd(env.DAILY_USER_COST_CAP_USD, DEFAULT_DAILY_USER_COST_CAP_USD),
   };
@@ -142,6 +147,29 @@ export function inputCharCount(messages: unknown, systemInstruction: unknown): n
   return total;
 }
 
+function isModelRole(role: unknown): boolean {
+  if (typeof role !== "string") return false;
+  const value = role.trim().toLowerCase();
+  return value === "model" || value === "assistant" || value === "system";
+}
+
+/**
+ * Characters in the latest user message. Model turns are skipped.
+ * A message with no role counts as the user's, which is how older
+ * callers send a single turn.
+ */
+export function latestUserCharCount(messages: unknown): number {
+  if (!Array.isArray(messages)) return 0;
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (!message || typeof message !== "object") continue;
+    const record = message as { role?: unknown; content?: unknown };
+    if (isModelRole(record.role)) continue;
+    return typeof record.content === "string" ? record.content.length : 0;
+  }
+  return 0;
+}
+
 export interface BridgeUsageBucket {
   day?: unknown;
   count?: unknown;
@@ -188,6 +216,10 @@ export function paymentRequiredError(): GateError {
 
 export function inputTooLongError(): GateError {
   return new GateError(429, "input_too_long", AI_ACCESS_MESSAGES.input_too_long);
+}
+
+export function conversationTooLongError(): GateError {
+  return new GateError(429, "conversation_too_long", AI_ACCESS_MESSAGES.conversation_too_long);
 }
 
 export function interviewsPausedError(): GateError {

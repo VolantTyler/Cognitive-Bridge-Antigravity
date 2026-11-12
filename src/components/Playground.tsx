@@ -11,7 +11,7 @@ import { generateAlignmentPrompt, generateInverseAlignmentPrompt, RESEARCH_FRAMI
 import { chatWithGeminiStream, DEFAULT_GEMINI_MODEL } from '../services/gemini';
 import { AiAccessError } from '../services/aiAccess';
 import { CHAT_PAUSED_PLACEHOLDER } from '../constants/paywallCopy';
-import { AI_ACCESS_MESSAGES } from '../constants/aiAccess';
+import { AI_ACCESS_MESSAGES, DEFAULT_MAX_MESSAGE_CHARS } from '../constants/aiAccess';
 import { logProductEvent } from '../services/productAnalytics';
 import { AlignmentJudgment } from '../jev/questions';
 import { judgeAlignment } from '../services/jev';
@@ -357,6 +357,10 @@ export default function Playground({
   const submitPrompt = async (rawPrompt: string, options?: { scoresOverride?: OceanScores }) => {
     const userPrompt = rawPrompt.trim();
     if (!userPrompt || isLoading) return;
+    if (userPrompt.length > DEFAULT_MAX_MESSAGE_CHARS) {
+      setAccessError(new AiAccessError('input_too_long'));
+      return;
+    }
 
     const snapshot = input;
     setAccessError(null);

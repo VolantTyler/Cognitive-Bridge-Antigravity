@@ -104,8 +104,14 @@ async function guardChat(req, deps) {
     if (!(0, modelRouter_1.isRequestableModel)(requestedModel)) {
         throw new gate_1.GateError(400, "bad_request", `Bad Request: Model '${requestedModel}' is not allowed.`);
     }
-    if ((0, gate_1.inputCharCount)(body.messages, body.systemInstruction) > config.maxInputChars) {
+    // Per-message cap is only the latest user turn. The total cap is the
+    // whole request (system instruction plus every message) and uses a
+    // different code so a long interview is not "that message is too long".
+    if ((0, gate_1.latestUserCharCount)(body.messages) > config.maxMessageChars) {
         throw (0, gate_1.inputTooLongError)();
+    }
+    if ((0, gate_1.inputCharCount)(body.messages, body.systemInstruction) > config.maxInputChars) {
+        throw (0, gate_1.conversationTooLongError)();
     }
     // Allowlist skips entitlements only. The dollar cap applies to every signed-in uid.
     if (user) {
