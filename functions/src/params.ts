@@ -3,6 +3,7 @@ import {
   DEFAULT_BRIDGE_CHAT_DAILY_CAP,
   DEFAULT_DAILY_USER_COST_CAP_USD,
   DEFAULT_MAX_INPUT_CHARS,
+  DEFAULT_MAX_MESSAGE_CHARS,
 } from "./accessCopy";
 import { GateConfig, configFromEnv } from "./gate";
 
@@ -38,9 +39,16 @@ const dailyUserCostCapUsd = defineString("DAILY_USER_COST_CAP_USD", {
   description: "Max estimated USD per uid per US Eastern day. Default 1.00. Placeholder prices; retune after test interviews. Not shown to users.",
 });
 
+const maxMessageChars = defineInt("MAX_MESSAGE_CHARS", {
+  default: DEFAULT_MAX_MESSAGE_CHARS,
+  description: "Max characters in the latest user message. Earlier turns are not counted. Over the cap, chat returns input_too_long.",
+});
+
+// Total request size, not the per-message limit. A full Mirror interview
+// plus a Bridge thread needs far more than one user message.
 const maxInputChars = defineInt("MAX_INPUT_CHARS", {
   default: DEFAULT_MAX_INPUT_CHARS,
-  description: "Max combined input characters per chat request.",
+  description: "Max characters in one chat request: system instruction plus every message. Over the cap, chat returns conversation_too_long.",
 });
 
 function paramOrEnv(envValue: string | undefined, read: () => string): string | undefined {
@@ -68,6 +76,7 @@ export function loadGateConfig(env: NodeJS.ProcessEnv = process.env): GateConfig
       env.DAILY_USER_COST_CAP_USD,
       () => dailyUserCostCapUsd.value()
     ),
+    MAX_MESSAGE_CHARS: paramOrEnv(env.MAX_MESSAGE_CHARS, () => String(maxMessageChars.value())),
     MAX_INPUT_CHARS: paramOrEnv(env.MAX_INPUT_CHARS, () => String(maxInputChars.value())),
   });
 }

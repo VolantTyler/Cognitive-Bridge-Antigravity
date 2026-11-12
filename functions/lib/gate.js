@@ -10,11 +10,13 @@ exports.sanitizeSessionId = sanitizeSessionId;
 exports.isBridgeChatFeature = isBridgeChatFeature;
 exports.isInterviewFeature = isInterviewFeature;
 exports.inputCharCount = inputCharCount;
+exports.latestUserCharCount = latestUserCharCount;
 exports.nextBridgeUsage = nextBridgeUsage;
 exports.unauthenticatedError = unauthenticatedError;
 exports.sessionExpiredError = sessionExpiredError;
 exports.paymentRequiredError = paymentRequiredError;
 exports.inputTooLongError = inputTooLongError;
+exports.conversationTooLongError = conversationTooLongError;
 exports.interviewsPausedError = interviewsPausedError;
 exports.appCheckError = appCheckError;
 exports.readHeader = readHeader;
@@ -86,6 +88,7 @@ function configFromEnv(env = process.env) {
         enforceAppCheck: parseFlag(env.ENFORCE_APP_CHECK, false),
         interviewsPaused: parseFlag(env.INTERVIEWS_PAUSED, false),
         bridgeDailyCap: parsePositiveInt(env.BRIDGE_CHAT_DAILY_CAP, accessCopy_1.DEFAULT_BRIDGE_CHAT_DAILY_CAP),
+        maxMessageChars: parsePositiveInt(env.MAX_MESSAGE_CHARS, accessCopy_1.DEFAULT_MAX_MESSAGE_CHARS),
         maxInputChars: parsePositiveInt(env.MAX_INPUT_CHARS, accessCopy_1.DEFAULT_MAX_INPUT_CHARS),
         dailyUserCostCapUsd: parsePositiveUsd(env.DAILY_USER_COST_CAP_USD, accessCopy_1.DEFAULT_DAILY_USER_COST_CAP_USD),
     };
@@ -137,6 +140,31 @@ function inputCharCount(messages, systemInstruction) {
     }
     return total;
 }
+function isModelRole(role) {
+    if (typeof role !== "string")
+        return false;
+    const value = role.trim().toLowerCase();
+    return value === "model" || value === "assistant" || value === "system";
+}
+/**
+ * Characters in the latest user message. Model turns are skipped.
+ * A message with no role counts as the user's, which is how older
+ * callers send a single turn.
+ */
+function latestUserCharCount(messages) {
+    if (!Array.isArray(messages))
+        return 0;
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+        const message = messages[index];
+        if (!message || typeof message !== "object")
+            continue;
+        const record = message;
+        if (isModelRole(record.role))
+            continue;
+        return typeof record.content === "string" ? record.content.length : 0;
+    }
+    return 0;
+}
 /**
  * Cap unit is one chatProxy request, not one user message.
  *
@@ -170,6 +198,9 @@ function paymentRequiredError() {
 }
 function inputTooLongError() {
     return new GateError(429, "input_too_long", accessCopy_1.AI_ACCESS_MESSAGES.input_too_long);
+}
+function conversationTooLongError() {
+    return new GateError(429, "conversation_too_long", accessCopy_1.AI_ACCESS_MESSAGES.conversation_too_long);
 }
 function interviewsPausedError() {
     return new GateError(503, "interviews_paused", accessCopy_1.AI_ACCESS_MESSAGES.interviews_paused);

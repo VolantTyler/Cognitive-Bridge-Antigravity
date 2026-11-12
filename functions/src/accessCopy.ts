@@ -20,7 +20,28 @@ export const CHAT_CAP_RESET_LABEL = "midnight US Eastern";
  */
 export const BRIDGE_CHAT_DAILY_MESSAGE_COPY = 50;
 export const DEFAULT_BRIDGE_CHAT_DAILY_CAP = 100;
-export const DEFAULT_MAX_INPUT_CHARS = 8000;
+/**
+ * Latest user message only. Earlier turns are not counted.
+ * This is what "That message is too long" means.
+ */
+export const DEFAULT_MAX_MESSAGE_CHARS = 4000;
+/**
+ * Whole chat request: system instruction plus every message.
+ * Separate from DEFAULT_MAX_MESSAGE_CHARS. Over the cap, the
+ * server returns conversation_too_long, not input_too_long.
+ *
+ * Measured 2026-11-12. Mirror 5th-answer request:
+ *   MIRROR_SYSTEM_PROMPT 2,762 + INITIAL_MIRROR_MESSAGE 410
+ *   + four question replies at 2,500 (replies in agent_test_report.md
+ *     run about 1,800–2,800) + five answers at the per-message cap
+ *   = 33,172
+ * Bridge turn 50 is the existing daily cap. Same per-message cap,
+ * 2,500-character replies, and the longest alignment prompt (~2,200):
+ *   = about 325,000
+ * 400,000 covers that full day with headroom. It is not the
+ * per-message limit.
+ */
+export const DEFAULT_MAX_INPUT_CHARS = 400000;
 /** Placeholder launch cap. Retune after the 10–20 test interviews. Not shown to users. */
 export const DEFAULT_DAILY_USER_COST_CAP_USD = 1;
 
@@ -31,6 +52,7 @@ export const AI_ACCESS_CODES = {
   dailyCap: "daily_cap",
   costCap: "cost_cap",
   inputTooLong: "input_too_long",
+  conversationTooLong: "conversation_too_long",
   interviewsPaused: "interviews_paused",
   interviewsExhausted: "interviews_exhausted",
   appCheck: "app_check",
@@ -59,6 +81,7 @@ export const AI_ACCESS_MESSAGES: Record<AiAccessCode, string> = {
   daily_cap: dailyCapMessage(),
   cost_cap: costCapMessage(),
   input_too_long: "That message is too long. Try a shorter one.",
+  conversation_too_long: "This conversation is too long to continue. Start a new chat to keep going. Your results are still here.",
   interviews_paused: "New interviews are paused for now. Your results are still available if you're signed in.",
   interviews_exhausted: "You've used both interviews included with your purchase. Your results stay available. Each account can buy once.",
   app_check: "We couldn't connect just now. Refresh the page and try again.",
@@ -72,6 +95,7 @@ export const SERVER_ACCESS_CODES = {
   rateLimited: "rate_limited",
   costCapReached: "cost_cap_reached",
   inputTooLong: "input_too_long",
+  conversationTooLong: "conversation_too_long",
   interviewsPaused: "interviews_paused",
   interviewsExhausted: "interviews_exhausted",
   appCheck: "app_check",
@@ -86,6 +110,7 @@ export const SERVER_CODE_TO_CLIENT: Record<ServerAccessCode, AiAccessCode> = {
   rate_limited: "daily_cap",
   cost_cap_reached: "cost_cap",
   input_too_long: "input_too_long",
+  conversation_too_long: "conversation_too_long",
   interviews_paused: "interviews_paused",
   interviews_exhausted: "interviews_exhausted",
   app_check: "app_check",

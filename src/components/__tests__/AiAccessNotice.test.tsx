@@ -4,13 +4,16 @@ import { describe, expect, it, vi } from 'vitest';
 import Mirror from '../Mirror';
 import Playground from '../Playground';
 import { ComparisonMessage, OceanScores } from '../../types';
-import { AI_ACCESS_MESSAGES } from '../../constants/aiAccess';
+import { AI_ACCESS_MESSAGES, DEFAULT_MAX_MESSAGE_CHARS } from '../../constants/aiAccess';
+
+const streamCalls = vi.hoisted(() => ({ count: 0 }));
 
 vi.mock('../../services/gemini', async () => {
   const { AiAccessError } = await import('../../services/aiAccess');
   return {
     DEFAULT_GEMINI_MODEL: 'gemini-test',
     chatWithGeminiStream: async function* () {
+      streamCalls.count += 1;
       throw new AiAccessError('signed_out');
     },
   };
@@ -63,6 +66,26 @@ describe('locked AI responses', () => {
     expect(setMessages).not.toHaveBeenCalled();
   });
 
+  it('blocks a Mirror answer over the per-message cap before calling the model', async () => {
+    streamCalls.count = 0;
+    render(
+      <Mirror
+        messages={[{ role: 'model', content: 'Welcome.' }]}
+        setMessages={vi.fn()}
+        onComplete={vi.fn()}
+      />
+    );
+    const input = screen.getByPlaceholderText(/Respond to the scenario/i);
+    fireEvent.change(input, { target: { value: 'x'.repeat(DEFAULT_MAX_MESSAGE_CHARS + 1) } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send response' }));
+
+    const notice = await screen.findByRole('status');
+    expect(notice).toHaveAttribute('data-ai-access', 'input_too_long');
+    expect(notice).toHaveTextContent(AI_ACCESS_MESSAGES.input_too_long);
+    expect(input).toHaveValue('x'.repeat(DEFAULT_MAX_MESSAGE_CHARS + 1));
+    expect(streamCalls.count).toBe(0);
+  });
+
   it('keeps a Bridge draft in the input when the request is rejected', async () => {
     render(<BridgeHarness />);
     const input = screen.getByPlaceholderText(/Ask a question to compare/i);
@@ -76,6 +99,22 @@ describe('locked AI responses', () => {
       expect(input).toHaveValue('Where should we go?');
       expect(screen.getByRole('button', { name: /Ask your first question/i })).toBeInTheDocument();
     });
+    expect(screen.queryByRole('button', { name: 'Delete conversation' })).not.toBeInTheDocument();
+  });
+
+  it('blocks a Bridge prompt over the per-message cap and keeps the draft', async () => {
+    streamCalls.count = 0;
+    render(<BridgeHarness />);
+    const input = screen.getByPlaceholderText(/Ask a question to compare/i);
+    const tooLong = 'y'.repeat(DEFAULT_MAX_MESSAGE_CHARS + 1);
+    fireEvent.change(input, { target: { value: tooLong } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send prompt' }));
+
+    const notice = await screen.findByRole('status');
+    expect(notice).toHaveAttribute('data-ai-access', 'input_too_long');
+    expect(notice).toHaveTextContent(AI_ACCESS_MESSAGES.input_too_long);
+    expect(input).toHaveValue(tooLong);
+    expect(streamCalls.count).toBe(0);
     expect(screen.queryByRole('button', { name: 'Delete conversation' })).not.toBeInTheDocument();
   });
 });
