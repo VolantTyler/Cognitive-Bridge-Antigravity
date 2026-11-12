@@ -3,6 +3,7 @@ import { costMicrosForUsage } from "./pricing";
 export interface UsageMetadata {
   promptTokenCount?: number;
   candidatesTokenCount?: number;
+  thoughtsTokenCount?: number;
   totalTokenCount?: number;
 }
 
@@ -13,7 +14,13 @@ export interface UsageRecord {
   feature: string;
   model: string;
   promptTokens: number;
+  /** Candidate tokens plus thinking tokens. Thinking is billed as output. */
   completionTokens: number;
+  thoughtsTokenCount: number;
+  /** Budget sent on this call. Null when thinkingConfig was not set. */
+  thinkingBudget: number | null;
+  /** True when the client disconnected before the model stream finished. */
+  aborted: boolean;
   costMicros: number;
   ts?: unknown;
 }
@@ -25,6 +32,9 @@ export interface UsageLogLine {
   model: string;
   promptTokens: number;
   completionTokens: number;
+  thoughtsTokenCount: number;
+  thinkingBudget: number | null;
+  aborted: boolean;
   costMicros: number;
 }
 
@@ -36,6 +46,9 @@ const USAGE_FIELDS = [
   "model",
   "promptTokens",
   "completionTokens",
+  "thoughtsTokenCount",
+  "thinkingBudget",
+  "aborted",
   "costMicros",
   "ts",
 ] as const;
@@ -51,16 +64,23 @@ export function usageFromChunks(chunks: Array<{
 } | null | undefined>): {
   promptTokens: number;
   completionTokens: number;
+  thoughtsTokenCount: number;
 } {
   let promptTokens = 0;
-  let completionTokens = 0;
+  let candidates = 0;
+  let thoughtsTokenCount = 0;
   for (const chunk of chunks) {
     const meta = chunk?.usageMetadata;
     if (!meta) continue;
     promptTokens = tokenCount(meta.promptTokenCount);
-    completionTokens = tokenCount(meta.candidatesTokenCount);
+    candidates = tokenCount(meta.candidatesTokenCount);
+    thoughtsTokenCount = tokenCount(meta.thoughtsTokenCount);
   }
-  return { promptTokens, completionTokens };
+  return {
+    promptTokens,
+    thoughtsTokenCount,
+    completionTokens: candidates + thoughtsTokenCount,
+  };
 }
 
 export function buildUsageRecord(input: {
@@ -71,10 +91,17 @@ export function buildUsageRecord(input: {
   model: string;
   promptTokens: number;
   completionTokens: number;
+  thoughtsTokenCount?: number;
+  thinkingBudget?: number | null;
+  aborted?: boolean;
   ts?: unknown;
 }): UsageRecord {
   const promptTokens = tokenCount(input.promptTokens);
   const completionTokens = tokenCount(input.completionTokens);
+  const thoughtsTokenCount = tokenCount(input.thoughtsTokenCount);
+  const thinkingBudget = typeof input.thinkingBudget === "number" && Number.isFinite(input.thinkingBudget)
+    ? Math.min(8192, Math.max(0, Math.floor(input.thinkingBudget)))
+    : null;
   const record: UsageRecord = {
     uid: input.uid,
     sessionId: input.sessionId,
@@ -83,6 +110,9 @@ export function buildUsageRecord(input: {
     model: input.model,
     promptTokens,
     completionTokens,
+    thoughtsTokenCount,
+    thinkingBudget,
+    aborted: input.aborted === true,
     costMicros: costMicrosForUsage({
       model: input.model,
       promptTokens,
@@ -107,6 +137,11 @@ export function usageLogLine(record: UsageRecord): UsageLogLine {
     model: record.model,
     promptTokens: tokenCount(record.promptTokens),
     completionTokens: tokenCount(record.completionTokens),
+    thoughtsTokenCount: tokenCount(record.thoughtsTokenCount),
+    thinkingBudget: typeof record.thinkingBudget === "number" && Number.isFinite(record.thinkingBudget)
+      ? Math.max(0, Math.floor(record.thinkingBudget))
+      : null,
+    aborted: record.aborted === true,
     costMicros,
   };
 }

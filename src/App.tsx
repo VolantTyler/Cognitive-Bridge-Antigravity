@@ -53,6 +53,8 @@ export default function App() {
   const [checkoutBusy, setCheckoutBusy] = useState(false);
   const purchaseIntent = useRef(false);
   const loggedEvents = useRef(new Set<string>());
+  const completeInFlight = useRef(false);
+  const [completePending, setCompletePending] = useState(false);
   const [activeModule, setActiveModule] = useState<ModuleId>('mirror');
   const [scores, setScores] = useState<OceanScores | null>(null);
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
@@ -215,25 +217,33 @@ export default function App() {
   };
 
   const handleMirrorComplete = async (newScores: OceanScores) => {
-    if (access?.paid) {
-      try {
-        const result = await completeInterview(readStoredReservation());
-        if (result.newlyCompleted) logProductEvent('interview_completed');
-        setAccess((prev) => prev ? {
-          ...prev,
-          interviewsCompleted: result.completed,
-          interviewsRemaining: result.remaining,
-          inProgress: false,
-        } : prev);
-      } catch (error) {
-        console.error('Interview complete failed:', error);
-        setFlowAlert(ENTITLEMENT_FAILED);
-        return;
+    if (completeInFlight.current) return;
+    completeInFlight.current = true;
+    setCompletePending(true);
+    try {
+      if (access?.paid) {
+        try {
+          const result = await completeInterview(readStoredReservation());
+          if (result.newlyCompleted) logProductEvent('interview_completed');
+          setAccess((prev) => prev ? {
+            ...prev,
+            interviewsCompleted: result.completed,
+            interviewsRemaining: result.remaining,
+            inProgress: false,
+          } : prev);
+        } catch (error) {
+          console.error('Interview complete failed:', error);
+          setFlowAlert(ENTITLEMENT_FAILED);
+          return;
+        }
       }
+      setScores(newScores);
+      setActiveModule('tailor');
+      saveToCloud(newScores, mirrorMessages, playgroundMessages, 'tailor');
+    } finally {
+      completeInFlight.current = false;
+      setCompletePending(false);
     }
-    setScores(newScores);
-    setActiveModule('tailor');
-    saveToCloud(newScores, mirrorMessages, playgroundMessages, 'tailor');
   };
 
   const retakeDraftOpen = !shouldPersistInterviewDraft({
@@ -611,6 +621,7 @@ export default function App() {
                     setMessages={setMirrorMessages}
                     onComplete={handleMirrorComplete}
                     onSaveSession={handleMirrorSave}
+                    completePending={completePending}
                   />
                 ) : interviewsExhausted ? (
                   <InterviewsExhausted onViewResults={() => setActiveModule(scores ? 'tailor' : 'mirror')} />

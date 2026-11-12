@@ -23,6 +23,14 @@ vi.mock('../../services/firebase', () => ({
 const dialogue: Message[] = [
   { role: 'model', content: 'A teammate falls sick before launch. What do you do?' },
   { role: 'user', content: 'I would take the night shift so they can recover.' },
+  { role: 'model', content: 'Next scenario.' },
+  { role: 'user', content: 'I say the plan will fail and offer a smaller trial.' },
+  { role: 'model', content: 'Next scenario.' },
+  { role: 'user', content: 'I work alone and send the result at the end.' },
+  { role: 'model', content: 'Next scenario.' },
+  { role: 'user', content: 'I keep the stable tool and say why.' },
+  { role: 'model', content: 'Next scenario.' },
+  { role: 'user', content: 'I shut down and check on my teammate.' },
   {
     role: 'model',
     content: `Mapping complete.\nJSON_SCORES:\n${JSON.stringify({

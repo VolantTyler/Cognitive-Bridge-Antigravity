@@ -61,6 +61,9 @@ describe("support email", () => {
         "STRIPE_MANAGED_PAYMENTS=false",
         "STRIPE_AUTOMATIC_TAX=false",
         "LEGACY_ACCESS_CUTOFF=2026-11-09T19:00:00.000Z",
+        "# Mirror scoring turn only (the reply after the 5th answer). 0 turns thinking off.",
+        "# Clamped to 0..8192. Question turns always use budget 0.",
+        "MIRROR_FINAL_THINKING_BUDGET=1024",
         "",
       ].join("\n")
     );
