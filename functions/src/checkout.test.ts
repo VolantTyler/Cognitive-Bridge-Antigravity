@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import Stripe from "stripe";
 import {
   CHECKOUT_CONSENT_REQUIRED,
   TERMS_VERSION,
@@ -18,6 +19,7 @@ import {
   handleCheckoutStatus,
   handleCreateCheckout,
   handleStripeWebhook,
+  productionCheckoutLogger,
   CheckoutHttpDeps,
 } from "./checkoutHttp";
 import {
@@ -694,6 +696,371 @@ describe("createCheckout", () => {
     expect(res.code).toBe(503);
     expect(res.body).toMatchObject({ code: "test_mode_only" });
     expect(createSession).not.toHaveBeenCalled();
+  });
+
+  const openFailed = "Couldn't open checkout. You haven't been charged.";
+
+  function consentedPost() {
+    return {
+      method: "POST" as const,
+      headers: { authorization: "Bearer token" },
+      body: { termsAccepted: true, termsVersion: TERMS_VERSION },
+    };
+  }
+
+  function secretFree(serialized: string) {
+    expect(serialized).not.toContain("ada@example.com");
+    expect(serialized).not.toContain("price_from_env");
+    expect(serialized).not.toContain("uid-1");
+    expect(serialized).not.toContain("secret-canary");
+    expect(serialized).not.toContain("pm_secret");
+    expect(serialized).not.toContain("4242424242424242");
+    expect(serialized).not.toContain("cognitive-bridge-ai.web.app");
+  }
+
+  it("logs a Stripe invalid request without secrets and returns stripe_invalid_request", async () => {
+    const store = new MemoryStore();
+    const logs = logger();
+    let seen: Record<string, unknown> | undefined;
+    const stripeError = new Stripe.errors.StripeInvalidRequestError({
+      message: "Invalid request",
+      type: "invalid_request_error",
+      code: "resource_missing",
+      param: "line_items[0][price]",
+      statusCode: 400,
+      requestId: "req_test_123",
+      headers: { Authorization: "Bearer secret-canary" },
+      payment_method: { id: "pm_secret" } as never,
+    });
+    Object.assign(stripeError, { rawCard: "4242424242424242" });
+    const res = jsonRes();
+    await handleCreateCheckout(consentedPost(), res, deps(store, {
+      logger: logs,
+      gateway: () => ({
+        createSession: async (params) => {
+          seen = params as unknown as Record<string, unknown>;
+          throw stripeError;
+        },
+        refundNonUs: async () => undefined,
+        retrieveSession: async () => null,
+        findSucceededSessionIds: async () => [],
+      }),
+    }));
+    expect(res.code).toBe(502);
+    expect(res.body).toEqual({ error: openFailed, code: "stripe_invalid_request" });
+    expect(logs.error).toHaveBeenCalledTimes(1);
+    const details = logs.error.mock.calls[0][1] as Record<string, unknown>;
+    expect(logs.error.mock.calls[0][0]).toBe("createCheckout failed");
+    expect(details.branch).toBe("managedPayments off");
+    expect(details.paramKeys).toEqual(Object.keys(seen ?? {}).sort());
+    expect(details.paramKeys).toContain("customer_email");
+    expect(details.paramKeys).toContain("custom_text");
+    expect(details.paramKeys).not.toContain("automatic_tax");
+    expect(details.stripe).toEqual({
+      type: "StripeInvalidRequestError",
+      code: "resource_missing",
+      param: "line_items[0][price]",
+      statusCode: 400,
+      message: "Invalid request",
+      requestId: "req_test_123",
+    });
+    expect(details.stripe).not.toHaveProperty("decline_code");
+    expect(details).not.toHaveProperty("error");
+    secretFree(JSON.stringify(details));
+    secretFree(JSON.stringify(res.body));
+    expect(JSON.stringify(res.body)).not.toContain("resource_missing");
+    expect(JSON.stringify(res.body)).not.toContain("req_test_123");
+    expect(store.consents).toEqual([]);
+    expect(store.sessions.size).toBe(0);
+  });
+
+  it("maps Stripe error types to short codes and logs decline_code only when set", async () => {
+    const cases: Array<{ error: unknown; code: string; decline?: string }> = [
+      {
+        error: new Stripe.errors.StripeCardError({
+          message: "Your card was declined",
+          type: "card_error",
+          code: "card_declined",
+          decline_code: "insufficient_funds",
+          statusCode: 402,
+          requestId: "req_card",
+        }),
+        code: "stripe_card",
+        decline: "insufficient_funds",
+      },
+      {
+        error: new Stripe.errors.StripeCardError({
+          message: "Card error",
+          type: "card_error",
+          code: "card_declined",
+          statusCode: 402,
+          requestId: "req_card_bare",
+        }),
+        code: "stripe_card",
+      },
+      {
+        error: new Stripe.errors.StripeRateLimitError({
+          message: "Too many requests",
+          type: "rate_limit_error",
+          statusCode: 429,
+          requestId: "req_rate",
+        }),
+        code: "stripe_rate_limit",
+      },
+      {
+        error: new Stripe.errors.StripeAuthenticationError({
+          message: "Invalid API key",
+          type: "authentication_error",
+          statusCode: 401,
+          requestId: "req_auth",
+        }),
+        code: "stripe_authentication",
+      },
+      {
+        error: new Stripe.errors.StripeAPIError({
+          message: "Stripe unavailable",
+          type: "api_error",
+          statusCode: 500,
+          requestId: "req_api",
+        }),
+        code: "stripe_api",
+      },
+      {
+        error: new Stripe.errors.StripeConnectionError({ message: "Network down" }),
+        code: "stripe_connection",
+      },
+      {
+        error: new Stripe.errors.StripeIdempotencyError({
+          message: "Keys differ",
+          type: "idempotency_error",
+          statusCode: 400,
+          requestId: "req_idem",
+        }),
+        code: "stripe_idempotency",
+      },
+      {
+        error: new Stripe.errors.StripePermissionError({
+          message: "Not allowed",
+          statusCode: 403,
+          requestId: "req_perm",
+        }),
+        code: "stripe_permission",
+      },
+      {
+        error: Object.assign(new Error("future"), {
+          type: "StripeFutureError",
+          raw: { apiKey: "secret-canary" },
+        }),
+        code: "stripe_error",
+      },
+    ];
+
+    for (const item of cases) {
+      const store = new MemoryStore();
+      const logs = logger();
+      const res = jsonRes();
+      await handleCreateCheckout(consentedPost(), res, deps(store, {
+        logger: logs,
+        gateway: () => ({
+          createSession: async () => {
+            throw item.error;
+          },
+          refundNonUs: async () => undefined,
+          retrieveSession: async () => null,
+          findSucceededSessionIds: async () => [],
+        }),
+      }));
+      expect(res.code).toBe(502);
+      expect(res.body).toEqual({ error: openFailed, code: item.code });
+      const details = logs.error.mock.calls[0][1] as { branch: string; stripe: Record<string, unknown> };
+      expect(details.branch).toBe("managedPayments off");
+      expect(typeof details.stripe.message).toBe("string");
+      if (item.decline) expect(details.stripe.decline_code).toBe(item.decline);
+      else expect(details.stripe).not.toHaveProperty("decline_code");
+      secretFree(JSON.stringify(details));
+      secretFree(JSON.stringify(res.body));
+    }
+  });
+
+  it("redacts a key echoed in a Stripe message before logging it", async () => {
+    const leaked = ["sk", "test", "leakedvalue"].join("_");
+    const store = new MemoryStore();
+    const logs = logger();
+    const res = jsonRes();
+    await handleCreateCheckout(consentedPost(), res, deps(store, {
+      logger: logs,
+      gateway: () => ({
+        createSession: async () => {
+          throw new Stripe.errors.StripeAuthenticationError({
+            message: `Invalid API Key provided: ${leaked}`,
+            type: "authentication_error",
+            statusCode: 401,
+            requestId: "req_auth_key",
+          });
+        },
+        refundNonUs: async () => undefined,
+        retrieveSession: async () => null,
+        findSucceededSessionIds: async () => [],
+      }),
+    }));
+    expect(res.body).toEqual({ error: openFailed, code: "stripe_authentication" });
+    const details = logs.error.mock.calls[0][1] as { stripe: { message: string } };
+    expect(details.stripe.message).toBe("Invalid API Key provided: [redacted]");
+    expect(JSON.stringify(details)).not.toContain(leaked);
+    expect(JSON.stringify(res.body)).not.toContain(leaked);
+    expect(JSON.stringify(res.body)).not.toContain("Invalid API Key");
+  });
+
+  it("logs name, message, and stack for a non-Stripe failure", async () => {
+    const store = new MemoryStore();
+    const logs = logger();
+    const failure = new Error("firestore unavailable");
+    failure.name = "FirestoreError";
+    const res = jsonRes();
+    await handleCreateCheckout(consentedPost(), res, deps(store, {
+      logger: logs,
+      gateway: () => ({
+        createSession: async () => {
+          throw failure;
+        },
+        refundNonUs: async () => undefined,
+        retrieveSession: async () => null,
+        findSucceededSessionIds: async () => [],
+      }),
+    }));
+    expect(res.body).toEqual({ error: openFailed, code: "checkout_failed" });
+    const details = logs.error.mock.calls[0][1] as {
+      branch: string;
+      paramKeys: string[];
+      error: { name: string; message: string; stack?: string };
+    };
+    expect(details.branch).toBe("managedPayments off");
+    expect(details.paramKeys).toContain("mode");
+    expect(details.error).toMatchObject({ name: "FirestoreError", message: "firestore unavailable" });
+    expect(details.error.stack).toContain("firestore unavailable");
+    expect(details).not.toHaveProperty("stripe");
+    secretFree(JSON.stringify(details));
+  });
+
+  it("does not dump an unknown thrown value into the log", async () => {
+    const store = new MemoryStore();
+    const logs = logger();
+    const res = jsonRes();
+    await handleCreateCheckout(consentedPost(), res, deps(store, {
+      logger: logs,
+      gateway: () => ({
+        createSession: async () => {
+          throw { apiKey: "secret-canary", email: "ada@example.com" };
+        },
+        refundNonUs: async () => undefined,
+        retrieveSession: async () => null,
+        findSucceededSessionIds: async () => [],
+      }),
+    }));
+    expect(res.body).toEqual({ error: openFailed, code: "checkout_failed" });
+    const details = logs.error.mock.calls[0][1] as { error: { name: string; message: string } };
+    expect(details.error).toEqual({ name: "Error", message: "Checkout failed" });
+    secretFree(JSON.stringify(details));
+  });
+
+  it("logs the Managed Payments branch and param keys when that branch built the session", async () => {
+    const store = new MemoryStore();
+    const logs = logger();
+    let seen: Record<string, unknown> | undefined;
+    const res = jsonRes();
+    await handleCreateCheckout(consentedPost(), res, deps(store, {
+      logger: logs,
+      config: () => ({
+        priceId: "price_from_env",
+        baseUrl: "https://cognitive-bridge-ai.web.app",
+        paymentsEnabled: true,
+        managedPayments: true,
+        automaticTax: true,
+      }),
+      gateway: () => ({
+        createSession: async (params) => {
+          seen = params as unknown as Record<string, unknown>;
+          throw new Stripe.errors.StripeInvalidRequestError({
+            message: "Invalid request",
+            type: "invalid_request_error",
+            code: "parameter_unknown",
+            param: "custom_text",
+            statusCode: 400,
+            requestId: "req_managed",
+          });
+        },
+        refundNonUs: async () => undefined,
+        retrieveSession: async () => null,
+        findSucceededSessionIds: async () => [],
+      }),
+    }));
+    expect(res.body).toEqual({ error: openFailed, code: "stripe_invalid_request" });
+    const details = logs.error.mock.calls[0][1] as { branch: string; paramKeys: string[] };
+    expect(details.branch).toBe("managedPayments on");
+    expect(details.paramKeys).toEqual(Object.keys(seen ?? {}).sort());
+    expect(details.paramKeys).toContain("managed_payments");
+    expect(details.paramKeys).not.toContain("custom_text");
+    expect(details.paramKeys).not.toContain("automatic_tax");
+    expect(details.paramKeys).not.toContain("receipt_email");
+    secretFree(JSON.stringify(details));
+  });
+
+  it("logs the same diagnostics when Stripe returns a session without a url", async () => {
+    const store = new MemoryStore();
+    const logs = logger();
+    let seen: Record<string, unknown> | undefined;
+    const res = jsonRes();
+    await handleCreateCheckout(consentedPost(), res, deps(store, {
+      logger: logs,
+      gateway: () => ({
+        createSession: async (params) => {
+          seen = params as unknown as Record<string, unknown>;
+          return { id: "cs_missing", url: null };
+        },
+        refundNonUs: async () => undefined,
+        retrieveSession: async () => null,
+        findSucceededSessionIds: async () => [],
+      }),
+    }));
+    expect(res.code).toBe(502);
+    expect(res.body).toEqual({ error: openFailed, code: "checkout_unavailable" });
+    expect(logs.error).toHaveBeenCalledTimes(1);
+    const details = logs.error.mock.calls[0][1] as {
+      branch: string;
+      paramKeys: string[];
+      error: { name: string; message: string; stack?: string };
+    };
+    expect(logs.error.mock.calls[0][0]).toBe("createCheckout failed");
+    expect(details.branch).toBe("managedPayments off");
+    expect(details.paramKeys).toEqual(Object.keys(seen ?? {}).sort());
+    expect(details.error.name).toBe("Error");
+    expect(details.error.message).toBe("Checkout session missing url");
+    expect(details.error.stack).toContain("Checkout session missing url");
+    expect(details).not.toHaveProperty("stripe");
+    secretFree(JSON.stringify(details));
+    secretFree(JSON.stringify(res.body));
+    expect(store.consents).toEqual([]);
+    expect(store.sessions.size).toBe(0);
+  });
+});
+
+describe("checkout failure logger", () => {
+  it("writes structured failures as one JSON line and leaves other errors as text", () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    productionCheckoutLogger().error("createCheckout failed", {
+      branch: "managedPayments off",
+      paramKeys: ["mode"],
+      stripe: { type: "StripeInvalidRequestError", message: "Invalid request" },
+    });
+    expect(JSON.parse(String(spy.mock.calls[0][0]))).toEqual({
+      message: "createCheckout failed",
+      branch: "managedPayments off",
+      paramKeys: ["mode"],
+      stripe: { type: "StripeInvalidRequestError", message: "Invalid request" },
+    });
+    productionCheckoutLogger().error("restorePurchase failed");
+    expect(spy.mock.calls[1][0]).toBe("restorePurchase failed");
+    spy.mockRestore();
   });
 });
 

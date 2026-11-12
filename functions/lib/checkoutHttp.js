@@ -15,12 +15,118 @@ const consoleLogger = {
     info(message) {
         console.info(message);
     },
-    error(message) {
+    error(message, details) {
+        if (details) {
+            console.error(JSON.stringify({ message, ...details }));
+            return;
+        }
         console.error(message);
     },
 };
 function productionCheckoutLogger() {
     return consoleLogger;
+}
+const CHECKOUT_OPEN_FAILED = "Couldn't open checkout. You haven't been charged.";
+/**
+ * Client `code` values for Stripe failures. Derived from the error type only.
+ * Stripe's own `code` (resource_missing, card_declined, …) stays in the log.
+ */
+const STRIPE_CLIENT_CODES = {
+    StripeInvalidRequestError: "stripe_invalid_request",
+    invalid_request_error: "stripe_invalid_request",
+    StripeCardError: "stripe_card",
+    card_error: "stripe_card",
+    StripeRateLimitError: "stripe_rate_limit",
+    rate_limit_error: "stripe_rate_limit",
+    StripeAuthenticationError: "stripe_authentication",
+    authentication_error: "stripe_authentication",
+    StripePermissionError: "stripe_permission",
+    StripeAPIError: "stripe_api",
+    api_error: "stripe_api",
+    StripeConnectionError: "stripe_connection",
+    StripeIdempotencyError: "stripe_idempotency",
+    idempotency_error: "stripe_idempotency",
+    StripeSignatureVerificationError: "stripe_signature",
+    StripeInvalidGrantError: "stripe_invalid_grant",
+    invalid_grant: "stripe_invalid_grant",
+    StripeError: "stripe_error",
+};
+const STRIPE_CLASS_TYPE = /^Stripe[A-Za-z0-9]*Error$/;
+const SECRET_TEXT = /\b(?:sk|rk)_(?:test|live)_[A-Za-z0-9]+|\bwhsec_[A-Za-z0-9]+/g;
+function stringField(value) {
+    return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+function publicText(value) {
+    return value.replace(SECRET_TEXT, "[redacted]");
+}
+function isStripeFailure(error) {
+    if (!error || typeof error !== "object")
+        return false;
+    const type = error.type;
+    const rawType = error.rawType;
+    if (typeof type === "string" && (STRIPE_CLASS_TYPE.test(type) || STRIPE_CLIENT_CODES[type]))
+        return true;
+    return typeof rawType === "string" && Boolean(STRIPE_CLIENT_CODES[rawType]);
+}
+function clientCodeForCheckoutFailure(error) {
+    if (!isStripeFailure(error))
+        return "checkout_failed";
+    const type = stringField(error.type);
+    if (type && STRIPE_CLIENT_CODES[type])
+        return STRIPE_CLIENT_CODES[type];
+    const rawType = stringField(error.rawType);
+    if (rawType && STRIPE_CLIENT_CODES[rawType])
+        return STRIPE_CLIENT_CODES[rawType];
+    return "stripe_error";
+}
+/** Names only. Values such as email, price, and secret keys are never copied. */
+function stripeFailureLog(error) {
+    const stripe = {
+        type: stringField(error.type) ?? stringField(error.rawType) ?? "StripeError",
+        message: typeof error.message === "string" ? publicText(error.message) : "",
+    };
+    const code = stringField(error.code);
+    if (code)
+        stripe.code = publicText(code);
+    const param = stringField(error.param);
+    if (param)
+        stripe.param = publicText(param);
+    if (typeof error.statusCode === "number" && Number.isFinite(error.statusCode)) {
+        stripe.statusCode = error.statusCode;
+    }
+    const requestId = stringField(error.requestId);
+    if (requestId)
+        stripe.requestId = publicText(requestId);
+    const declineCode = stringField(error.decline_code);
+    if (declineCode)
+        stripe.decline_code = publicText(declineCode);
+    return stripe;
+}
+function plainFailureLog(error) {
+    if (error instanceof Error) {
+        const body = { name: error.name, message: publicText(error.message) };
+        if (typeof error.stack === "string" && error.stack.length > 0)
+            body.stack = publicText(error.stack);
+        return body;
+    }
+    if (typeof error === "string" && error.length > 0)
+        return { name: "Error", message: publicText(error) };
+    return { name: "Error", message: "Checkout failed" };
+}
+function checkoutFailureDetails(error, built) {
+    const details = {};
+    if (built) {
+        details.branch = built.managedPayments ? "managedPayments on" : "managedPayments off";
+        details.paramKeys = built.paramKeys;
+    }
+    if (isStripeFailure(error))
+        details.stripe = stripeFailureLog(error);
+    else
+        details.error = plainFailureLog(error);
+    return details;
+}
+function logCreateCheckoutFailure(logger, error, built) {
+    logger.error("createCheckout failed", checkoutFailureDetails(error, built));
 }
 function sendGate(res, error) {
     res.status(error.status).json({ error: error.message, code: error.code });
@@ -57,6 +163,7 @@ async function handleCreateCheckout(req, res, deps) {
         sendFailure(res, 405, "method_not_allowed", "POST required.");
         return;
     }
+    let built = null;
     try {
         const user = await requireCheckoutUser(req, deps);
         const config = deps.config();
@@ -77,9 +184,14 @@ async function handleCreateCheckout(req, res, deps) {
             managedPayments: config.managedPayments,
             automaticTax: config.automaticTax,
         });
+        built = {
+            managedPayments: config.managedPayments,
+            paramKeys: Object.keys(params).sort(),
+        };
         const session = await deps.gateway().createSession(params, (0, checkoutConfig_1.checkoutIdempotencyKey)(user.uid, deps.now()));
         if (!session.url) {
-            throw new gate_1.GateError(502, "checkout_unavailable", "Couldn't open checkout. You haven't been charged.");
+            logCreateCheckoutFailure(deps.logger, new Error("Checkout session missing url"), built);
+            throw new gate_1.GateError(502, "checkout_unavailable", CHECKOUT_OPEN_FAILED);
         }
         await deps.store.writeCheckoutConsent({
             uid: user.uid,
@@ -107,8 +219,8 @@ async function handleCreateCheckout(req, res, deps) {
             sendGate(res, gate);
             return;
         }
-        deps.logger.error("createCheckout failed");
-        sendFailure(res, 502, "checkout_failed", "Couldn't open checkout. You haven't been charged.");
+        logCreateCheckoutFailure(deps.logger, error, built);
+        sendFailure(res, 502, clientCodeForCheckoutFailure(error), CHECKOUT_OPEN_FAILED);
     }
 }
 async function handleRestorePurchase(req, res, deps) {
