@@ -27,10 +27,10 @@ afterAll(async () => {
   await testEnv?.cleanup();
 });
 
-const locked = ["entitlements", "usage", "usage_server", "stripe_events", "daily_cost", "checkout_sessions", "checkout_consents"] as const;
+const locked = ["entitlements", "usage", "usage_server", "stripe_events", "daily_cost", "checkout_sessions", "checkout_consents", "admin_resets"] as const;
 
 describe("server-only Firestore collections", () => {
-  test("a signed-in client cannot read or write entitlements, usage, usage_server, stripe_events, daily_cost, checkout_sessions, or checkout_consents", async () => {
+  test("a signed-in client cannot read or write entitlements, usage, usage_server, stripe_events, daily_cost, checkout_sessions, checkout_consents, or admin_resets", async () => {
     await testEnv.withSecurityRulesDisabled(async (context) => {
       const db = context.firestore();
       for (const name of locked) {
