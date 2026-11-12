@@ -1,4 +1,4 @@
-import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 const mockFetch = vi.fn();
 globalThis.fetch = mockFetch;
@@ -37,6 +37,7 @@ describe('Jev judge requests', () => {
     vi.clearAllMocks();
     mockFetch.mockReset();
     sessionStorage.removeItem('cb.interviewReservation');
+    vi.stubEnv('VITE_JUDGE_ENABLED', 'true');
     authState.currentUser = {
       uid: 'user-1',
       getIdToken: vi.fn(async () => 'id-token-test'),
@@ -46,6 +47,10 @@ describe('Jev judge requests', () => {
       status: 503,
       json: async () => ({ unavailable: true }),
     });
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it('tags a mirror judge call as the judge step and sends the reservation', async () => {
@@ -77,4 +82,35 @@ describe('Jev judge requests', () => {
     expect(body.feature).toBe('bridge');
     expect(body.reservationId).toBe('iv_mirror_1');
   });
+});
+
+describe('Jev judge disabled', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFetch.mockReset();
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ answers: { openness: { type: 'noul', noul: 0.9 } } }),
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it.each([undefined, '', 'false', 'TRUE', '1'])(
+    'does not call the judge endpoint when VITE_JUDGE_ENABLED is %s',
+    async (value) => {
+      vi.stubEnv('VITE_JUDGE_ENABLED', value);
+      await expect(judgeOcean([], scores)).resolves.toBeNull();
+      await expect(judgeAlignment({
+        scores,
+        userQuery: 'hello',
+        alignedReply: 'aligned',
+        unalignedReply: 'unaligned',
+      })).resolves.toBeNull();
+      expect(mockFetch).not.toHaveBeenCalled();
+    }
+  );
 });

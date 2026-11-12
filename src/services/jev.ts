@@ -22,6 +22,12 @@ import { AiAccessError, aiAccessErrorFromResponse, authorizedAiHeaders, getAiSes
 
 const JUDGE_TIMEOUT_MS = 12000;
 
+// Off unless VITE_JUDGE_ENABLED is exactly "true". To turn the Jev judge back on,
+// set that flag to true and bind TYPESAFE_API_KEY as a Firebase secret on judgeProxy.
+function isJevJudgeEnabled(): boolean {
+  return import.meta.env.VITE_JUDGE_ENABLED === 'true';
+}
+
 function getJudgeUrl(): string {
   const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'cognitive-bridge-ai';
   if (
@@ -40,6 +46,7 @@ export async function requestJudgment(
   questions: Record<string, JevQuestion>,
   feature = 'judge'
 ): Promise<JevAnswers | null> {
+  if (!isJevJudgeEnabled()) return null;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), JUDGE_TIMEOUT_MS);
   try {

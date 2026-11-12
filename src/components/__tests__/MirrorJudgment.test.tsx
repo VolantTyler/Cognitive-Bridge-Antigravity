@@ -42,6 +42,7 @@ describe('Mirror Jev score check', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
 
@@ -68,7 +69,32 @@ describe('Mirror Jev score check', () => {
     });
   });
 
+  it.each([undefined, 'false'])(
+    'does not call the judge when VITE_JUDGE_ENABLED is %s and still proceeds with the interview scores',
+    async (value) => {
+      vi.stubEnv('VITE_JUDGE_ENABLED', value);
+      const onComplete = vi.fn();
+      render(<Mirror messages={dialogue} setMessages={vi.fn()} onComplete={onComplete} />);
+
+      const proceed = await screen.findByRole('button', { name: /Proceed to Phase 2/i });
+      expect(fetch).not.toHaveBeenCalled();
+      expect(screen.queryByText('Higher than your answers support')).not.toBeInTheDocument();
+      expect(screen.queryByText(/Checking these scores against your answers/i)).not.toBeInTheDocument();
+
+      fireEvent.click(proceed);
+      expect(onComplete).toHaveBeenCalledWith({
+        openness: 50,
+        conscientiousness: 85,
+        extroversion: 40,
+        agreeableness: 80,
+        neuroticism: 30,
+      });
+      expect(fetch).not.toHaveBeenCalled();
+    }
+  );
+
   it('shows a band correction when the judge says a score is too high', async () => {
+    vi.stubEnv('VITE_JUDGE_ENABLED', 'true');
     vi.mocked(fetch).mockResolvedValue({
       ok: true,
       json: async () => ({
@@ -88,6 +114,9 @@ describe('Mirror Jev score check', () => {
 
     expect(await screen.findByText('Higher than your answers support')).toBeInTheDocument();
     expect(screen.getByText('85 → 50')).toBeInTheDocument();
+    const [url, init] = vi.mocked(fetch).mock.calls[0];
+    expect(String(url)).toMatch(/judgeProxy|\/api\/judge/);
+    expect((init as RequestInit).method).toBe('POST');
 
     fireEvent.click(screen.getByRole('button', { name: /Accept band corrections/i }));
     await waitFor(() => {
