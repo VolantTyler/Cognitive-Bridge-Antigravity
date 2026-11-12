@@ -4,6 +4,7 @@
  */
 
 import { Message } from "../types";
+import { MirrorTurn } from "../mirror/interviewTurns";
 import { reservationRequestField } from "./accessClient";
 import { AiAccessError, aiAccessErrorFromResponse, authorizedAiHeaders, getAiSessionId } from "./aiAccess";
 import {
@@ -454,7 +455,8 @@ async function postChat(
   systemInstruction: string | undefined,
   modelName: string,
   stream: boolean,
-  feature: string | undefined
+  feature: string | undefined,
+  turn?: MirrorTurn,
 ): Promise<Response> {
   return fetch(getProxyUrl(), {
     method: "POST",
@@ -467,6 +469,7 @@ async function postChat(
       feature: feature || "chat",
       sessionId: getAiSessionId(),
       ...reservationRequestField(),
+      ...(turn ? { turnIndex: turn.turnIndex, isFinalTurn: turn.isFinalTurn } : {}),
     }),
     signal: typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function"
       ? AbortSignal.timeout(ATTEMPT_TIMEOUT_MS)
@@ -478,7 +481,8 @@ export async function chatWithGemini(
   messages: Message[],
   systemInstruction?: string,
   modelName: string = DEFAULT_GEMINI_MODEL,
-  _feature?: string
+  _feature?: string,
+  turn?: MirrorTurn,
 ): Promise<string> {
   const ollamaConfig = getOllamaConfig();
   if (ollamaConfig.enabled) {
@@ -491,7 +495,7 @@ export async function chatWithGemini(
   for (let index = 0; index < models.length; index++) {
     const model = models[index];
     try {
-      const response = await postChat(messages, systemInstruction, model, false, _feature);
+      const response = await postChat(messages, systemInstruction, model, false, _feature, turn);
       if (!response.ok) {
         throw await readProxyError(response);
       }
@@ -523,7 +527,8 @@ export async function* chatWithGeminiStream(
   modelName: string = DEFAULT_GEMINI_MODEL,
   _feature?: string,
   onFallback?: (failedModel: string, nextModel: string) => void,
-  onAccepted?: () => void
+  onAccepted?: () => void,
+  turn?: MirrorTurn,
 ): AsyncGenerator<string, void, unknown> {
   const ollamaConfig = getOllamaConfig();
   if (ollamaConfig.enabled) {
@@ -540,7 +545,7 @@ export async function* chatWithGeminiStream(
     const model = models[index];
     let yielded = false;
     try {
-      const response = await postChat(messages, systemInstruction, model, true, _feature);
+      const response = await postChat(messages, systemInstruction, model, true, _feature, turn);
       if (!response.ok) {
         throw await readProxyError(response);
       }

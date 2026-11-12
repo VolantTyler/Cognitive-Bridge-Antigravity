@@ -12,6 +12,7 @@ import { chatWithGeminiStream } from '../services/gemini';
 import {
   MIRROR_QUESTION_COUNT,
   continuationInstruction,
+  mirrorTurnFields,
   parseScoreBlock,
   questionNumberAt,
   scoresReady,
@@ -179,6 +180,7 @@ export default function Mirror({ messages, setMessages, onComplete, onSaveSessio
 
     const answerCount = userAnswerCount([...messages, userMessage]);
     const acceptScores = answerCount >= MIRROR_QUESTION_COUNT;
+    const turn = mirrorTurnFields(answerCount);
     const showModel = (content: string) => {
       setMessages(prev => {
         const last = prev[prev.length - 1];
@@ -196,7 +198,8 @@ export default function Mirror({ messages, setMessages, onComplete, onSaveSessio
         () => {
           setLoadingText('Still working on it…');
         },
-        commitTurn
+        commitTurn,
+        turn,
       );
 
       for await (const chunk of stream) {
@@ -224,7 +227,8 @@ export default function Mirror({ messages, setMessages, onComplete, onSaveSessio
           () => {
             setLoadingText('Still working on it…');
           },
-          commitTurn
+          commitTurn,
+          turn,
         );
         for await (const chunk of followStream) {
           commitTurn();

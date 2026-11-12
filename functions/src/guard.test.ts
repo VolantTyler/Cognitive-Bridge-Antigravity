@@ -440,6 +440,8 @@ describe("admin store", () => {
       model: "gemini-2.5-flash",
       promptTokens: 3,
       completionTokens: 4,
+      thoughtsTokenCount: 1,
+      thinkingBudget: 0,
       costMicros,
     });
     expect(memory.added[0]).toEqual({
@@ -450,6 +452,8 @@ describe("admin store", () => {
       model: "gemini-2.5-flash",
       promptTokens: 3,
       completionTokens: 4,
+      thoughtsTokenCount: 1,
+      thinkingBudget: 0,
       costMicros,
       ts: "SERVER_TS",
     });

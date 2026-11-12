@@ -60,6 +60,8 @@ export async function writeUsageRecord(record: UsageRecord): Promise<void> {
     model: record.model,
     promptTokens: record.promptTokens,
     completionTokens: record.completionTokens,
+    thoughtsTokenCount: record.thoughtsTokenCount,
+    thinkingBudget: record.thinkingBudget,
     costMicros,
     ts: record.ts ?? FieldValue.serverTimestamp(),
   });

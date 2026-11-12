@@ -10,6 +10,7 @@ import {
 } from "./modelRouter";
 import { GuardContext, GuardRequest, sanitizeReservationId } from "./guard";
 import { GateError } from "./gate";
+import { mirrorThinkingBudget, ThinkingDecision } from "./mirrorThinking";
 import { UsageRecord, buildUsageRecord, usageFromChunks } from "./usageLog";
 
 export interface GeminiChunk {
@@ -17,6 +18,7 @@ export interface GeminiChunk {
   usageMetadata?: {
     promptTokenCount?: number;
     candidatesTokenCount?: number;
+    thoughtsTokenCount?: number;
     totalTokenCount?: number;
   };
 }
@@ -24,7 +26,10 @@ export interface GeminiChunk {
 export interface GenerateRequest {
   model: string;
   contents: Array<{ role?: string; parts: Array<{ text?: string }> }>;
-  config: { systemInstruction?: unknown };
+  config: {
+    systemInstruction?: unknown;
+    thinkingConfig?: { thinkingBudget: number };
+  };
 }
 
 export interface GeminiClient {
@@ -86,7 +91,24 @@ async function noteInterviewStarted(deps: ChatDeps, ctx: GuardContext) {
   }
 }
 
-async function safeLog(deps: ChatDeps, ctx: GuardContext, model: string, promptTokens: number, completionTokens: number) {
+function generationConfig(
+  systemInstruction: unknown,
+  decision: ThinkingDecision,
+): GenerateRequest["config"] {
+  if (decision.thinkingBudget === undefined) return { systemInstruction };
+  return {
+    systemInstruction,
+    thinkingConfig: { thinkingBudget: decision.thinkingBudget },
+  };
+}
+
+async function safeLog(
+  deps: ChatDeps,
+  ctx: GuardContext,
+  model: string,
+  usage: { promptTokens: number; completionTokens: number; thoughtsTokenCount: number },
+  thinkingBudget: number | null,
+) {
   if (!ctx.uid) return;
   try {
     await deps.logUsage(buildUsageRecord({
@@ -95,8 +117,10 @@ async function safeLog(deps: ChatDeps, ctx: GuardContext, model: string, promptT
       reservationId: sanitizeReservationId(ctx.reservationId),
       feature: ctx.feature,
       model,
-      promptTokens,
-      completionTokens,
+      promptTokens: usage.promptTokens,
+      completionTokens: usage.completionTokens,
+      thoughtsTokenCount: usage.thoughtsTokenCount,
+      thinkingBudget,
     }));
   } catch {
     console.error("usage_server write failed");
@@ -112,6 +136,8 @@ export async function handleChat(req: GuardRequest, res: HttpResponse, deps: Cha
       systemInstruction?: unknown;
       modelName?: string;
       stream?: boolean;
+      turnIndex?: unknown;
+      isFinalTurn?: unknown;
     };
     const messages = body.messages ?? [];
     const requestedModel = normalizeModelName(body.modelName);
@@ -125,25 +151,38 @@ export async function handleChat(req: GuardRequest, res: HttpResponse, deps: Cha
       parts: [{ text: message.content }],
     }));
     const chain = buildModelChain(requestedModel);
-    const requestConfig = { systemInstruction: body.systemInstruction };
+    const thinkingInput = {
+      feature: ctx.feature,
+      messages,
+      turnIndex: body.turnIndex,
+      isFinalTurn: body.isFinalTurn,
+      envValue: process.env.MIRROR_FINAL_THINKING_BUDGET,
+    };
 
     if (body.stream) {
       let opened: {
         model: string;
         iterator: AsyncIterator<GeminiChunk>;
         first: IteratorResult<GeminiChunk>;
+        thinkingBudget: number | null;
       } | null = null;
 
       for (const model of chain) {
+        const decision = mirrorThinkingBudget({ ...thinkingInput, model });
         try {
           const responseStream = await deps.ai.models.generateContentStream({
             model,
             contents,
-            config: requestConfig,
+            config: generationConfig(body.systemInstruction, decision),
           });
           const iterator = responseStream[Symbol.asyncIterator]();
           const first = await iterator.next();
-          opened = { model, iterator, first };
+          opened = {
+            model,
+            iterator,
+            first,
+            thinkingBudget: decision.thinkingBudget ?? null,
+          };
           break;
         } catch (error) {
           const kind = classifyModelError(error);
@@ -192,7 +231,7 @@ export async function handleChat(req: GuardRequest, res: HttpResponse, deps: Cha
           writeChunk(next.value);
         }
         const usage = usageFromChunks(seen);
-        await safeLog(deps, ctx, opened.model, usage.promptTokens, usage.completionTokens);
+        await safeLog(deps, ctx, opened.model, usage, opened.thinkingBudget);
         res.write("data: [DONE]\n\n");
         res.end();
       } catch (error) {
@@ -209,19 +248,24 @@ export async function handleChat(req: GuardRequest, res: HttpResponse, deps: Cha
     let succeeded = false;
     let promptTokens = 0;
     let completionTokens = 0;
+    let thoughtsTokenCount = 0;
+    let thinkingBudget: number | null = null;
 
     for (const model of chain) {
+      const decision = mirrorThinkingBudget({ ...thinkingInput, model });
       try {
         const response = await deps.ai.models.generateContent({
           model,
           contents,
-          config: requestConfig,
+          config: generationConfig(body.systemInstruction, decision),
         });
         responseText = response.text || "";
         activeModel = model;
         const usage = usageFromChunks([response]);
         promptTokens = usage.promptTokens;
         completionTokens = usage.completionTokens;
+        thoughtsTokenCount = usage.thoughtsTokenCount;
+        thinkingBudget = decision.thinkingBudget ?? null;
         succeeded = true;
         break;
       } catch (error) {
@@ -241,7 +285,7 @@ export async function handleChat(req: GuardRequest, res: HttpResponse, deps: Cha
     }
 
     await noteInterviewStarted(deps, ctx);
-    await safeLog(deps, ctx, activeModel, promptTokens, completionTokens);
+    await safeLog(deps, ctx, activeModel, { promptTokens, completionTokens, thoughtsTokenCount }, thinkingBudget);
     res.status(200).json({
       text: responseText,
       model: activeModel,

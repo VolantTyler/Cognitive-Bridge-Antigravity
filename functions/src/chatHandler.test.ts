@@ -43,8 +43,8 @@ describe("usage records", () => {
   it("keeps the last usageMetadata and drops message content", () => {
     expect(usageFromChunks([
       { text: "secret prompt", usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 1 } },
-      { usageMetadata: { promptTokenCount: 9, candidatesTokenCount: 4 } },
-    ])).toEqual({ promptTokens: 9, completionTokens: 4 });
+      { usageMetadata: { promptTokenCount: 9, candidatesTokenCount: 4, thoughtsTokenCount: 7 } },
+    ])).toEqual({ promptTokens: 9, completionTokens: 11, thoughtsTokenCount: 7 });
 
     const record = buildUsageRecord({
       uid: "u",
@@ -63,8 +63,12 @@ describe("usage records", () => {
       "promptTokens",
       "reservationId",
       "sessionId",
+      "thinkingBudget",
+      "thoughtsTokenCount",
       "uid",
     ]);
+    expect(record.thoughtsTokenCount).toBe(0);
+    expect(record.thinkingBudget).toBeNull();
     expect(record.costMicros).toBe(costMicrosForUsage({
       model: "gemini-2.5-flash",
       promptTokens: 9,
@@ -84,6 +88,8 @@ describe("usage records", () => {
       "model",
       "promptTokens",
       "reservationId",
+      "thinkingBudget",
+      "thoughtsTokenCount",
       "uid",
     ]);
     const serialized = JSON.stringify(line);
@@ -139,6 +145,14 @@ describe("handleChat", () => {
       logUsage,
     });
     expect(res.snapshot().payload).toMatchObject({ text: "answered", model: "gemini-2.5-flash" });
+    expect(generateContent).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      model: "gemini-2.5-pro",
+      config: { systemInstruction: undefined },
+    }));
+    expect(generateContent).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      model: "gemini-2.5-flash",
+      config: { systemInstruction: undefined, thinkingConfig: { thinkingBudget: 0 } },
+    }));
     expect(logUsage).toHaveBeenCalledWith({
       uid: "user-1",
       sessionId: "sess-1",
@@ -147,6 +161,8 @@ describe("handleChat", () => {
       model: "gemini-2.5-flash",
       promptTokens: 12,
       completionTokens: 3,
+      thoughtsTokenCount: 0,
+      thinkingBudget: 0,
       costMicros: costMicrosForUsage({
         model: "gemini-2.5-flash",
         promptTokens: 12,
@@ -188,10 +204,85 @@ describe("handleChat", () => {
       model: "gemini-2.5-flash",
       promptTokens: 8,
       completionTokens: 6,
+      thoughtsTokenCount: 0,
+      thinkingBudget: null,
       feature: "playground-aligned",
       sessionId: null,
       reservationId: null,
     }));
+  });
+
+  it("uses budget 0 on a mirror flash question turn and the env budget on the scoring turn", async () => {
+    const previous = process.env.MIRROR_FINAL_THINKING_BUDGET;
+    process.env.MIRROR_FINAL_THINKING_BUDGET = "256";
+    try {
+      const logUsage = vi.fn(async () => {});
+      const generateContentStream = vi.fn(async () => (async function* () {
+        yield {
+          text: "next",
+          usageMetadata: { promptTokenCount: 10, candidatesTokenCount: 2, thoughtsTokenCount: 5 },
+        };
+      })());
+      const guard = async () => ({
+        uid: "user-1",
+        email: null,
+        email_verified: false,
+        feature: "mirror",
+        sessionId: "sess",
+        reservationId: "iv_1",
+      });
+      const ai = { models: { generateContent: vi.fn(), generateContentStream } } as GeminiClient;
+
+      const question = mockRes();
+      await handleChat({
+        method: "POST",
+        body: {
+          stream: true,
+          modelName: "gemini-2.5-flash",
+          feature: "mirror",
+          turnIndex: 5,
+          isFinalTurn: true,
+          messages: [{ role: "user", content: "only one answer" }],
+        },
+      }, question, { guard, ai, logUsage });
+      expect(generateContentStream).toHaveBeenLastCalledWith(expect.objectContaining({
+        config: expect.objectContaining({ thinkingConfig: { thinkingBudget: 0 } }),
+      }));
+      expect(logUsage).toHaveBeenLastCalledWith(expect.objectContaining({
+        thinkingBudget: 0,
+        thoughtsTokenCount: 5,
+        completionTokens: 7,
+        costMicros: costMicrosForUsage({
+          model: "gemini-2.5-flash",
+          promptTokens: 10,
+          completionTokens: 7,
+        }),
+      }));
+
+      const scoring = mockRes();
+      await handleChat({
+        method: "POST",
+        body: {
+          stream: true,
+          modelName: "gemini-2.5-flash",
+          feature: "mirror",
+          turnIndex: 1,
+          isFinalTurn: false,
+          messages: Array.from({ length: 5 }, () => ({ role: "user", content: "answer" })),
+        },
+      }, scoring, { guard, ai, logUsage });
+      expect(generateContentStream).toHaveBeenLastCalledWith(expect.objectContaining({
+        config: expect.objectContaining({ thinkingConfig: { thinkingBudget: 256 } }),
+      }));
+      expect(logUsage).toHaveBeenLastCalledWith(expect.objectContaining({
+        thinkingBudget: 256,
+        thoughtsTokenCount: 5,
+        completionTokens: 7,
+      }));
+    } finally {
+      if (previous === undefined) delete process.env.MIRROR_FINAL_THINKING_BUDGET;
+      else process.env.MIRROR_FINAL_THINKING_BUDGET = previous;
+    }
   });
 });
 
