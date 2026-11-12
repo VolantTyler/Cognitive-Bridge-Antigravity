@@ -65,7 +65,7 @@ export interface BillingStore {
 
 export interface CheckoutLogger {
   info(message: string): void;
-  error(message: string): void;
+  error(message: string, details?: Record<string, unknown>): void;
 }
 
 export interface PaidSessionSnapshot {
