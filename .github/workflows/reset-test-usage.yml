@@ -1,0 +1,84 @@
+# Manual reset of interview usage for Cognitive Bridge QA accounts.
+# workflow_dispatch only. dry_run defaults to true and writes nothing.
+#
+# Auth: secrets.FIREBASE_SERVICE_ACCOUNT_COGNITIVE_BRIDGE_AI
+# (same JSON the cost report and the Hosting/Functions deploy workflows use).
+# Project: cognitive-bridge-ai
+# Database: ai-studio-10d489d8-3b32-488a-9698-e415f2608028
+#
+# Allowlist, case-insensitive, exact. Every input email must match, and the
+# Firebase Auth record's email is checked again before any write:
+#   /^cos-stahl\+cbtest[^@]*@mail\.grokbot\.com$/i
+# There is no list-all-users path. A non-matching email fails the run.
+#
+# One transaction per user writes only entitlements/{uid}, usage/{uid}
+# (interviews ledger), and an admin_resets audit doc. It does not delete
+# interview transcripts or usage_server rows.
+#
+# Dry run:
+#   gh workflow run reset-test-usage.yml --repo VolantTyler/Cognitive-Bridge-Antigravity -f dry_run=true -f emails='cos-stahl+cbtest1@mail.grokbot.com'
+# Real run:
+#   gh workflow run reset-test-usage.yml --repo VolantTyler/Cognitive-Bridge-Antigravity -f dry_run=false -f emails='cos-stahl+cbtest1@mail.grokbot.com'
+
+name: Reset test account interview usage
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Print each account and the writes, and write nothing. Only false writes."
+        required: false
+        type: boolean
+        default: true
+      emails:
+        description: "Comma-separated emails. Each must match the cbtest allowlist."
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: reset-test-usage
+  cancel-in-progress: false
+
+jobs:
+  reset-test-usage:
+    name: Reset allowlisted interview usage
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            functions/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Functions dependencies
+        working-directory: functions
+        run: npm ci
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_COGNITIVE_BRIDGE_AI }}
+          project_id: cognitive-bridge-ai
+
+      - name: Reset allowlisted interview usage
+        env:
+          GOOGLE_CLOUD_PROJECT: cognitive-bridge-ai
+          GCLOUD_PROJECT: cognitive-bridge-ai
+          FIRESTORE_DATABASE_ID: ai-studio-10d489d8-3b32-488a-9698-e415f2608028
+          RESET_DRY_RUN: ${{ inputs.dry_run }}
+          RESET_EMAILS: ${{ inputs.emails }}
+        run: npx tsx scripts/reset-test-usage.ts
