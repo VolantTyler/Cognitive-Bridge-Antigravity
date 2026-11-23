@@ -1,6 +1,8 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import AccessFlow from "../AccessFlow";
+import { NEED_HELP_OR_REFUND, SUPPORT_EMAIL } from "../../constants/checkoutCopy";
+import { SUPPORT_EMAIL_LINK_CLASS } from "../SupportEmailLink";
 import {
   CHECKOUT_CANCELED_BANNER,
   CHECKOUT_CONSENT_ERROR,
@@ -59,6 +61,13 @@ describe("paywall", () => {
     expect(screen.queryByText(/Stripe test card/)).not.toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent(CHECKOUT_CANCELED_BANNER);
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    const help = screen.getByText((_, node) => {
+      return node?.nodeName === "P" && (node.textContent ?? "").startsWith(NEED_HELP_OR_REFUND);
+    });
+    expect(help.textContent).toBe(`${NEED_HELP_OR_REFUND} Email ${SUPPORT_EMAIL}.`);
+    const helpLink = help.querySelector("a");
+    expect(helpLink).toHaveAttribute("href", `mailto:${SUPPORT_EMAIL}`);
+    expect(helpLink?.className).toContain(SUPPORT_EMAIL_LINK_CLASS);
     fireEvent.click(button);
     expect(props.onUnlock).toHaveBeenCalled();
   });

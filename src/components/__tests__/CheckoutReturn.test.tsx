@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { CheckoutReturn } from "../CheckoutReturn";
 import { ACCOUNT_COPY } from "../../constants/accountCopy";
@@ -8,6 +8,7 @@ import {
   CHECKOUT_SIGN_IN,
   CheckoutClientError,
   CheckoutViewStatus,
+  NEED_HELP_OR_REFUND,
   NON_US_HEADING,
   NON_US_REFUND_FAILED_BODY,
   NON_US_REFUNDED_BODY,
@@ -17,6 +18,12 @@ import { CheckoutAuthGate, CheckoutAuthUser } from "../../services/checkoutAuth"
 import { SUPPORT_EMAIL_LINK_CLASS } from "../SupportEmailLink";
 
 const noop = async () => "pending" as const;
+
+function helpLines() {
+  return screen.getAllByText((_, node) => {
+    return node?.nodeName === "P" && (node.textContent ?? "").startsWith(NEED_HELP_OR_REFUND);
+  });
+}
 
 const readyAuth: CheckoutAuthGate = {
   ready: async () => {},
@@ -76,9 +83,14 @@ describe("checkout return", () => {
     expect(await screen.findByRole("heading", { name: NON_US_HEADING })).toBeInTheDocument();
     const status = screen.getByRole("status");
     expect(status).toHaveTextContent(NON_US_REFUNDED_BODY);
-    const mail = screen.getByRole("link", { name: SUPPORT_EMAIL });
+    const mail = within(status).getByRole("link", { name: SUPPORT_EMAIL });
     expect(mail).toHaveAttribute("href", `mailto:${SUPPORT_EMAIL}`);
     expect(mail.className).toContain(SUPPORT_EMAIL_LINK_CLASS);
+    const help = helpLines();
+    expect(help.length).toBeGreaterThan(1);
+    for (const line of help) {
+      expect(line.querySelector("a")).toHaveAttribute("href", `mailto:${SUPPORT_EMAIL}`);
+    }
     expect(status).not.toHaveTextContent(/minutes|business days|5-10/i);
     expect(BACK_TO_COGNITIVE_BRIDGE).toBe("Back to Cognitive Bridge");
     const back = screen.getByRole("link", { name: BACK_TO_COGNITIVE_BRIDGE });
@@ -118,6 +130,14 @@ describe("checkout return", () => {
       expect(screen.getByRole("status")).toHaveTextContent("Payment confirmed.");
     });
     expect(screen.queryByText(NON_US_REFUNDED_BODY)).not.toBeInTheDocument();
+    const help = helpLines();
+    expect(help.length).toBeGreaterThan(1);
+    for (const line of help) {
+      expect(line.textContent).toBe(`${NEED_HELP_OR_REFUND} Email ${SUPPORT_EMAIL}.`);
+      const link = line.querySelector("a");
+      expect(link).toHaveAttribute("href", `mailto:${SUPPORT_EMAIL}`);
+      expect(link?.className).toContain(SUPPORT_EMAIL_LINK_CLASS);
+    }
   });
 
   it("shows a canceled checkout without a charge", () => {

@@ -6,6 +6,7 @@
 import { useEffect, useRef, useState } from "react";
 import AccountAuthPanel from "./AccountAuthPanel";
 import DemoExperience from "./DemoExperience";
+import { NeedHelpOrRefundLine } from "./SupportEmailLink";
 import { AccountUser } from "../services/accountAuth";
 import { ProductSurface } from "../access/productAccess";
 import {
@@ -150,6 +151,7 @@ export default function AccessFlow({
         {" "}
         <a href="/terms" className="underline">Terms</a>
       </div>
+      <NeedHelpOrRefundLine className="mt-4 text-sm leading-relaxed text-text-secondary" />
       <div className="mt-4 flex items-start gap-3">
         <input
           id="checkout-terms"

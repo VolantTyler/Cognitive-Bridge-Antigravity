@@ -4,6 +4,7 @@
  */
 
 import { APP_VERSION_LABEL } from "../appVersion";
+import { NeedHelpOrRefundLine } from "./SupportEmailLink";
 
 export default function SiteFooter({
   modelLabel,
@@ -13,7 +14,7 @@ export default function SiteFooter({
   onOpenReleaseNotes?: () => void;
 }) {
   return (
-    <footer className="h-auto md:h-auto border-t border-border-primary px-6 py-4 flex flex-col md:flex-row items-center justify-between gap-3 text-[9px] uppercase tracking-[0.3em] font-bold text-text-muted-darker bg-bg-primary transition-colors duration-300">
+    <footer className="h-auto md:h-auto border-t border-border-primary px-6 py-4 flex flex-col md:flex-row md:flex-wrap items-center justify-between gap-3 text-[9px] uppercase tracking-[0.3em] font-bold text-text-muted-darker bg-bg-primary transition-colors duration-300">
       <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 md:gap-4 text-center">
         <a
           href="https://tylerstahl.dev"
@@ -59,6 +60,7 @@ export default function SiteFooter({
           <span>Procedural Skills Engine</span>
         </div>
       )}
+      <NeedHelpOrRefundLine className="w-full basis-full text-center normal-case tracking-normal text-xs font-medium leading-relaxed text-text-muted" />
     </footer>
   );
 }

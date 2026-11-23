@@ -4,6 +4,7 @@
  */
 
 import { useEffect, useRef, type ReactNode } from "react";
+import { REFUND_REQUEST_HEADING, REFUND_REQUEST_INSTRUCTIONS } from "../constants/checkoutCopy";
 import { TERMS_RETAKE_REPLACES } from "../constants/paywallCopy";
 import SiteFooter from "./SiteFooter";
 import { SupportEmailLink } from "./SupportEmailLink";
@@ -82,6 +83,11 @@ export function TermsPage() {
       <Section heading="All sales are final">
         <p>
           All sales are final, except duplicate charges, charges where you didn't get access, purchases with a billing address outside the US (these are refunded automatically), or where the law requires a refund.
+        </p>
+      </Section>
+      <Section heading={REFUND_REQUEST_HEADING}>
+        <p>
+          Email <SupportEmailLink /> {REFUND_REQUEST_INSTRUCTIONS}
         </p>
       </Section>
       <Section heading="What this is, and what it isn't">
