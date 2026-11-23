@@ -7,7 +7,6 @@ import {
   FINAL_SALE,
   PAYWALL_BUTTON,
   PAYWALL_PRICE,
-  PAYWALL_TEST_MODE,
   PAYWALL_TITLE,
   PAYWALL_US,
 } from "../../constants/paywallCopy";
@@ -55,8 +54,9 @@ describe("paywall", () => {
     fireEvent.click(consent);
     expect(button).toBeEnabled();
     expect(screen.queryByText(CHECKOUT_CONSENT_ERROR)).not.toBeInTheDocument();
-    const testMode = screen.getByText(PAYWALL_TEST_MODE);
-    expect(testMode.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
+    expect(screen.queryByText(/Test mode/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/no real charge/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Stripe test card/)).not.toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent(CHECKOUT_CANCELED_BANNER);
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     fireEvent.click(button);

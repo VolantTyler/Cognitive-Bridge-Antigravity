@@ -170,7 +170,8 @@ async function handleCreateCheckout(req, res, deps) {
         if (!config.paymentsEnabled || !config.priceId) {
             throw new gate_1.GateError(503, "payments_disabled", "Checkout is not open yet.");
         }
-        (0, checkoutConfig_1.assertStripeTestKey)(deps.secretKey());
+        (0, checkoutConfig_1.assertChargeableLivePriceId)(config.priceId);
+        (0, checkoutConfig_1.assertStripeLiveKey)(deps.secretKey());
         const entitlement = await deps.store.readEntitlement(user.uid);
         if (entitlement?.paid) {
             throw new gate_1.GateError(409, "already_entitled", "This account already has access.");
@@ -230,7 +231,7 @@ async function handleRestorePurchase(req, res, deps) {
     }
     try {
         const user = await requireCheckoutUser(req, deps);
-        (0, checkoutConfig_1.assertStripeTestKey)(deps.secretKey());
+        (0, checkoutConfig_1.assertStripeLiveKey)(deps.secretKey());
         const gateway = deps.gateway();
         const result = await (0, checkoutEvents_1.restorePurchaseForUser)(user.uid, {
             ...eventDeps(deps, gateway),
@@ -302,12 +303,12 @@ async function handleStripeWebhook(req, res, deps) {
     }
     try {
         const secretKey = deps.secretKey();
-        const gateway = (0, checkoutConfig_1.isStripeTestKey)(secretKey) ? deps.gateway() : null;
+        const gateway = (0, checkoutConfig_1.isStripeLiveKey)(secretKey) ? deps.gateway() : null;
         await (0, checkoutEvents_1.handleStripeEvent)(event, eventDeps(deps, {
             async refundNonUs(paymentIntentId, sessionId) {
                 if (!gateway) {
-                    const error = new Error("not_test_mode");
-                    throw Object.assign(error, { code: "not_test_mode" });
+                    const error = new Error("not_live_mode");
+                    throw Object.assign(error, { code: "not_live_mode" });
                 }
                 await gateway.refundNonUs(paymentIntentId, sessionId);
             },

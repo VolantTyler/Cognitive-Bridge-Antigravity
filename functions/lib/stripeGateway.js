@@ -21,7 +21,7 @@ function constructStripeEvent(rawBody, signature, webhookSecret) {
     };
 }
 function createStripeGateway(secretKey) {
-    (0, checkoutConfig_1.assertStripeTestKey)(secretKey);
+    (0, checkoutConfig_1.assertStripeLiveKey)(secretKey);
     const stripe = new stripe_1.default(secretKey, { apiVersion: API_VERSION });
     return {
         async createSession(params, idempotencyKey) {

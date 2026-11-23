@@ -124,9 +124,6 @@ export const FINAL_SALE =
 
 export const PAYWALL_BUTTON = "Unlock my interview, $6";
 
-/** Remove when live Stripe keys replace test mode. */
-export const PAYWALL_TEST_MODE = "Test mode: no real charge. Use a Stripe test card.";
-
 export const PAYWALL_BUTTON_BUSY = "Opening checkout…";
 
 export const PAYWALL_CAPTION =

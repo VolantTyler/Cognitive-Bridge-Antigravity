@@ -1,9 +1,11 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.CHECKOUT_CONSENT_REQUIRED = exports.TERMS_VERSION = exports.CHECKOUT_IDEMPOTENCY_WINDOW_MS = exports.INTERVIEWS_ALLOWED = exports.STRIPE_WEBHOOK_SECRET_NAME = exports.STRIPE_SECRET_KEY_NAME = void 0;
+exports.CHECKOUT_CONSENT_REQUIRED = exports.TERMS_VERSION = exports.CHECKOUT_IDEMPOTENCY_WINDOW_MS = exports.INTERVIEWS_ALLOWED = exports.STRIPE_WEBHOOK_SECRET_NAME = exports.STRIPE_SECRET_KEY_NAME = exports.RETIRED_TEST_PRICE_ID = exports.LIVE_PRICE_ID_PLACEHOLDER = void 0;
 exports.loadCheckoutConfig = loadCheckoutConfig;
-exports.isStripeTestKey = isStripeTestKey;
-exports.assertStripeTestKey = assertStripeTestKey;
+exports.isStripeLiveKey = isStripeLiveKey;
+exports.assertStripeLiveKey = assertStripeLiveKey;
+exports.isChargeableLivePriceId = isChargeableLivePriceId;
+exports.assertChargeableLivePriceId = assertChargeableLivePriceId;
 exports.termsUrlForBase = termsUrlForBase;
 exports.checkoutIdempotencyKey = checkoutIdempotencyKey;
 exports.assertCheckoutConsent = assertCheckoutConsent;
@@ -12,16 +14,22 @@ exports.isSafeStripeQueryUid = isSafeStripeQueryUid;
 const params_1 = require("firebase-functions/params");
 const gate_1 = require("./gate");
 /**
- * Stripe test-mode checkout configuration.
+ * Stripe live-mode checkout configuration.
  *
  * Secret Manager names (defineSecret in index.ts, never commit values):
- * - STRIPE_SECRET_KEY — test secret key only (sk_test_…)
- * - STRIPE_WEBHOOK_SECRET — signing secret for the stripeWebhook endpoint
+ * - STRIPE_SECRET_KEY — live secret or restricted key (sk_live_ or rk_live_)
+ * - STRIPE_WEBHOOK_SECRET — live signing secret for the stripeWebhook endpoint
  *
  * Params (not secrets): STRIPE_PRICE_ID, APP_BASE_URL, PAYMENTS_ENABLED,
  * STRIPE_MANAGED_PAYMENTS, STRIPE_AUTOMATIC_TAX.
  * The charged amount lives on the Stripe Price, not in this repo.
  */
+/** Refused if STRIPE_PRICE_ID is set back to this placeholder. Not chargeable. */
+exports.LIVE_PRICE_ID_PLACEHOLDER = "price_REPLACE_ME_AFTER_CREATING_LIVE_6_DOLLAR_PRICE";
+/** Sandbox Price previously committed in functions/.env. Refused so a live key cannot charge it. */
+exports.RETIRED_TEST_PRICE_ID = "price_1UadSFEW8GloDNOQc0mhRCHU";
+/** Stripe Price ids are `price_` plus one alphanumeric token. */
+const CHARGEABLE_PRICE_ID = /^price_[A-Za-z0-9]{14,}$/;
 exports.STRIPE_SECRET_KEY_NAME = "STRIPE_SECRET_KEY";
 exports.STRIPE_WEBHOOK_SECRET_NAME = "STRIPE_WEBHOOK_SECRET";
 /** One purchase: 1 interview + 1 retake. The interview counter itself is a later PR. */
@@ -36,7 +44,7 @@ exports.TERMS_VERSION = "2026-11-09";
 exports.CHECKOUT_CONSENT_REQUIRED = "Please agree to the Terms and confirm you are 18 or older.";
 const stripePriceId = (0, params_1.defineString)("STRIPE_PRICE_ID", {
     default: "",
-    description: "Stripe Price ID for the one-time purchase. Test-mode price until launch.",
+    description: "Live Stripe Price ID for the one-time purchase. Amount is on the Price. Placeholder and test-mode ids are refused.",
 });
 const appBaseUrl = (0, params_1.defineString)("APP_BASE_URL", {
     default: "https://cognitive-bridge-ai.web.app",
@@ -47,12 +55,12 @@ const paymentsEnabled = (0, params_1.defineString)("PAYMENTS_ENABLED", {
     description: "When false, createCheckout refuses new sessions. Webhooks still run. Rollback switch.",
 });
 const managedPayments = (0, params_1.defineString)("STRIPE_MANAGED_PAYMENTS", {
-    default: "false",
-    description: "When true, Checkout sets managed_payments.enabled and does not set automatic_tax or shipping. When false, Checkout sets managed_payments.enabled to false.",
+    default: "true",
+    description: "Live checkout sets managed_payments.enabled and does not set automatic_tax or payment_intent_data.receipt_email. Set false only to opt out.",
 });
 const automaticTax = (0, params_1.defineString)("STRIPE_AUTOMATIC_TAX", {
     default: "false",
-    description: "Plain Stripe Tax only. Ignored when STRIPE_MANAGED_PAYMENTS is true.",
+    description: "Plain Stripe Tax only. Leave false for live checkout. Ignored when STRIPE_MANAGED_PAYMENTS is true, which rejects automatic_tax.",
 });
 function paramOrEnv(envValue, read, fallback) {
     if (envValue !== undefined)
@@ -79,17 +87,31 @@ function loadCheckoutConfig(env = process.env) {
         priceId: paramOrEnv(env.STRIPE_PRICE_ID, () => stripePriceId.value(), "").trim(),
         baseUrl: paramOrEnv(env.APP_BASE_URL, () => appBaseUrl.value(), "https://cognitive-bridge-ai.web.app").trim(),
         paymentsEnabled: parseFlag(paramOrEnv(env.PAYMENTS_ENABLED, () => paymentsEnabled.value(), "false"), false),
-        managedPayments: parseFlag(paramOrEnv(env.STRIPE_MANAGED_PAYMENTS, () => managedPayments.value(), "false"), false),
+        managedPayments: parseFlag(paramOrEnv(env.STRIPE_MANAGED_PAYMENTS, () => managedPayments.value(), "true"), true),
         automaticTax: parseFlag(paramOrEnv(env.STRIPE_AUTOMATIC_TAX, () => automaticTax.value(), "false"), false),
     };
 }
-/** True only for a test-mode secret key. Live keys are refused in this PR. */
-function isStripeTestKey(secretKey) {
-    return secretKey.startsWith("sk_test_");
+/** True for a live secret key or a live restricted key. Test keys are refused. */
+function isStripeLiveKey(secretKey) {
+    return secretKey.startsWith("sk_live_") || secretKey.startsWith("rk_live_");
 }
-function assertStripeTestKey(secretKey) {
-    if (!isStripeTestKey(secretKey)) {
-        throw new gate_1.GateError(503, "test_mode_only", "Checkout is in test mode only.");
+function assertStripeLiveKey(secretKey) {
+    if (!isStripeLiveKey(secretKey)) {
+        throw new gate_1.GateError(503, "live_mode_only", "Checkout is in live mode only.");
+    }
+}
+/** True when this id can be sent to Stripe in live mode. */
+function isChargeableLivePriceId(priceId) {
+    const id = priceId.trim();
+    if (id === exports.LIVE_PRICE_ID_PLACEHOLDER || id === exports.RETIRED_TEST_PRICE_ID)
+        return false;
+    if (id.toUpperCase().includes("REPLACE"))
+        return false;
+    return CHARGEABLE_PRICE_ID.test(id);
+}
+function assertChargeableLivePriceId(priceId) {
+    if (!isChargeableLivePriceId(priceId)) {
+        throw new gate_1.GateError(503, "payments_not_configured", "Checkout is not open yet.");
     }
 }
 function termsUrlForBase(baseUrl) {

@@ -1,7 +1,7 @@
 import Stripe from "stripe";
 import {
   CheckoutSessionCreateParams,
-  assertStripeTestKey,
+  assertStripeLiveKey,
   isSafeStripeQueryUid,
 } from "./checkoutConfig";
 import { PaidSessionSnapshot, snapshotCheckoutSession } from "./checkoutTypes";
@@ -38,7 +38,7 @@ export function constructStripeEvent(
 }
 
 export function createStripeGateway(secretKey: string): StripeGateway {
-  assertStripeTestKey(secretKey);
+  assertStripeLiveKey(secretKey);
   const stripe = new Stripe(secretKey, { apiVersion: API_VERSION });
   return {
     async createSession(params, idempotencyKey) {

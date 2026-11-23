@@ -65,7 +65,7 @@ exports.judgeProxy = (0, https_1.onRequest)({ cors, timeoutSeconds: 30 }, async 
         logUsage,
     });
 });
-// Test-mode keys only. Values live in Secret Manager, not in the repo.
+// Live keys only (sk_live_ or rk_live_). Values live in Secret Manager, not in the repo.
 const stripeSecretKey = (0, params_1.defineSecret)("STRIPE_SECRET_KEY");
 const stripeWebhookSecret = (0, params_1.defineSecret)("STRIPE_WEBHOOK_SECRET");
 function checkoutHttpDeps() {
