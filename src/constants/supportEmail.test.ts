@@ -37,28 +37,29 @@ describe("support email", () => {
     expect(offenders).toEqual([]);
   });
 
-  it("commits functions/.env with the test-mode price and no secrets", () => {
+  it("commits functions/.env with the live price and no secrets", () => {
     const text = readFileSync("functions/.env", "utf8");
     expect(text).toBe(
       [
         "# Non-secret defaults for non-interactive `firebase deploy`.",
         "# The merge workflow runs from the repo root; the CLI loads this file",
         "# from the functions directory (firebase.json functions.source).",
-        "# Launch values for Stripe test mode. STRIPE_PRICE_ID is a test-mode Price ID. No secrets.",
+        "# Live checkout. STRIPE_PRICE_ID is the live $6 one-time Price. No secrets in this file.",
         "AI_GATE_MODE=paid",
         "AI_ALLOWLIST_UIDS=",
         "ENFORCE_APP_CHECK=false",
         "INTERVIEWS_PAUSED=false",
         "BRIDGE_CHAT_DAILY_CAP=100",
-        "DAILY_USER_COST_CAP_USD=10",
+        "DAILY_USER_COST_CAP_USD=1",
         "# Latest user message only. \"That message is too long.\"",
         "MAX_MESSAGE_CHARS=4000",
         "# Whole request: system instruction plus every message. Not the per-message limit.",
         "MAX_INPUT_CHARS=400000",
-        "STRIPE_PRICE_ID=price_1UadSFEW8GloDNOQc0mhRCHU",
+        "STRIPE_PRICE_ID=price_1UeyXmRGeBWlxISlUdgniPm9",
         "APP_BASE_URL=https://cognitive-bridge-ai.web.app",
         "PAYMENTS_ENABLED=true",
-        "STRIPE_MANAGED_PAYMENTS=false",
+        "STRIPE_MANAGED_PAYMENTS=true",
+        "# Ignored while Managed Payments is on. Leave false; do not enable plain Stripe Tax.",
         "STRIPE_AUTOMATIC_TAX=false",
         "LEGACY_ACCESS_CUTOFF=2026-11-09T19:00:00.000Z",
         "# Mirror scoring turn only (the reply after the 5th answer). 0 turns thinking off.",
@@ -67,7 +68,8 @@ describe("support email", () => {
         "",
       ].join("\n")
     );
-    expect(text).not.toMatch(/sk_live_|sk_test_|whsec_|pending/i);
+    expect(text).not.toMatch(/sk_live_|sk_test_|rk_live_|rk_test_|whsec_|pending/i);
+    expect(text).not.toContain("price_1UadSFEW8GloDNOQc0mhRCHU");
     const ignored = spawnSync("git", ["check-ignore", "-q", "functions/.env"], { encoding: "utf8" });
     expect(ignored.status).toBe(1);
   });

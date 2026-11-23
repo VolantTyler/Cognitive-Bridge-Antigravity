@@ -2,16 +2,25 @@ import { defineString } from "firebase-functions/params";
 import { GateError } from "./gate";
 
 /**
- * Stripe test-mode checkout configuration.
+ * Stripe live-mode checkout configuration.
  *
  * Secret Manager names (defineSecret in index.ts, never commit values):
- * - STRIPE_SECRET_KEY — test secret key only (sk_test_…)
- * - STRIPE_WEBHOOK_SECRET — signing secret for the stripeWebhook endpoint
+ * - STRIPE_SECRET_KEY — live secret or restricted key (sk_live_ or rk_live_)
+ * - STRIPE_WEBHOOK_SECRET — live signing secret for the stripeWebhook endpoint
  *
  * Params (not secrets): STRIPE_PRICE_ID, APP_BASE_URL, PAYMENTS_ENABLED,
  * STRIPE_MANAGED_PAYMENTS, STRIPE_AUTOMATIC_TAX.
  * The charged amount lives on the Stripe Price, not in this repo.
  */
+
+/** Refused if STRIPE_PRICE_ID is set back to this placeholder. Not chargeable. */
+export const LIVE_PRICE_ID_PLACEHOLDER = "price_REPLACE_ME_AFTER_CREATING_LIVE_6_DOLLAR_PRICE";
+
+/** Sandbox Price previously committed in functions/.env. Refused so a live key cannot charge it. */
+export const RETIRED_TEST_PRICE_ID = "price_1UadSFEW8GloDNOQc0mhRCHU";
+
+/** Stripe Price ids are `price_` plus one alphanumeric token. */
+const CHARGEABLE_PRICE_ID = /^price_[A-Za-z0-9]{14,}$/;
 
 export const STRIPE_SECRET_KEY_NAME = "STRIPE_SECRET_KEY";
 export const STRIPE_WEBHOOK_SECRET_NAME = "STRIPE_WEBHOOK_SECRET";
@@ -33,7 +42,7 @@ export const CHECKOUT_CONSENT_REQUIRED =
 
 const stripePriceId = defineString("STRIPE_PRICE_ID", {
   default: "",
-  description: "Stripe Price ID for the one-time purchase. Test-mode price until launch.",
+  description: "Live Stripe Price ID for the one-time purchase. Amount is on the Price. Placeholder and test-mode ids are refused.",
 });
 
 const appBaseUrl = defineString("APP_BASE_URL", {
@@ -47,13 +56,13 @@ const paymentsEnabled = defineString("PAYMENTS_ENABLED", {
 });
 
 const managedPayments = defineString("STRIPE_MANAGED_PAYMENTS", {
-  default: "false",
-  description: "When true, Checkout sets managed_payments.enabled and does not set automatic_tax or shipping. When false, Checkout sets managed_payments.enabled to false.",
+  default: "true",
+  description: "Live checkout sets managed_payments.enabled and does not set automatic_tax or payment_intent_data.receipt_email. Set false only to opt out.",
 });
 
 const automaticTax = defineString("STRIPE_AUTOMATIC_TAX", {
   default: "false",
-  description: "Plain Stripe Tax only. Ignored when STRIPE_MANAGED_PAYMENTS is true.",
+  description: "Plain Stripe Tax only. Leave false for live checkout. Ignored when STRIPE_MANAGED_PAYMENTS is true, which rejects automatic_tax.",
 });
 
 export interface CheckoutConfig {
@@ -87,21 +96,35 @@ export function loadCheckoutConfig(env: NodeJS.ProcessEnv = process.env): Checko
     baseUrl: paramOrEnv(env.APP_BASE_URL, () => appBaseUrl.value(), "https://cognitive-bridge-ai.web.app").trim(),
     paymentsEnabled: parseFlag(paramOrEnv(env.PAYMENTS_ENABLED, () => paymentsEnabled.value(), "false"), false),
     managedPayments: parseFlag(
-      paramOrEnv(env.STRIPE_MANAGED_PAYMENTS, () => managedPayments.value(), "false"),
-      false
+      paramOrEnv(env.STRIPE_MANAGED_PAYMENTS, () => managedPayments.value(), "true"),
+      true
     ),
     automaticTax: parseFlag(paramOrEnv(env.STRIPE_AUTOMATIC_TAX, () => automaticTax.value(), "false"), false),
   };
 }
 
-/** True only for a test-mode secret key. Live keys are refused in this PR. */
-export function isStripeTestKey(secretKey: string): boolean {
-  return secretKey.startsWith("sk_test_");
+/** True for a live secret key or a live restricted key. Test keys are refused. */
+export function isStripeLiveKey(secretKey: string): boolean {
+  return secretKey.startsWith("sk_live_") || secretKey.startsWith("rk_live_");
 }
 
-export function assertStripeTestKey(secretKey: string): void {
-  if (!isStripeTestKey(secretKey)) {
-    throw new GateError(503, "test_mode_only", "Checkout is in test mode only.");
+export function assertStripeLiveKey(secretKey: string): void {
+  if (!isStripeLiveKey(secretKey)) {
+    throw new GateError(503, "live_mode_only", "Checkout is in live mode only.");
+  }
+}
+
+/** True when this id can be sent to Stripe in live mode. */
+export function isChargeableLivePriceId(priceId: string): boolean {
+  const id = priceId.trim();
+  if (id === LIVE_PRICE_ID_PLACEHOLDER || id === RETIRED_TEST_PRICE_ID) return false;
+  if (id.toUpperCase().includes("REPLACE")) return false;
+  return CHARGEABLE_PRICE_ID.test(id);
+}
+
+export function assertChargeableLivePriceId(priceId: string): void {
+  if (!isChargeableLivePriceId(priceId)) {
+    throw new GateError(503, "payments_not_configured", "Checkout is not open yet.");
   }
 }
 

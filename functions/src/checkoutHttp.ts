@@ -3,11 +3,12 @@ import { appCheckError, readHeader, GateError } from "./gate";
 import {
   CheckoutConfig,
   TERMS_VERSION,
+  assertChargeableLivePriceId,
   assertCheckoutConsent,
-  assertStripeTestKey,
+  assertStripeLiveKey,
   buildCheckoutSessionCreateParams,
   checkoutIdempotencyKey,
-  isStripeTestKey,
+  isStripeLiveKey,
 } from "./checkoutConfig";
 import { handleStripeEvent, restorePurchaseForUser, EventDeps } from "./checkoutEvents";
 import { BillingStore, CheckoutLogger, clientStatusForRecord } from "./checkoutTypes";
@@ -211,7 +212,8 @@ export async function handleCreateCheckout(
     if (!config.paymentsEnabled || !config.priceId) {
       throw new GateError(503, "payments_disabled", "Checkout is not open yet.");
     }
-    assertStripeTestKey(deps.secretKey());
+    assertChargeableLivePriceId(config.priceId);
+    assertStripeLiveKey(deps.secretKey());
     const entitlement = await deps.store.readEntitlement(user.uid);
     if (entitlement?.paid) {
       throw new GateError(409, "already_entitled", "This account already has access.");
@@ -275,7 +277,7 @@ export async function handleRestorePurchase(
   }
   try {
     const user = await requireCheckoutUser(req, deps);
-    assertStripeTestKey(deps.secretKey());
+    assertStripeLiveKey(deps.secretKey());
     const gateway = deps.gateway();
     const result = await restorePurchaseForUser(user.uid, {
       ...eventDeps(deps, gateway),
@@ -354,12 +356,12 @@ export async function handleStripeWebhook(
   }
   try {
     const secretKey = deps.secretKey();
-    const gateway = isStripeTestKey(secretKey) ? deps.gateway() : null;
+    const gateway = isStripeLiveKey(secretKey) ? deps.gateway() : null;
     await handleStripeEvent(event, eventDeps(deps, {
       async refundNonUs(paymentIntentId, sessionId) {
         if (!gateway) {
-          const error = new Error("not_test_mode");
-          throw Object.assign(error, { code: "not_test_mode" });
+          const error = new Error("not_live_mode");
+          throw Object.assign(error, { code: "not_live_mode" });
         }
         await gateway.refundNonUs(paymentIntentId, sessionId);
       },

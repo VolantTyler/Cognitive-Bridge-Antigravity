@@ -5,13 +5,18 @@ import { fileURLToPath } from "node:url";
 import Stripe from "stripe";
 import {
   CHECKOUT_CONSENT_REQUIRED,
+  LIVE_PRICE_ID_PLACEHOLDER,
+  RETIRED_TEST_PRICE_ID,
   TERMS_VERSION,
+  assertStripeLiveKey,
   buildCheckoutSessionCreateParams,
   checkoutIdempotencyKey,
-  isStripeTestKey,
+  isChargeableLivePriceId,
+  isStripeLiveKey,
   loadCheckoutConfig,
   termsUrlForBase,
 } from "./checkoutConfig";
+import { createStripeGateway } from "./stripeGateway";
 import { createFirestoreBillingStore } from "./checkoutStore";
 import { handleStripeEvent, restorePurchaseForUser } from "./checkoutEvents";
 import {
@@ -32,6 +37,9 @@ import { GateError } from "./gate";
 
 const testKey = ["sk", "test", "example"].join("_");
 const liveKey = ["sk", "live", "example"].join("_");
+const restrictedLiveKey = ["rk", "live", "example"].join("_");
+const restrictedTestKey = ["rk", "test", "example"].join("_");
+const chargeablePriceId = "price_1ExampleLivePrice000001";
 
 function walk(dir: string): string[] {
   const out: string[] = [];
@@ -215,11 +223,24 @@ describe("checkout session params", () => {
     expect("consent_collection" in params).toBe(false);
   });
 
-  it("refuses a non-https terms URL and live secret keys", () => {
+  it("refuses a non-https terms URL and test secret keys", () => {
     expect(() => termsUrlForBase("http://localhost:3000")).toThrow(GateError);
-    expect(isStripeTestKey(testKey)).toBe(true);
-    expect(isStripeTestKey(liveKey)).toBe(false);
-    expect(isStripeTestKey("")).toBe(false);
+    expect(isStripeLiveKey(liveKey)).toBe(true);
+    expect(isStripeLiveKey(restrictedLiveKey)).toBe(true);
+    expect(isStripeLiveKey(testKey)).toBe(false);
+    expect(isStripeLiveKey(restrictedTestKey)).toBe(false);
+    expect(isStripeLiveKey("")).toBe(false);
+    expect(() => assertStripeLiveKey(testKey)).toThrow(GateError);
+    expect(() => assertStripeLiveKey(restrictedTestKey)).toThrow(GateError);
+    expect(isChargeableLivePriceId(chargeablePriceId)).toBe(true);
+    expect(isChargeableLivePriceId(LIVE_PRICE_ID_PLACEHOLDER)).toBe(false);
+    expect(isChargeableLivePriceId(RETIRED_TEST_PRICE_ID)).toBe(false);
+    expect(isChargeableLivePriceId("price_from_env")).toBe(false);
+    expect(isChargeableLivePriceId("price_REPLACE_ME")).toBe(false);
+    expect(isChargeableLivePriceId("")).toBe(false);
+    expect(() => createStripeGateway(testKey)).toThrow(GateError);
+    expect(() => createStripeGateway(liveKey)).not.toThrow();
+    expect(() => createStripeGateway(restrictedLiveKey)).not.toThrow();
     expect(checkoutIdempotencyKey("uid-1", 15_000)).toBe(checkoutIdempotencyKey("uid-1", 29_999));
     expect(checkoutIdempotencyKey("uid-1", 15_000)).not.toBe(checkoutIdempotencyKey("uid-1", 30_000));
   });
@@ -231,6 +252,8 @@ describe("checkout session params", () => {
       const text = readFileSync(file, "utf8");
       expect(text, file).not.toMatch(/sk_live_[A-Za-z0-9]/);
       expect(text, file).not.toMatch(/sk_test_[A-Za-z0-9]/);
+      expect(text, file).not.toMatch(/rk_live_[A-Za-z0-9]/);
+      expect(text, file).not.toMatch(/rk_test_[A-Za-z0-9]/);
       expect(text, file).not.toMatch(/whsec_[A-Za-z0-9]/);
     }
     const index = readFileSync(path.join(sourceDir, "index.ts"), "utf8");
@@ -289,6 +312,86 @@ describe("stripe webhook", () => {
     expect(JSON.stringify(res.body)).not.toContain("sig_header_value");
     expect(store.entitlementWrites).toBe(0);
     expect(store.events.size).toBe(0);
+  });
+
+  it("refunds a non-US session with a live key and records a failed refund for a test key", async () => {
+    const paid = paidObject({ customer_details: { address: { country: "CA" } } });
+    const event = {
+      id: "evt_ca_live",
+      type: "checkout.session.completed",
+      data: { object: paid },
+    };
+    const liveStore = new MemoryStore();
+    const refundNonUs = vi.fn(async () => undefined);
+    const liveRes = jsonRes();
+    await handleStripeWebhook({
+      method: "POST",
+      rawBody: Buffer.from("{}"),
+      headers: { "stripe-signature": "sig" },
+    }, liveRes, {
+      config: () => ({
+        priceId: chargeablePriceId,
+        baseUrl: "https://cognitive-bridge-ai.web.app",
+        paymentsEnabled: true,
+        managedPayments: true,
+        automaticTax: false,
+      }),
+      secretKey: () => liveKey,
+      webhookSecret: () => "webhook-secret",
+      store: liveStore,
+      verifyIdToken: async () => ({ uid: "uid-1", email: null, email_verified: true }),
+      verifyAppCheck: async () => undefined,
+      enforceAppCheck: () => false,
+      now: () => 0,
+      gateway: () => ({
+        createSession: async () => ({ id: "cs_123", url: null }),
+        refundNonUs,
+        retrieveSession: async () => null,
+        findSucceededSessionIds: async () => [],
+      }),
+      logger: logger(),
+      constructEvent: () => event,
+    });
+    expect(liveRes.code).toBe(200);
+    expect(refundNonUs).toHaveBeenCalledWith("pi_123", "cs_123");
+    expect(liveStore.sessions.get("cs_123")?.outcome).toBe("non_us_refunded");
+    expect(liveStore.entitlementWrites).toBe(0);
+
+    const testStore = new MemoryStore();
+    const testRefund = vi.fn(async () => undefined);
+    const testRes = jsonRes();
+    await handleStripeWebhook({
+      method: "POST",
+      rawBody: Buffer.from("{}"),
+      headers: { "stripe-signature": "sig" },
+    }, testRes, {
+      config: () => ({
+        priceId: chargeablePriceId,
+        baseUrl: "https://cognitive-bridge-ai.web.app",
+        paymentsEnabled: true,
+        managedPayments: true,
+        automaticTax: false,
+      }),
+      secretKey: () => testKey,
+      webhookSecret: () => "webhook-secret",
+      store: testStore,
+      verifyIdToken: async () => ({ uid: "uid-1", email: null, email_verified: true }),
+      verifyAppCheck: async () => undefined,
+      enforceAppCheck: () => false,
+      now: () => 0,
+      gateway: () => ({
+        createSession: async () => ({ id: "cs_123", url: null }),
+        refundNonUs: testRefund,
+        retrieveSession: async () => null,
+        findSucceededSessionIds: async () => [],
+      }),
+      logger: logger(),
+      constructEvent: () => ({ ...event, id: "evt_ca_test" }),
+    });
+    expect(testRes.code).toBe(200);
+    expect(testRefund).not.toHaveBeenCalled();
+    expect(testStore.sessions.get("cs_123")?.outcome).toBe("non_us_refund_failed");
+    expect(testStore.entitlementWrites).toBe(0);
   });
 
   it("ignores a duplicate event after the entitlement is written", async () => {
@@ -467,13 +570,13 @@ describe("createCheckout", () => {
   function deps(store: MemoryStore, overrides: Partial<CheckoutHttpDeps> = {}): CheckoutHttpDeps {
     return {
       config: () => ({
-        priceId: "price_from_env",
+        priceId: chargeablePriceId,
         baseUrl: "https://cognitive-bridge-ai.web.app",
         paymentsEnabled: true,
         managedPayments: false,
         automaticTax: false,
       }),
-      secretKey: () => testKey,
+      secretKey: () => liveKey,
       webhookSecret: () => "webhook-secret",
       store,
       verifyIdToken: async () => ({ uid: "uid-1", email: "ada@example.com", email_verified: true }),
@@ -559,7 +662,7 @@ describe("createCheckout", () => {
     expect(seen).toMatchObject({
       mode: "payment",
       billing_address_collection: "required",
-      line_items: [{ price: "price_from_env", quantity: 1 }],
+      line_items: [{ price: chargeablePriceId, quantity: 1 }],
       managed_payments: { enabled: false },
     });
     expect(seen && typeof seen === "object" && "custom_text" in seen).toBe(false);
@@ -668,28 +771,84 @@ describe("createCheckout", () => {
     expect(loadCheckoutConfig({
       STRIPE_PRICE_ID: "",
       PAYMENTS_ENABLED: "true",
-    })).toMatchObject({ priceId: "", paymentsEnabled: true });
+    })).toMatchObject({ priceId: "", paymentsEnabled: true, managedPayments: true, automaticTax: false });
+    expect(loadCheckoutConfig({
+      STRIPE_PRICE_ID: LIVE_PRICE_ID_PLACEHOLDER,
+      PAYMENTS_ENABLED: "true",
+      STRIPE_MANAGED_PAYMENTS: "true",
+      STRIPE_AUTOMATIC_TAX: "false",
+    })).toMatchObject({
+      priceId: LIVE_PRICE_ID_PLACEHOLDER,
+      paymentsEnabled: true,
+      managedPayments: true,
+      automaticTax: false,
+    });
+    const committed = readFileSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../.env"), "utf8");
+    expect(committed).toContain("STRIPE_PRICE_ID=price_1UeyXmRGeBWlxISlUdgniPm9");
+    expect(isChargeableLivePriceId("price_1UeyXmRGeBWlxISlUdgniPm9")).toBe(true);
+    expect(committed).not.toContain(LIVE_PRICE_ID_PLACEHOLDER);
+    expect(committed).toContain("STRIPE_MANAGED_PAYMENTS=true");
+    expect(committed).toContain("STRIPE_AUTOMATIC_TAX=false");
+    expect(committed).not.toContain(RETIRED_TEST_PRICE_ID);
   });
 
-  it("refuses a live secret key", async () => {
+  it("refuses a test secret key and a price that is not a live Price id", async () => {
     const store = new MemoryStore();
-    const res = jsonRes();
     const createSession = vi.fn();
+    const gateway = () => ({
+      createSession,
+      refundNonUs: async () => undefined,
+      retrieveSession: async () => null,
+      findSucceededSessionIds: async () => [],
+    });
+    const res = jsonRes();
     await handleCreateCheckout({
       method: "POST",
       headers: { authorization: "Bearer token" },
+      body: { termsAccepted: true, termsVersion: TERMS_VERSION },
     }, res, deps(store, {
-      secretKey: () => liveKey,
-      gateway: () => ({
-        createSession,
-        refundNonUs: async () => undefined,
-        retrieveSession: async () => null,
-        findSucceededSessionIds: async () => [],
-      }),
+      secretKey: () => testKey,
+      gateway,
     }));
     expect(res.code).toBe(503);
-    expect(res.body).toMatchObject({ code: "test_mode_only" });
+    expect(res.body).toMatchObject({ code: "live_mode_only" });
     expect(createSession).not.toHaveBeenCalled();
+
+    for (const priceId of [LIVE_PRICE_ID_PLACEHOLDER, RETIRED_TEST_PRICE_ID, "price_from_env", "price_REPLACE_ME"]) {
+      const refused = jsonRes();
+      await handleCreateCheckout({
+        method: "POST",
+        headers: { authorization: "Bearer token" },
+        body: { termsAccepted: true, termsVersion: TERMS_VERSION },
+      }, refused, deps(store, {
+        secretKey: () => liveKey,
+        config: () => ({
+          priceId,
+          baseUrl: "https://cognitive-bridge-ai.web.app",
+          paymentsEnabled: true,
+          managedPayments: true,
+          automaticTax: false,
+        }),
+        gateway,
+      }));
+      expect(refused.code, priceId).toBe(503);
+      expect(refused.body, priceId).toMatchObject({ code: "payments_not_configured" });
+    }
+    expect(createSession).not.toHaveBeenCalled();
+
+    createSession.mockResolvedValue({ id: "cs_rk", url: "https://checkout.stripe.com/c/pay/cs_rk" });
+    const restricted = jsonRes();
+    await handleCreateCheckout({
+      method: "POST",
+      headers: { authorization: "Bearer token" },
+      body: { termsAccepted: true, termsVersion: TERMS_VERSION },
+    }, restricted, deps(store, {
+      secretKey: () => restrictedLiveKey,
+      gateway,
+    }));
+    expect(restricted.code).toBe(200);
+    expect(restricted.body).toEqual({ url: "https://checkout.stripe.com/c/pay/cs_rk" });
+    expect(createSession).toHaveBeenCalledTimes(1);
   });
 
   const openFailed = "Couldn't open checkout. You haven't been charged.";
@@ -705,6 +864,7 @@ describe("createCheckout", () => {
   function secretFree(serialized: string) {
     expect(serialized).not.toContain("ada@example.com");
     expect(serialized).not.toContain("price_from_env");
+    expect(serialized).not.toContain(chargeablePriceId);
     expect(serialized).not.toContain("uid-1");
     expect(serialized).not.toContain("secret-canary");
     expect(serialized).not.toContain("pm_secret");
@@ -966,7 +1126,7 @@ describe("createCheckout", () => {
     await handleCreateCheckout(consentedPost(), res, deps(store, {
       logger: logs,
       config: () => ({
-        priceId: "price_from_env",
+        priceId: chargeablePriceId,
         baseUrl: "https://cognitive-bridge-ai.web.app",
         paymentsEnabled: true,
         managedPayments: true,
