@@ -65,6 +65,8 @@ describe("support email", () => {
         "# Mirror scoring turn only (the reply after the 5th answer). 0 turns thinking off.",
         "# Clamped to 0..8192. Question turns always use budget 0.",
         "MIRROR_FINAL_THINKING_BUDGET=1024",
+        "# Not read by function code. Bump the value to force a deploy that rebinds secret versions.",
+        "SECRET_REBIND=2026-11-23",
         "",
       ].join("\n")
     );
