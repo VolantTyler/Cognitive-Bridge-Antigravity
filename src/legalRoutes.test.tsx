@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { APP_VERSION_LABEL } from "./appVersion";
 import { PrivacyPage, TermsPage } from "./components/LegalPages";
 import { StandaloneRoutes } from "./components/StandaloneRoutes";
-import { SUPPORT_EMAIL } from "./constants/checkoutCopy";
+import { REFUND_REQUEST_HEADING, REFUND_REQUEST_INSTRUCTIONS, SUPPORT_EMAIL } from "./constants/checkoutCopy";
 import { SUPPORT_EMAIL_LINK_CLASS } from "./components/SupportEmailLink";
 import { parseLocation } from "./routes";
 
@@ -32,9 +32,17 @@ describe("legal routes", () => {
     expect(screen.getByText(/you must be 18 or older to buy/i)).toBeInTheDocument();
     expect(screen.queryByText(/Some items in brackets are still being confirmed/)).not.toBeInTheDocument();
     expect(screen.queryByText(/\[.*pending/i)).not.toBeInTheDocument();
-    const support = screen.getByRole("link", { name: SUPPORT_EMAIL });
-    expect(support).toHaveAttribute("href", `mailto:${SUPPORT_EMAIL}`);
-    expect(support.className).toContain(SUPPORT_EMAIL_LINK_CLASS);
+    const supportLinks = screen.getAllByRole("link", { name: SUPPORT_EMAIL });
+    expect(supportLinks.length).toBeGreaterThan(1);
+    for (const support of supportLinks) {
+      expect(support).toHaveAttribute("href", `mailto:${SUPPORT_EMAIL}`);
+      expect(support.className).toContain(SUPPORT_EMAIL_LINK_CLASS);
+    }
+    const refundRequest = screen.getByRole("heading", { name: REFUND_REQUEST_HEADING }).closest("section");
+    expect(refundRequest?.querySelector("p")?.textContent).toBe(
+      `Email ${SUPPORT_EMAIL} ${REFUND_REQUEST_INSTRUCTIONS}`
+    );
+    expect(refundRequest?.querySelector("a")?.getAttribute("href")).toBe(`mailto:${SUPPORT_EMAIL}`);
     expect(screen.getByText("New Jersey law governs these terms.")).toBeInTheDocument();
     expect(screen.getByText(
       "All sales are final, except duplicate charges, charges where you didn't get access, purchases with a billing address outside the US (these are refunded automatically), or where the law requires a refund."

@@ -2,7 +2,12 @@ import { spawnSync } from "node:child_process";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { SUPPORT_EMAIL } from "./checkoutCopy";
+import {
+  NEED_HELP_OR_REFUND,
+  REFUND_REQUEST_HEADING,
+  REFUND_REQUEST_INSTRUCTIONS,
+  SUPPORT_EMAIL,
+} from "./checkoutCopy";
 
 const SUPPORT_ADDRESS = "cos-stahl+cbsupport@mail.grokbot.com";
 
@@ -35,6 +40,17 @@ describe("support email", () => {
       }
     }
     expect(offenders).toEqual([]);
+  });
+
+  it("pins the help and refund-request wording without a second address", () => {
+    expect(NEED_HELP_OR_REFUND).toBe("Need help or a refund?");
+    expect(REFUND_REQUEST_HEADING).toBe("How to request a refund");
+    expect(REFUND_REQUEST_INSTRUCTIONS).toBe(
+      "to request a refund. Include your account email and the date of your purchase."
+    );
+    expect(NEED_HELP_OR_REFUND).not.toContain("@");
+    expect(REFUND_REQUEST_INSTRUCTIONS).not.toContain("@");
+    expect(REFUND_REQUEST_INSTRUCTIONS).not.toContain(SUPPORT_EMAIL);
   });
 
   it("commits functions/.env with the live price and no secrets", () => {

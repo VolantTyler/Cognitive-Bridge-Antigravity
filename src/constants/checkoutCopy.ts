@@ -6,6 +6,15 @@
 
 export const SUPPORT_EMAIL = "cos-stahl+cbsupport@mail.grokbot.com";
 
+/** Lead-in on the footer, paywall, and checkout return. Keep this wording. */
+export const NEED_HELP_OR_REFUND = "Need help or a refund?";
+
+export const REFUND_REQUEST_HEADING = "How to request a refund";
+
+/** Follows "Email <support>" on the Terms page. Does not change the all-sales-final policy. */
+export const REFUND_REQUEST_INSTRUCTIONS =
+  "to request a refund. Include your account email and the date of your purchase.";
+
 export const NON_US_HEADING = "We couldn't complete your purchase";
 
 export const NON_US_REFUNDED_BODY =

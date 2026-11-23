@@ -40,7 +40,7 @@ import {
 import { CheckoutAuthGate, checkoutAuthGate } from "../services/checkoutAuth";
 import AccountAuthPanel from "./AccountAuthPanel";
 import SiteFooter from "./SiteFooter";
-import { withSupportEmail } from "./SupportEmailLink";
+import { NeedHelpOrRefundLine, withSupportEmail } from "./SupportEmailLink";
 
 const POLL_MS = 30_000;
 
@@ -278,6 +278,7 @@ export function CheckoutReturn({
             {BACK_TO_COGNITIVE_BRIDGE}
           </a>
         )}
+        <NeedHelpOrRefundLine className="mt-6 text-sm leading-relaxed text-text-secondary" />
       </main>
       <SiteFooter />
       {signInOpen && (
